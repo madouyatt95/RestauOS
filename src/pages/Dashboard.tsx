@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { useOrderStore } from '../stores/orderStore';
+import { useAuthStore } from '../stores/authStore';
 import { ShoppingBag, Users, Receipt, ArrowDown, Bell, ChevronRight } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router-dom';
@@ -8,6 +9,7 @@ const fmt = (n: number) => n.toLocaleString('fr-FR');
 
 export default function Dashboard() {
   const { getCA, getOrderCount, getClientCount, getAvgTicket, getTopProducts, getCAByDay } = useOrderStore();
+  const { user } = useAuthStore();
   const navigate = useNavigate();
 
   const ca = getCA(0);
@@ -27,8 +29,8 @@ export default function Dashboard() {
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-start mb-6">
         <div>
-          <h1 className="text-xl font-black text-white">Bonjour, Cheikh ! 👋</h1>
-          <p className="text-text-secondary text-xs mt-1">Gérant</p>
+          <h1 className="text-xl font-black text-white">Bonjour, {user?.name.split(' ')[0] || 'Cheikh'} ! 👋</h1>
+          <p className="text-text-secondary text-xs mt-1">{user?.role || 'Gérant'}</p>
         </div>
         <button className="w-10 h-10 rounded-full glass-card flex items-center justify-center relative" onClick={() => navigate('/plus')}>
           <Bell size={18} className="text-text-secondary" />
@@ -124,7 +126,11 @@ export default function Dashboard() {
         <div className="space-y-3">
           {topProducts.slice(0, 3).map((p) => (
             <div key={p.name} className="flex items-center gap-3">
-              <span className="text-2xl w-10 text-center">{p.image}</span>
+              {p.image.startsWith('/') ? (
+                <img src={p.image} alt={p.name} className="w-10 h-10 rounded-xl object-cover shrink-0" />
+              ) : (
+                <span className="text-2xl w-10 text-center shrink-0">{p.image}</span>
+              )}
               <div className="flex-1 min-w-0">
                 <div className="text-white font-semibold text-sm truncate">{p.name}</div>
                 <div className="text-text-tertiary text-[10px]">{p.sales} ventes</div>

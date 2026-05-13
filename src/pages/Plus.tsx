@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuthStore } from '../stores/authStore';
 import {
   User, Building2, CreditCard, Users, Settings, HelpCircle, LogOut,
   ChevronRight, BarChart3, Heart, Truck
@@ -22,18 +23,28 @@ const quickLinks = [
 
 export default function Plus() {
   const navigate = useNavigate();
+  const { user, logout } = useAuthStore();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
 
   return (
     <div className="page-content pt-14 pb-28">
       {/* Profile Card */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
         className="glass-card-lg p-5 flex items-center gap-4 mb-6">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange to-amber-600 flex items-center justify-center text-2xl font-black text-white shadow-[0_4px_20px_rgba(255,138,0,0.3)]">
-          CF
-        </div>
+        {user?.avatar ? (
+          <img src={user.avatar} alt={user.name} className="w-16 h-16 rounded-2xl object-cover shadow-[0_4px_20px_rgba(255,138,0,0.3)]" />
+        ) : (
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange to-amber-600 flex items-center justify-center text-2xl font-black text-white shadow-[0_4px_20px_rgba(255,138,0,0.3)]">
+            {(user?.name || 'Cheikh Fall').split(' ').map(n => n[0]).join('')}
+          </div>
+        )}
         <div className="flex-1">
-          <h2 className="text-white font-bold text-lg">Cheikh Fall</h2>
-          <p className="text-text-secondary text-sm">Gérant</p>
+          <h2 className="text-white font-bold text-lg">{user?.name || 'Cheikh Fall'}</h2>
+          <p className="text-text-secondary text-sm">{user?.role || 'Gérant'}</p>
         </div>
         <button className="w-9 h-9 glass-card rounded-full flex items-center justify-center">
           <Settings size={16} className="text-text-secondary" />
@@ -79,7 +90,7 @@ export default function Plus() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
-        onClick={() => navigate('/')}
+        onClick={handleLogout}
         className="w-full mt-6 py-4 rounded-2xl glass-card flex items-center justify-center gap-2 text-red font-semibold text-sm active:bg-red/5 transition-colors">
         <LogOut size={16} />
         Déconnexion

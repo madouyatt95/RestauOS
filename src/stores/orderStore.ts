@@ -27,13 +27,13 @@ export interface Order {
 }
 
 export const PRODUCTS: Product[] = [
-  { id: 'p1', name: 'Thiéboudienne', price: 5000, category: 'plats', image: '🍛', stock: 30, cost: 2000 },
-  { id: 'p2', name: 'Yassa Poulet', price: 4000, category: 'plats', image: '🍗', stock: 25, cost: 1500 },
-  { id: 'p3', name: 'Mafé Bœuf', price: 4500, category: 'plats', image: '🥘', stock: 20, cost: 1800 },
+  { id: 'p1', name: 'Thiéboudienne', price: 5000, category: 'plats', image: '/images/thieboudienne.png', stock: 30, cost: 2000 },
+  { id: 'p2', name: 'Yassa Poulet', price: 4000, category: 'plats', image: '/images/yassa_poulet.png', stock: 25, cost: 1500 },
+  { id: 'p3', name: 'Mafé Bœuf', price: 4500, category: 'plats', image: '/images/mafe.png', stock: 20, cost: 1800 },
   { id: 'p4', name: 'Thiou Poisson', price: 4000, category: 'plats', image: '🐟', stock: 18, cost: 1600 },
   { id: 'p5', name: 'Dibi Agneau', price: 6000, category: 'plats', image: '🥩', stock: 15, cost: 2500 },
   { id: 'p6', name: 'Pastels', price: 2000, category: 'plats', image: '🥟', stock: 40, cost: 600 },
-  { id: 'p7', name: 'Jus de Bissap', price: 1500, category: 'boissons', image: '🍹', stock: 50, cost: 300 },
+  { id: 'p7', name: 'Jus de Bissap', price: 1500, category: 'boissons', image: '/images/jus_bissap.png', stock: 50, cost: 300 },
   { id: 'p8', name: 'Jus de Bouye', price: 1500, category: 'boissons', image: '🥛', stock: 40, cost: 300 },
   { id: 'p9', name: 'Eau minérale', price: 500, category: 'boissons', image: '💧', stock: 100, cost: 150 },
   { id: 'p10', name: 'Coca-Cola', price: 1000, category: 'boissons', image: '🥤', stock: 60, cost: 400 },

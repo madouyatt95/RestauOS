@@ -89,7 +89,11 @@ export default function Caisse() {
           const qty = getCartQty(p.id);
           return (
             <motion.div key={p.id} layout className="glass-card p-4 flex items-center gap-3">
-              <span className="text-3xl w-12 text-center shrink-0">{p.image}</span>
+              {p.image.startsWith('/') ? (
+                <img src={p.image} alt={p.name} className="w-12 h-12 rounded-xl object-cover shrink-0" />
+              ) : (
+                <span className="text-3xl w-12 text-center shrink-0">{p.image}</span>
+              )}
               <div className="flex-1 min-w-0">
                 <div className="text-white font-semibold text-sm">{p.name}</div>
                 <div className="text-orange font-bold text-sm">{fmt(p.price)} <span className="text-text-tertiary text-[10px] font-normal">FCFA</span></div>
@@ -149,8 +153,15 @@ export default function Caisse() {
               {/* Cart items */}
               <div className="space-y-2 mb-6 max-h-32 overflow-y-auto">
                 {cart.map(c => (
-                  <div key={c.product.id} className="flex justify-between text-sm">
-                    <span className="text-text-secondary">{c.product.image} {c.product.name} x{c.quantity}</span>
+                  <div key={c.product.id} className="flex justify-between items-center text-sm">
+                    <div className="flex items-center gap-2">
+                      {c.product.image.startsWith('/') ? (
+                        <img src={c.product.image} className="w-6 h-6 rounded object-cover" />
+                      ) : (
+                        <span>{c.product.image}</span>
+                      )}
+                      <span className="text-text-secondary">{c.product.name} x{c.quantity}</span>
+                    </div>
                     <span className="text-white font-semibold">{fmt(c.product.price * c.quantity)}</span>
                   </div>
                 ))}

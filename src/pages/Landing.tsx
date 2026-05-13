@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { ShoppingBag, Package, Users, BarChart3, Heart, Truck, ChefHat } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useAuthStore, DEMO_USERS } from '../stores/authStore';
+import { ShoppingBag, Package, Users, BarChart3, Heart, Truck, ChefHat, X } from 'lucide-react';
 
 const modules = [
   { icon: ShoppingBag, label: 'Caisse & Commandes', color: '#FF8A00' },
@@ -13,6 +15,13 @@ const modules = [
 
 export default function Landing() {
   const navigate = useNavigate();
+  const { login } = useAuthStore();
+  const [showLogin, setShowLogin] = useState(false);
+
+  const handleLogin = (user: typeof DEMO_USERS[0]) => {
+    login(user);
+    navigate('/dashboard');
+  };
 
   return (
     <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center px-6 py-12">
@@ -65,10 +74,10 @@ export default function Landing() {
         {/* CTA */}
         <motion.button
           whileTap={{ scale: 0.97 }}
-          onClick={() => navigate('/dashboard')}
+          onClick={() => setShowLogin(true)}
           className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange to-amber-600 text-white font-bold text-lg shadow-[0_8px_32px_rgba(255,138,0,0.35)] active:shadow-[0_4px_16px_rgba(255,138,0,0.25)] transition-shadow"
         >
-          Commencer
+          Se connecter
         </motion.button>
       </motion.div>
 
@@ -90,6 +99,42 @@ export default function Landing() {
           </div>
         ))}
       </motion.div>
+
+      {/* Login Modal */}
+      <AnimatePresence>
+        {showLogin && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setShowLogin(false)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25 }}
+              className="modal-sheet relative" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <button onClick={() => setShowLogin(false)} className="absolute top-4 right-4 text-text-tertiary">
+                <X size={20} />
+              </button>
+              <h3 className="text-white font-bold text-lg mb-2">Comptes de démonstration</h3>
+              <p className="text-text-secondary text-sm mb-6">Sélectionnez un profil pour vous connecter d'un simple clic.</p>
+              
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                {DEMO_USERS.map((user) => (
+                  <button key={user.id} onClick={() => handleLogin(user)}
+                    className="glass-card p-4 flex flex-col items-center gap-3 active:border-orange/30 transition-colors">
+                    {user.avatar ? (
+                      <img src={user.avatar} alt={user.name} className="w-12 h-12 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-violet to-blue flex items-center justify-center text-white font-black text-lg">
+                        {user.name.split(' ').map(n => n[0]).join('')}
+                      </div>
+                    )}
+                    <div className="text-center">
+                      <div className="text-white text-xs font-bold">{user.name}</div>
+                      <div className="text-text-tertiary text-[10px] mt-0.5">{user.role}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
