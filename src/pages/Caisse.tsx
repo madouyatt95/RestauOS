@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOrderStore, PRODUCTS } from '../stores/orderStore';
 import { useStockStore } from '../stores/stockStore';
-import { Search, Plus, Minus, ShoppingCart, Check, CreditCard, Smartphone, Banknote, Wallet, Bell } from 'lucide-react';
+import { Search, Plus, Minus, ShoppingCart, Check, CreditCard, Smartphone, Banknote, Wallet, Bell, Mic, Wifi } from 'lucide-react';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 const categories = ['Tout', 'Plats', 'Boissons', 'Desserts'] as const;
@@ -21,6 +21,26 @@ export default function Caisse() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [splitCount, setSplitCount] = useState(1);
   const [showUpsell, setShowUpsell] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceText, setVoiceText] = useState('');
+  const [showSoftPOS, setShowSoftPOS] = useState(false);
+
+  const handleVoiceOrder = () => {
+    setIsListening(true);
+    setVoiceText('Écoute en cours...');
+    
+    setTimeout(() => {
+      setVoiceText('Deux Thiéboudienne poisson, un sans piment, et trois Bissap...');
+    }, 1500);
+
+    setTimeout(() => {
+      const thieb = PRODUCTS.find(p => p.name.includes('Thiéboudienne'));
+      const bissap = PRODUCTS.find(p => p.name.includes('Bissap'));
+      if (thieb) { addToCart(thieb); addToCart(thieb); }
+      if (bissap) { addToCart(bissap); addToCart(bissap); addToCart(bissap); }
+      setIsListening(false);
+    }, 3500);
+  };
 
   const handleAddToCart = (p: typeof PRODUCTS[0]) => {
     addToCart(p);
@@ -44,10 +64,21 @@ export default function Caisse() {
   const getCartQty = (id: string) => cart.find(c => c.product.id === id)?.quantity || 0;
 
   const handleCheckout = (payment: 'especes' | 'wave' | 'orange_money' | 'carte') => {
-    const newOrder = checkout(payment);
-    if (newOrder) {
-      consumeStockForOrder(newOrder.items, newOrder.id);
+    if (payment === 'carte') {
+      setShowPayment(false);
+      setShowSoftPOS(true);
+      setTimeout(() => {
+        setShowSoftPOS(false);
+        finalizeOrder(payment);
+      }, 4000);
+      return;
     }
+    finalizeOrder(payment);
+  };
+
+  const finalizeOrder = (payment: 'especes' | 'wave' | 'orange_money' | 'carte') => {
+    const newOrder = checkout(payment);
+    if (newOrder) consumeStockForOrder(newOrder.items, newOrder.id);
     setShowPayment(false);
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 2500);
@@ -136,6 +167,28 @@ export default function Caisse() {
         })}
       </div>
 
+      {/* Voice AI FAB */}
+      <button onClick={handleVoiceOrder}
+        className="fixed bottom-24 right-4 w-14 h-14 rounded-full bg-gradient-to-r from-violet to-fuchsia-600 shadow-[0_4px_20px_rgba(139,92,246,0.5)] flex items-center justify-center active:scale-95 transition-transform z-[9997]">
+        <Mic size={24} className="text-white" />
+      </button>
+
+      {/* Voice AI Modal */}
+      <AnimatePresence>
+        {isListening && (
+          <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-0 left-0 right-0 z-[10003] glass-card-lg p-6 border-t border-violet/30 flex flex-col items-center">
+            <div className="w-16 h-16 rounded-full bg-violet/20 flex items-center justify-center mb-4">
+              <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1.5 }}>
+                <Mic size={32} className="text-violet" />
+              </motion.div>
+            </div>
+            <p className="text-white font-bold text-center text-lg">{voiceText}</p>
+            <p className="text-text-tertiary text-xs mt-2 uppercase tracking-widest font-black text-center">IA Vocale RestauOS</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Cart Bar */}
       {cartCount > 0 && (
         <motion.div
@@ -206,7 +259,7 @@ export default function Caisse() {
                   { key: 'especes' as const, label: 'Espèces', icon: Banknote, color: '#22C55E' },
                   { key: 'wave' as const, label: 'Wave', icon: Smartphone, color: '#3B82F6' },
                   { key: 'orange_money' as const, label: 'Orange Money', icon: Wallet, color: '#FF8A00' },
-                  { key: 'carte' as const, label: 'Carte bancaire', icon: CreditCard, color: '#8B5CF6' },
+                  { key: 'carte' as const, label: 'Tap-to-Pay (SoftPOS)', icon: CreditCard, color: '#8B5CF6' },
                 ].map(pm => (
                   <motion.button key={pm.key} whileTap={{ scale: 0.95 }}
                     onClick={() => handleCheckout(pm.key)}
@@ -241,6 +294,27 @@ export default function Caisse() {
               className="text-white text-xl font-bold">Paiement confirmé !</motion.p>
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
               className="text-text-secondary text-sm mt-2">Ticket généré avec succès</motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* SoftPOS Animation */}
+      <AnimatePresence>
+        {showSoftPOS && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[10002] bg-[#0a0f1a] flex flex-col items-center justify-center p-6 text-center">
+            <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 2 }}
+              className="w-32 h-32 rounded-full border-4 border-violet/30 flex items-center justify-center mb-8 relative">
+              <div className="absolute inset-0 rounded-full border-4 border-violet/10 scale-150 animate-ping" />
+              <Wifi size={48} className="text-violet" />
+            </motion.div>
+            <h2 className="text-white font-black text-2xl mb-2">Tap-to-Pay</h2>
+            <p className="text-text-secondary text-sm mb-8">Veuillez approcher la carte bancaire du client au dos de votre téléphone.</p>
+            <div className="glass-card p-4 rounded-2xl w-full max-w-xs flex justify-between items-center">
+              <span className="text-text-secondary text-sm">Montant à régler</span>
+              <span className="text-white font-black text-xl">{fmt(cartTotal)} <span className="text-xs">FCFA</span></span>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
