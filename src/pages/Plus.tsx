@@ -7,7 +7,7 @@ import { useThemeStore } from '../stores/themeStore';
 import {
   User, Building2, CreditCard, Users, Settings, HelpCircle, LogOut,
   ChevronRight, BarChart3, Heart, Truck, QrCode, X, Database,
-  Bell, Tag, Sun, Moon, Palette, Check, AlertCircle, ShoppingBag, Star, Trash2, Edit2
+  Bell, Tag, Sun, Moon, Palette, Check, AlertCircle, ShoppingBag, Star, Trash2, Edit2, MessageCircle
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useState } from 'react';
@@ -112,6 +112,7 @@ export default function Plus() {
                 { icon: Users, label: 'Utilisateurs', color: '#06B6D4' },
                 { icon: QrCode, label: 'Générer QR Menu', color: '#8B5CF6', action: 'qr' },
                 { icon: Database, label: 'Connecteur ERP', color: '#3B82F6', action: 'erp' },
+                { icon: MessageCircle, label: 'Bot WhatsApp', color: '#25D366', path: '/whatsapp-bot' },
               ] : []),
               { icon: Users, label: 'Personnel & Plannings', color: '#EC4899', path: '/personnel' },
               { icon: HelpCircle, label: 'Aide & Support', color: '#F59E0B' },

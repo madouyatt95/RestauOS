@@ -4,6 +4,8 @@ import { useOrderStore, PRODUCTS } from '../stores/orderStore';
 import { useTableStore, type Table } from '../stores/tableStore';
 import { useAuthStore } from '../stores/authStore';
 import { useReservationStore, type Reservation } from '../stores/reservationStore';
+import { useClientStore } from '../stores/clientStore';
+import { useNotificationStore } from '../stores/notificationStore';
 import { Search, ShoppingCart, X, ChefHat, Calendar, UserPlus, Phone, Plus, Minus, Trash2, Layout, Layers, Map as MapIcon, User, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -90,6 +92,8 @@ export default function Commandes() {
   const { cart, addToCart, updateQuantity, clearCart, checkout } = useOrderStore();
   const { tables, updateTableStatus, updateTablePosition, updateTableCapacity, updateTableFloor } = useTableStore();
   const { reservations, updateStatus, addReservation } = useReservationStore();
+  const { clients } = useClientStore();
+  const { addNotification } = useNotificationStore();
   const { user } = useAuthStore();
   
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
@@ -136,6 +140,22 @@ export default function Commandes() {
       if (t.status !== 'libre') return;
       updateStatus(assigningRes.id, 'confirmed', t.id);
       updateTableStatus(t.id, 'reservee');
+
+      // VIP Alert: check if client is Gold or Platinum
+      const vipClient = clients.find(c => 
+        c.name.toLowerCase() === assigningRes.clientName.toLowerCase() &&
+        (c.tier === 'gold' || c.tier === 'platinum')
+      );
+      if (vipClient) {
+        const tierLabel = vipClient.tier === 'platinum' ? 'Platinum 💎' : 'Gold ⭐';
+        addNotification({
+          title: `⭐ Alerte VIP — Table ${t.number}`,
+          message: `${vipClient.name} (${tierLabel}) vient de s'installer. ${vipClient.visits} visites, ${vipClient.points} pts.`,
+          type: 'order',
+          targetRole: 'Serveur',
+        });
+      }
+
       setAssigningRes(null);
       return;
     }

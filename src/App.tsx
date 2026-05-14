@@ -21,6 +21,7 @@ import Review from './pages/Review';
 import Onboarding from './pages/Onboarding';
 import MenuBuilder from './pages/MenuBuilder';
 import Factures from './pages/Factures';
+import WhatsAppBot from './pages/WhatsAppBot';
 import { useThemeStore } from './stores/themeStore';
 import { useEffect } from 'react';
 import './index.css';
@@ -80,6 +81,9 @@ function AppContent() {
           } />
           <Route path="/factures" element={
             <ProtectedRoute allowedRoles={['Admin', 'Gérant']}><Factures /></ProtectedRoute>
+          } />
+          <Route path="/whatsapp-bot" element={
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant']}><WhatsAppBot /></ProtectedRoute>
           } />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

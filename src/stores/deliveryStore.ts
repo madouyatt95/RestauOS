@@ -16,6 +16,7 @@ export interface Delivery {
   status: 'preparation' | 'en_route' | 'livre';
   estimatedTime: number; // minutes
   createdAt: string;
+  routeGroupId?: string;
 }
 
 interface DeliveryState {
@@ -23,6 +24,8 @@ interface DeliveryState {
   addDelivery: (d: Omit<Delivery, 'id'>) => void;
   updateStatus: (id: string, status: Delivery['status']) => void;
   updatePaymentStatus: (id: string, status: Delivery['paymentStatus']) => void;
+  groupDeliveries: (ids: string[]) => void;
+  ungroupDelivery: (id: string) => void;
 }
 
 export const useDeliveryStore = create<DeliveryState>()(
@@ -45,6 +48,15 @@ export const useDeliveryStore = create<DeliveryState>()(
       })),
       updatePaymentStatus: (id, paymentStatus) => set((s) => ({
         deliveries: s.deliveries.map(d => d.id === id ? { ...d, paymentStatus } : d)
+      })),
+      groupDeliveries: (ids) => {
+        const groupId = `grp-${Date.now()}`;
+        set((s) => ({
+          deliveries: s.deliveries.map(d => ids.includes(d.id) ? { ...d, routeGroupId: groupId } : d)
+        }));
+      },
+      ungroupDelivery: (id) => set((s) => ({
+        deliveries: s.deliveries.map(d => d.id === id ? { ...d, routeGroupId: undefined } : d)
       })),
     }),
     { name: 'restauos-deliveries' }

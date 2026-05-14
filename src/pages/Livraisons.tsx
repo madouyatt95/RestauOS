@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDeliveryStore, type Delivery } from '../stores/deliveryStore';
 import { useAuthStore } from '../stores/authStore';
-import { MapPin, Clock, Truck, Check, ChefHat, Phone, Navigation, Wallet, X } from 'lucide-react';
+import { MapPin, Clock, Truck, Check, ChefHat, Phone, Navigation, Wallet, X, Link2 } from 'lucide-react';
 
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -23,12 +23,14 @@ const statusConfig = {
 };
 
 export default function Livraisons() {
-  const { deliveries, updateStatus, updatePaymentStatus } = useDeliveryStore();
+  const { deliveries, updateStatus, updatePaymentStatus, groupDeliveries } = useDeliveryStore();
   const { user } = useAuthStore();
   const [selected, setSelected] = useState<Delivery | null>(null);
   const [showSignature, setShowSignature] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [optimized, setOptimized] = useState(false);
+  const [poolingMode, setPoolingMode] = useState(false);
+  const [poolSelection, setPoolSelection] = useState<string[]>([]);
 
   const isGerant = ['Admin', 'Gérant'].includes(user?.role || '');
 
@@ -76,6 +78,14 @@ export default function Livraisons() {
             className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg ${optimized ? 'bg-green text-white shadow-green/20' : 'bg-white/10 text-white border border-white/10'}`}
           >
             {isOptimizing ? 'Calcul...' : optimized ? 'Optimisé ✓' : 'Optimiser'}
+          </button>
+        )}
+        {isGerant && enCours.length > 1 && (
+          <button
+            onClick={() => { setPoolingMode(!poolingMode); setPoolSelection([]); }}
+            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg ${poolingMode ? 'bg-blue text-white shadow-blue/20' : 'bg-white/10 text-white border border-white/10'}`}
+          >
+            {poolingMode ? 'Annuler' : '🛣️ Mutualiser'}
           </button>
         )}
       </div>
@@ -133,13 +143,38 @@ export default function Livraisons() {
             <h3 className="text-white/60 font-black text-[10px] uppercase tracking-[0.2em]">En cours de traitement</h3>
             <span className="text-orange font-black text-xs">{enCours.length} Commandes</span>
           </div>
+
+          {/* Pooling Action Bar */}
+          {poolingMode && poolSelection.length >= 2 && (
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
+              <button onClick={() => { groupDeliveries(poolSelection); setPoolingMode(false); setPoolSelection([]); }}
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue to-cyan-500 text-white font-black text-sm flex items-center justify-center gap-3 shadow-xl shadow-blue/20 active:scale-95 transition-transform">
+                <Link2 size={18} />
+                Créer Combo Route ({poolSelection.length} courses)
+              </button>
+            </motion.div>
+          )}
+
           <div className="space-y-4">
             {enCours.map(d => {
               const cfg = statusConfig[d.status];
               return (
-                <motion.div key={d.id} layout className="glass-card p-5 border-white/5 active:scale-98 transition-all" onClick={() => setSelected(d)}>
+                <motion.div key={d.id} layout className={`glass-card p-5 border-white/5 active:scale-98 transition-all ${d.routeGroupId ? 'border-l-4 border-l-blue' : ''} ${poolSelection.includes(d.id) ? 'ring-2 ring-blue' : ''}`}
+                  onClick={() => {
+                    if (poolingMode) {
+                      setPoolSelection(prev => prev.includes(d.id) ? prev.filter(id => id !== d.id) : [...prev, d.id]);
+                    } else {
+                      setSelected(d);
+                    }
+                  }}
+                >
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center gap-4">
+                      {poolingMode && (
+                        <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${poolSelection.includes(d.id) ? 'bg-blue border-blue text-white' : 'border-white/20 text-transparent'}`}>
+                          <Check size={14} />
+                        </div>
+                      )}
                       <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border border-white/5" style={{ background: cfg.bg }}>
                         <cfg.icon size={22} style={{ color: cfg.color }} />
                       </div>
@@ -148,6 +183,11 @@ export default function Livraisons() {
                         <div className="flex items-center gap-1.5 text-text-tertiary text-[10px] font-bold uppercase mt-0.5">
                           <MapPin size={10} /> {d.address}
                         </div>
+                        {d.routeGroupId && (
+                          <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-blue/10 text-blue text-[9px] font-black uppercase tracking-widest">
+                            <Link2 size={9} /> Combo Route
+                          </span>
+                        )}
                       </div>
                     </div>
                     <span className="text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-sm" style={{ color: cfg.color, background: cfg.bg }}>
