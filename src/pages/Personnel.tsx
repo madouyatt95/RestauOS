@@ -48,13 +48,13 @@ export default function Personnel() {
   const weekDates = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
   const todayStr = new Date().toISOString().split('T')[0];
 
-  const getShift = (empId: string, date: string) => {
-    return shifts.find(s => s.employeeId === empId && s.date === date);
+  const getShifts = (empId: string, date: string) => {
+    return shifts.filter(s => s.employeeId === empId && s.date === date);
   };
 
-  // Get today's shift for an employee (used in Presences tab)
-  const getTodayShift = (empId: string) => {
-    return shifts.find(s => s.employeeId === empId && s.date === todayStr);
+  // Get today's shifts for an employee (used in Presences tab)
+  const getTodayShifts = (empId: string) => {
+    return shifts.filter(s => s.employeeId === empId && s.date === todayStr);
   };
 
   const weekLabel = useMemo(() => {
@@ -146,32 +146,39 @@ export default function Personnel() {
                     </div>
                   </div>
                   {weekDates.map(d => {
-                    const shift = getShift(emp.id, d.date);
-                    const cfg = shift ? shiftConfig[shift.type] : null;
+                    const dayShifts = getShifts(emp.id, d.date);
                     return (
-                      <div key={d.date} className={`flex-1 mx-0.5 rounded-xl min-h-[52px] flex items-center justify-center transition-all ${d.isToday ? 'ring-1 ring-orange/20' : ''}`}>
-                        {shift && cfg ? (
-                          <motion.button
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="w-full h-full rounded-xl flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform relative group"
-                            style={{ background: cfg.bg }}
-                            onClick={() => {
-                              if (isManager && confirm(`Supprimer le service ${cfg.label} de ${emp.name} ?`)) {
-                                removeShift(shift.id);
-                              }
-                            }}
-                          >
-                            <cfg.icon size={14} style={{ color: cfg.color }} />
-                            <span className="text-[8px] font-black uppercase tracking-wider" style={{ color: cfg.color }}>{cfg.short}</span>
-                          </motion.button>
-                        ) : (
+                      <div key={d.date} className={`flex-1 mx-0.5 rounded-xl min-h-[52px] flex flex-col items-center justify-center gap-0.5 p-0.5 transition-all ${d.isToday ? 'ring-1 ring-orange/20' : ''}`}>
+                        {dayShifts.map(shift => {
+                          const cfg = shiftConfig[shift.type];
+                          return (
+                            <motion.button
+                              key={shift.id}
+                              initial={{ scale: 0.8, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              className="w-full rounded-lg flex items-center justify-center gap-1 py-1.5 active:scale-95 transition-transform"
+                              style={{ background: cfg.bg }}
+                              onClick={() => {
+                                if (isManager && confirm(`Supprimer le service ${cfg.label} de ${emp.name} ?`)) {
+                                  removeShift(shift.id);
+                                }
+                              }}
+                            >
+                              <cfg.icon size={10} style={{ color: cfg.color }} />
+                              <span className="text-[7px] font-black uppercase" style={{ color: cfg.color }}>{cfg.short}</span>
+                            </motion.button>
+                          );
+                        })}
+                        {isManager && dayShifts.length < 2 && (
                           <button
-                            onClick={() => { if (isManager) setAddingShift({ empId: emp.id, date: d.date }); }}
-                            className={`w-full h-full rounded-xl border border-dashed flex items-center justify-center transition-all ${isManager ? 'border-white/10 hover:border-orange/40 hover:bg-orange/5 cursor-pointer' : 'border-white/5 cursor-default'}`}
+                            onClick={() => setAddingShift({ empId: emp.id, date: d.date })}
+                            className="w-full flex-1 min-h-[20px] rounded-lg border border-dashed border-white/10 flex items-center justify-center hover:border-orange/40 hover:bg-orange/5 transition-all"
                           >
-                            {isManager && <Plus size={12} className="text-white/20" />}
+                            <Plus size={10} className="text-white/20" />
                           </button>
+                        )}
+                        {!isManager && dayShifts.length === 0 && (
+                          <div className="w-full flex-1 min-h-[20px] rounded-lg border border-dashed border-white/5" />
                         )}
                       </div>
                     );
@@ -207,8 +214,7 @@ export default function Personnel() {
           </div>
           {employees.map(emp => {
             const sc = statusConfig[emp.status];
-            const todayShift = getTodayShift(emp.id);
-            const sCfg = todayShift ? shiftConfig[todayShift.type] : null;
+            const todayShifts = getTodayShifts(emp.id);
             return (
               <motion.div key={emp.id} layout className="glass-card p-4 flex items-center gap-4 border-white/5 active:scale-98 transition-all" onClick={() => setSelectedEmp(emp)}>
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-white/10 to-transparent flex items-center justify-center text-2xl border border-white/5 shadow-inner">
@@ -217,11 +223,17 @@ export default function Personnel() {
                 <div className="flex-1 min-w-0">
                   <h4 className="text-white font-black text-sm">{emp.name}</h4>
                   <p className="text-text-tertiary text-[10px] font-bold uppercase">{emp.role}</p>
-                  {/* Show today's planned shift */}
-                  {sCfg ? (
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <sCfg.icon size={10} style={{ color: sCfg.color }} />
-                      <span className="text-[9px] font-bold" style={{ color: sCfg.color }}>{sCfg.label} · {todayShift!.hours}</span>
+                  {todayShifts.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {todayShifts.map(ts => {
+                        const tc = shiftConfig[ts.type];
+                        return (
+                          <div key={ts.id} className="flex items-center gap-1 px-2 py-0.5 rounded-md" style={{ background: tc.bg }}>
+                            <tc.icon size={9} style={{ color: tc.color }} />
+                            <span className="text-[8px] font-black uppercase" style={{ color: tc.color }}>{tc.short} {ts.hours}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <span className="text-[9px] font-bold text-text-tertiary mt-1 block">Pas de service aujourd'hui</span>
@@ -360,17 +372,23 @@ export default function Personnel() {
                 <p className="text-orange font-bold text-xs uppercase tracking-widest">{selectedEmp.role}</p>
               </div>
 
-              {/* Show today's shift info in the modal */}
+              {/* Show today's shifts info in the modal */}
               {(() => {
-                const ts = getTodayShift(selectedEmp.id);
-                const tc = ts ? shiftConfig[ts.type] : null;
-                return tc ? (
-                  <div className="flex items-center gap-3 px-4 py-3 rounded-2xl mb-6" style={{ background: tc.bg }}>
-                    <tc.icon size={18} style={{ color: tc.color }} />
-                    <div>
-                      <span className="text-white font-bold text-xs block">{tc.label}</span>
-                      <span className="text-text-tertiary text-[10px]">{ts!.hours}</span>
-                    </div>
+                const todayS = getTodayShifts(selectedEmp.id);
+                return todayS.length > 0 ? (
+                  <div className="space-y-2 mb-6">
+                    {todayS.map(ts => {
+                      const tc = shiftConfig[ts.type];
+                      return (
+                        <div key={ts.id} className="flex items-center gap-3 px-4 py-3 rounded-2xl" style={{ background: tc.bg }}>
+                          <tc.icon size={18} style={{ color: tc.color }} />
+                          <div>
+                            <span className="text-white font-bold text-xs block">{tc.label}</span>
+                            <span className="text-text-tertiary text-[10px]">{ts.hours}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="flex items-center gap-3 px-4 py-3 rounded-2xl mb-6 bg-white/5">
