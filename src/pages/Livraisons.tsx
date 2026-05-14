@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDeliveryStore, type Delivery } from '../stores/deliveryStore';
+import { useAuthStore } from '../stores/authStore';
 import { MapPin, Clock, Truck, Check, ChefHat, Package } from 'lucide-react';
 
 const statusConfig = {
@@ -11,10 +12,15 @@ const statusConfig = {
 
 export default function Livraisons() {
   const { deliveries, updateStatus } = useDeliveryStore();
+  const { user } = useAuthStore();
   const [selected, setSelected] = useState<Delivery | null>(null);
 
-  const enCours = deliveries.filter(d => d.status !== 'livre');
-  const terminees = deliveries.filter(d => d.status === 'livre');
+  const filteredDeliveries = user?.role === 'Livreur' 
+    ? deliveries.filter(d => d.driverName === user.name)
+    : deliveries;
+
+  const enCours = filteredDeliveries.filter(d => d.status !== 'livre');
+  const terminees = filteredDeliveries.filter(d => d.status === 'livre');
 
   return (
     <div className="page-content pt-14 pb-28">

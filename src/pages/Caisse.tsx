@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOrderStore, PRODUCTS } from '../stores/orderStore';
-import { Search, Plus, Minus, ShoppingCart, Check, CreditCard, Smartphone, Banknote, Wallet } from 'lucide-react';
+import { useStockStore } from '../stores/stockStore';
+import { Search, Plus, Minus, ShoppingCart, Check, CreditCard, Smartphone, Banknote, Wallet, Bell } from 'lucide-react';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 const categories = ['Tout', 'Plats', 'Boissons', 'Desserts'] as const;
@@ -13,6 +14,7 @@ const orderTypes = [
 
 export default function Caisse() {
   const { cart, orderType, addToCart, updateQuantity, clearCart, setOrderType, checkout } = useOrderStore();
+  const { consumeStockForOrder } = useStockStore();
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState<string>('Tout');
   const [showPayment, setShowPayment] = useState(false);
@@ -29,7 +31,10 @@ export default function Caisse() {
   const getCartQty = (id: string) => cart.find(c => c.product.id === id)?.quantity || 0;
 
   const handleCheckout = (payment: 'especes' | 'wave' | 'orange_money' | 'carte') => {
-    checkout(payment);
+    const newOrder = checkout(payment);
+    if (newOrder) {
+      consumeStockForOrder(newOrder.items, newOrder.id);
+    }
     setShowPayment(false);
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 2500);
@@ -213,8 +218,4 @@ export default function Caisse() {
       </AnimatePresence>
     </div>
   );
-}
-
-function Bell({ size, className }: { size: number; className: string }) {
-  return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>;
 }

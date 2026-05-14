@@ -27,6 +27,7 @@ interface StockState {
   updateStock: (id: string, quantity: number) => void;
   addMovement: (movement: Omit<StockMovement, 'id'>) => void;
   getLowStockItems: () => StockItem[];
+  consumeStockForOrder: (items: any[], orderId: string) => void;
 }
 
 export const useStockStore = create<StockState>()(
@@ -76,6 +77,47 @@ export const useStockStore = create<StockState>()(
       }),
 
       getLowStockItems: () => get().items.filter(i => i.quantity <= i.minStock),
+
+      consumeStockForOrder: (orderItems, orderId) => {
+        const state = get();
+        const newMovements: StockMovement[] = [];
+        let updatedItems = [...state.items];
+
+        orderItems.forEach(cartItem => {
+          const product = cartItem.product;
+          if (product.recipe && product.recipe.length > 0) {
+            product.recipe.forEach((ingredient: any) => {
+              const totalAmount = ingredient.amount * cartItem.quantity;
+              
+              const stockItemIndex = updatedItems.findIndex(i => i.id === ingredient.stockItemId);
+              if (stockItemIndex !== -1) {
+                const item = updatedItems[stockItemIndex];
+                updatedItems[stockItemIndex] = {
+                  ...item,
+                  quantity: Math.max(0, item.quantity - totalAmount)
+                };
+
+                newMovements.push({
+                  id: `m-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                  itemId: item.id,
+                  itemName: item.name,
+                  type: 'sortie',
+                  quantity: totalAmount,
+                  date: new Date().toISOString(),
+                  note: `Commande ${orderId}`
+                });
+              }
+            });
+          }
+        });
+
+        if (newMovements.length > 0) {
+          set({
+            items: updatedItems,
+            movements: [...newMovements, ...state.movements]
+          });
+        }
+      },
     }),
     { name: 'restauos-stocks' }
   )

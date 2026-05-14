@@ -52,23 +52,29 @@ export default function Plus() {
       </motion.div>
 
       {/* Quick Links */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        {quickLinks.map((link, i) => (
-          <motion.button key={link.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 + i * 0.05 }}
-            onClick={() => navigate(link.path)}
-            className="glass-card p-4 flex flex-col items-center gap-2 active:border-orange/30 transition-colors">
-            <link.icon size={22} style={{ color: link.color }} />
-            <span className="text-white text-xs font-semibold">{link.label}</span>
-          </motion.button>
-        ))}
-      </div>
+      {['Admin', 'Gérant'].includes(user?.role || '') && (
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          {quickLinks.map((link, i) => (
+            <motion.button key={link.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 + i * 0.05 }}
+              onClick={() => navigate(link.path)}
+              className="glass-card p-4 flex flex-col items-center gap-2 active:border-orange/30 transition-colors">
+              <link.icon size={22} style={{ color: link.color }} />
+              <span className="text-white text-xs font-semibold">{link.label}</span>
+            </motion.button>
+          ))}
+        </div>
+      )}
 
       {/* Menu Items */}
       <div className="glass-card-lg overflow-hidden">
-        {menuItems.map((item, i) => (
+        {menuItems.map((item, i) => {
+          if (!['Admin', 'Gérant'].includes(user?.role || '') && ['Utilisateurs', 'Abonnements', 'Mon restaurant'].includes(item.label)) {
+            return null;
+          }
+          return (
           <motion.button key={item.label}
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
@@ -82,7 +88,8 @@ export default function Plus() {
             <span className="text-white font-medium text-sm flex-1 text-left">{item.label}</span>
             <ChevronRight size={16} className="text-text-tertiary" />
           </motion.button>
-        ))}
+          );
+        })}
       </div>
 
       {/* Logout */}

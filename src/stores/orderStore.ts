@@ -9,6 +9,7 @@ export interface Product {
   image: string;
   stock: number;
   cost: number;
+  recipe?: { stockItemId: string; amount: number }[];
 }
 
 export interface CartItem {
@@ -24,16 +25,29 @@ export interface Order {
   payment: 'especes' | 'wave' | 'orange_money' | 'carte';
   date: string;
   clientId?: string;
+  status: 'en_attente' | 'pret' | 'servi';
 }
 
 export const PRODUCTS: Product[] = [
-  { id: 'p1', name: 'Thiéboudienne', price: 5000, category: 'plats', image: '/images/thieboudienne.png', stock: 30, cost: 2000 },
-  { id: 'p2', name: 'Yassa Poulet', price: 4000, category: 'plats', image: '/images/yassa_poulet.png', stock: 25, cost: 1500 },
-  { id: 'p3', name: 'Mafé Bœuf', price: 4500, category: 'plats', image: '/images/mafe.png', stock: 20, cost: 1800 },
+  { 
+    id: 'p1', name: 'Thiéboudienne', price: 5000, category: 'plats', image: '/images/thieboudienne.png', stock: 30, cost: 2000,
+    recipe: [{ stockItemId: 's1', amount: 0.2 }, { stockItemId: 's2', amount: 0.1 }, { stockItemId: 's6', amount: 0.3 }]
+  },
+  { 
+    id: 'p2', name: 'Yassa Poulet', price: 4000, category: 'plats', image: '/images/yassa_poulet.png', stock: 25, cost: 1500,
+    recipe: [{ stockItemId: 's1', amount: 0.2 }, { stockItemId: 's4', amount: 0.3 }, { stockItemId: 's5', amount: 0.3 }]
+  },
+  { 
+    id: 'p3', name: 'Mafé Bœuf', price: 4500, category: 'plats', image: '/images/mafe.png', stock: 20, cost: 1800,
+    recipe: [{ stockItemId: 's1', amount: 0.2 }, { stockItemId: 's3', amount: 0.1 }]
+  },
   { id: 'p4', name: 'Thiou Poisson', price: 4000, category: 'plats', image: '🐟', stock: 18, cost: 1600 },
   { id: 'p5', name: 'Dibi Agneau', price: 6000, category: 'plats', image: '🥩', stock: 15, cost: 2500 },
   { id: 'p6', name: 'Pastels', price: 2000, category: 'plats', image: '🥟', stock: 40, cost: 600 },
-  { id: 'p7', name: 'Jus de Bissap', price: 1500, category: 'boissons', image: '/images/jus_bissap.png', stock: 50, cost: 300 },
+  { 
+    id: 'p7', name: 'Jus de Bissap', price: 1500, category: 'boissons', image: '/images/jus_bissap.png', stock: 50, cost: 300,
+    recipe: [{ stockItemId: 's9', amount: 0.05 }, { stockItemId: 's10', amount: 0.05 }]
+  },
   { id: 'p8', name: 'Jus de Bouye', price: 1500, category: 'boissons', image: '🥛', stock: 40, cost: 300 },
   { id: 'p9', name: 'Eau minérale', price: 500, category: 'boissons', image: '💧', stock: 100, cost: 150 },
   { id: 'p10', name: 'Coca-Cola', price: 1000, category: 'boissons', image: '🥤', stock: 60, cost: 400 },
@@ -69,6 +83,7 @@ const generateOrders = (): Order[] => {
         type: types[Math.floor(Math.random() * types.length)],
         payment: payments[Math.floor(Math.random() * payments.length)],
         date: day.toISOString(),
+        status: 'servi'
       });
     }
   }
@@ -84,8 +99,9 @@ interface OrderState {
   updateQuantity: (productId: string, qty: number) => void;
   clearCart: () => void;
   setOrderType: (type: Order['type']) => void;
-  checkout: (payment: Order['payment'], clientId?: string) => Order;
-  getCA: (daysAgo?: number) => number;
+  checkout: (payment: Order['payment'], clientId?: string) => Order | null;
+  updateOrderStatus: (orderId: string, status: Order['status']) => void;
+  getCA: (daysAgo: number) => number;
   getOrderCount: (daysAgo?: number) => number;
   getClientCount: (daysAgo?: number) => number;
   getAvgTicket: (daysAgo?: number) => number;
@@ -123,22 +139,35 @@ export const useOrderStore = create<OrderState>()(
       setOrderType: (type) => set({ orderType: type }),
 
       checkout: (payment, clientId) => {
-        const s = get();
-        const total = s.cart.reduce((sum, c) => sum + c.product.price * c.quantity, 0);
-        const order: Order = {
-          id: `ord-${Date.now()}`,
-          items: [...s.cart],
+        const state = get();
+        if (state.cart.length === 0) return null;
+
+        const total = state.cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+        
+        const newOrder: Order = {
+          id: `cmd-${Date.now()}`,
+          items: [...state.cart],
           total,
-          type: s.orderType,
+          type: state.orderType,
           payment,
-          date: new Date().toISOString(),
           clientId,
+          date: new Date().toISOString(),
+          status: 'en_attente',
         };
-        set({ orders: [order, ...s.orders], cart: [] });
-        return order;
+
+        set(state => ({
+          orders: [newOrder, ...state.orders],
+          cart: [],
+        }));
+
+        return newOrder;
       },
 
-      getCA: (daysAgo = 0) => {
+      updateOrderStatus: (orderId, status) => set(state => ({
+        orders: state.orders.map(o => o.id === orderId ? { ...o, status } : o)
+      })),
+
+      getCA: (daysAgo) => {
         const s = get();
         const now = new Date();
         const target = new Date(now);

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import BottomNav from './components/BottomNav';
+import ProtectedRoute from './components/ProtectedRoute';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Caisse from './pages/Caisse';
@@ -10,6 +11,7 @@ import Rapports from './pages/Rapports';
 import Livraisons from './pages/Livraisons';
 import Fidelite from './pages/Fidelite';
 import Plus from './pages/Plus';
+import Cuisine from './pages/Cuisine';
 import './index.css';
 
 function AppContent() {
@@ -19,14 +21,33 @@ function AppContent() {
       <AnimatePresence mode="wait">
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/caisse" element={<Caisse />} />
-          <Route path="/stocks" element={<Stocks />} />
-          <Route path="/personnel" element={<Personnel />} />
-          <Route path="/rapports" element={<Rapports />} />
-          <Route path="/livraisons" element={<Livraisons />} />
-          <Route path="/fidelite" element={<Fidelite />} />
-          <Route path="/plus" element={<Plus />} />
+          <Route path="/dashboard" element={
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant']}><Dashboard /></ProtectedRoute>
+          } />
+          <Route path="/caisse" element={
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier', 'Serveur']}><Caisse /></ProtectedRoute>
+          } />
+          <Route path="/cuisine" element={
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Chef cuisine']}><Cuisine /></ProtectedRoute>
+          } />
+          <Route path="/stocks" element={
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Chef cuisine']}><Stocks /></ProtectedRoute>
+          } />
+          <Route path="/personnel" element={
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant']}><Personnel /></ProtectedRoute>
+          } />
+          <Route path="/rapports" element={
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant']}><Rapports /></ProtectedRoute>
+          } />
+          <Route path="/livraisons" element={
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Livreur']}><Livraisons /></ProtectedRoute>
+          } />
+          <Route path="/fidelite" element={
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier', 'Serveur']}><Fidelite /></ProtectedRoute>
+          } />
+          <Route path="/plus" element={
+            <ProtectedRoute><Plus /></ProtectedRoute>
+          } />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>

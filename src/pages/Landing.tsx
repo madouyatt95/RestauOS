@@ -20,7 +20,10 @@ export default function Landing() {
 
   const handleLogin = (user: typeof DEMO_USERS[0]) => {
     login(user);
-    navigate('/dashboard');
+    if (user.role === 'Admin' || user.role === 'Gérant') navigate('/dashboard');
+    else if (user.role === 'Chef cuisine') navigate('/cuisine');
+    else if (user.role === 'Livreur') navigate('/livraisons');
+    else navigate('/caisse');
   };
 
   return (
