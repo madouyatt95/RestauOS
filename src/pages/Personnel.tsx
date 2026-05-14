@@ -36,15 +36,24 @@ function getWeekDates(weekOffset: number): { label: string; date: string; isToda
 
 export default function Personnel() {
   const { employees, updateStatus } = useStaffStore();
-  const { shifts, addShift, removeShift, swapRequests, updateSwapStatus } = usePlanningStore();
+  const { shifts, addShift, removeShift, swapRequests, addSwapRequest, colleagueRespond, managerRespond } = usePlanningStore();
   const { user } = useAuthStore();
   
   const [activeTab, setActiveTab] = useState<'planning' | 'presences' | 'echanges'>('planning');
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
   const [addingShift, setAddingShift] = useState<{ empId: string; date: string } | null>(null);
+  const [showSwapForm, setShowSwapForm] = useState(false);
+  const [swapStep, setSwapStep] = useState(1);
+  const [swapSelectedShift, setSwapSelectedShift] = useState<string | null>(null);
+  const [swapTargetEmp, setSwapTargetEmp] = useState<string | null>(null);
+  const [swapReason, setSwapReason] = useState('');
 
   const isManager = ['Admin', 'Gérant'].includes(user?.role || '');
+
+  // Find current user's employee record
+  const currentEmployee = employees.find(e => e.name === user?.name);
+  const myShifts = currentEmployee ? shifts.filter(s => s.employeeId === currentEmployee.id) : [];
   const weekDates = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -69,7 +78,12 @@ export default function Personnel() {
     return shifts.filter(s => dates.includes(s.date)).length;
   }, [shifts, weekDates]);
 
-  const pendingSwaps = swapRequests.filter(r => r.status === 'pending');
+  // Count actionable requests for the badge
+  const actionableSwaps = swapRequests.filter(r => {
+    if (isManager) return r.status === 'pending_manager';
+    if (currentEmployee) return r.status === 'pending_colleague' && r.toEmployeeId === currentEmployee.id;
+    return false;
+  });
 
   return (
     <div className="page-content pt-14 pb-28 min-h-screen bg-[#0a0c10]">
@@ -86,7 +100,7 @@ export default function Personnel() {
         {[
           { id: 'planning', label: 'Planning', icon: Clock, badge: 0 },
           { id: 'presences', label: 'Présences', icon: Users, badge: 0 },
-          { id: 'echanges', label: 'Échanges', icon: RefreshCw, badge: pendingSwaps.length },
+          { id: 'echanges', label: 'Échanges', icon: RefreshCw, badge: actionableSwaps.length },
         ].map(tab => (
           <button
             key={tab.id}
@@ -253,6 +267,14 @@ export default function Personnel() {
       {/* ─── ECHANGES TAB ─── */}
       {activeTab === 'echanges' && (
         <div className="px-4">
+          {/* Button to create swap request (for non-managers) */}
+          {!isManager && currentEmployee && myShifts.length > 0 && (
+            <button onClick={() => { setShowSwapForm(true); setSwapStep(1); setSwapSelectedShift(null); setSwapTargetEmp(null); setSwapReason(''); }}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange/20 to-blue/20 border border-orange/30 text-white font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 mb-6 active:scale-95 transition-transform">
+              <Plus size={18} /> Demander un échange
+            </button>
+          )}
+
           {swapRequests.length === 0 ? (
             <div className="py-16 text-center">
               <RefreshCw size={36} className="text-white/10 mx-auto mb-4" />
@@ -266,21 +288,41 @@ export default function Personnel() {
                 const toEmp = employees.find(e => e.id === req.toEmployeeId);
                 const shift = shifts.find(s => s.id === req.shiftId);
                 const sCfg = shift ? shiftConfig[shift.type] : null;
-                const isPending = req.status === 'pending';
-                const isApproved = req.status === 'approved';
+
+                // Status display
+                const statusMap = {
+                  pending_colleague: { label: 'Attente collègue', color: '#F59E0B', borderColor: 'border-l-orange' },
+                  pending_manager: { label: 'Attente gérant', color: '#3B82F6', borderColor: 'border-l-blue' },
+                  approved: { label: 'Approuvé ✓', color: '#22C55E', borderColor: 'border-l-green' },
+                  rejected: { label: 'Refusé', color: '#EF4444', borderColor: 'border-l-red' },
+                };
+                const st = statusMap[req.status];
+                const isDone = req.status === 'approved' || req.status === 'rejected';
+
+                // Who can act?
+                const isTargetColleague = currentEmployee && req.toEmployeeId === currentEmployee.id;
+                const canColleagueAct = req.status === 'pending_colleague' && isTargetColleague;
+                const canManagerAct = req.status === 'pending_manager' && isManager;
 
                 return (
-                  <motion.div key={req.id} layout className={`glass-card p-5 border-white/5 ${isPending ? 'border-l-4 border-l-orange' : isApproved ? 'border-l-4 border-l-green opacity-60' : 'border-l-4 border-l-red opacity-40'}`}>
-                    <div className="flex items-start justify-between mb-4">
+                  <motion.div key={req.id} layout className={`glass-card p-5 border-white/5 border-l-4 ${st.borderColor} ${isDone ? 'opacity-50' : ''}`}>
+                    {/* Status + Step indicator */}
+                    <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <AlertCircle size={16} className={isPending ? 'text-orange' : isApproved ? 'text-green' : 'text-red'} />
-                        <span className={`text-[9px] font-black uppercase tracking-widest ${isPending ? 'text-orange' : isApproved ? 'text-green' : 'text-red'}`}>
-                          {isPending ? 'En attente' : isApproved ? 'Approuvé' : 'Refusé'}
-                        </span>
+                        <AlertCircle size={14} style={{ color: st.color }} />
+                        <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: st.color }}>{st.label}</span>
                       </div>
                       <span className="text-text-tertiary text-[9px] font-bold">{new Date(req.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
                     </div>
+
+                    {/* Progress steps */}
+                    <div className="flex items-center gap-1 mb-4">
+                      <div className={`h-1 flex-1 rounded-full ${req.status !== 'rejected' ? 'bg-orange' : 'bg-red/40'}`} />
+                      <div className={`h-1 flex-1 rounded-full ${req.status === 'pending_manager' || req.status === 'approved' ? 'bg-blue' : 'bg-white/10'}`} />
+                      <div className={`h-1 flex-1 rounded-full ${req.status === 'approved' ? 'bg-green' : 'bg-white/10'}`} />
+                    </div>
                     
+                    {/* From → To */}
                     <div className="flex items-center gap-3 mb-3">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <span className="text-lg">{fromEmp?.avatar}</span>
@@ -302,12 +344,25 @@ export default function Personnel() {
 
                     <p className="text-text-secondary text-[11px] italic mb-4">« {req.reason} »</p>
 
-                    {isPending && isManager && (
+                    {/* Colleague action */}
+                    {canColleagueAct && (
                       <div className="flex gap-3">
-                        <button onClick={() => updateSwapStatus(req.id, 'approved')} className="flex-1 py-3 rounded-2xl bg-green/10 text-green font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-transform border border-green/20">
-                          <Check size={16} /> Accepter
+                        <button onClick={() => colleagueRespond(req.id, true)} className="flex-1 py-3 rounded-2xl bg-green/10 text-green font-black text-xs uppercase flex items-center justify-center gap-2 active:scale-95 transition-transform border border-green/20">
+                          <Check size={16} /> J'accepte
                         </button>
-                        <button onClick={() => updateSwapStatus(req.id, 'rejected')} className="flex-1 py-3 rounded-2xl bg-red/10 text-red font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-transform border border-red/20">
+                        <button onClick={() => colleagueRespond(req.id, false)} className="flex-1 py-3 rounded-2xl bg-red/10 text-red font-black text-xs uppercase flex items-center justify-center gap-2 active:scale-95 transition-transform border border-red/20">
+                          <X size={16} /> Refuser
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Manager action */}
+                    {canManagerAct && (
+                      <div className="flex gap-3">
+                        <button onClick={() => managerRespond(req.id, true)} className="flex-1 py-3 rounded-2xl bg-green/10 text-green font-black text-xs uppercase flex items-center justify-center gap-2 active:scale-95 transition-transform border border-green/20">
+                          <Check size={16} /> Valider
+                        </button>
+                        <button onClick={() => managerRespond(req.id, false)} className="flex-1 py-3 rounded-2xl bg-red/10 text-red font-black text-xs uppercase flex items-center justify-center gap-2 active:scale-95 transition-transform border border-red/20">
                           <X size={16} /> Refuser
                         </button>
                       </div>
@@ -319,6 +374,99 @@ export default function Personnel() {
           )}
         </div>
       )}
+
+      {/* ─── SWAP REQUEST FORM MODAL ─── */}
+      <AnimatePresence>
+        {showSwapForm && currentEmployee && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setShowSwapForm(false)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <h3 className="text-white font-black text-xl mb-2 text-center">Demander un échange</h3>
+
+              {/* Step indicator */}
+              <div className="flex items-center gap-2 mb-6 px-4">
+                {[1, 2, 3].map(s => (
+                  <div key={s} className={`flex-1 h-1 rounded-full transition-all ${swapStep >= s ? 'bg-orange' : 'bg-white/10'}`} />
+                ))}
+              </div>
+
+              {/* Step 1: Choose shift */}
+              {swapStep === 1 && (
+                <div>
+                  <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-4">1. Quel service voulez-vous échanger ?</p>
+                  <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+                    {myShifts.map(s => {
+                      const cfg = shiftConfig[s.type];
+                      const d = new Date(s.date);
+                      return (
+                        <button key={s.id} onClick={() => { setSwapSelectedShift(s.id); setSwapStep(2); }}
+                          className={`w-full p-4 rounded-2xl border flex items-center gap-4 transition-all active:scale-95 ${swapSelectedShift === s.id ? 'border-orange bg-orange/10' : 'border-white/10 bg-white/5'}`}>
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: cfg.bg }}>
+                            <cfg.icon size={18} style={{ color: cfg.color }} />
+                          </div>
+                          <div className="text-left">
+                            <span className="text-white font-bold text-xs block">{d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' })}</span>
+                            <span className="text-[10px] font-bold" style={{ color: cfg.color }}>{cfg.label} · {s.hours}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Choose colleague */}
+              {swapStep === 2 && (
+                <div>
+                  <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-4">2. Avec qui souhaitez-vous échanger ?</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {employees.filter(e => e.id !== currentEmployee.id).map(emp => (
+                      <button key={emp.id} onClick={() => { setSwapTargetEmp(emp.id); setSwapStep(3); }}
+                        className={`p-4 rounded-2xl border flex flex-col items-center gap-2 transition-all active:scale-95 ${swapTargetEmp === emp.id ? 'border-orange bg-orange/10' : 'border-white/10 bg-white/5'}`}>
+                        <span className="text-2xl">{emp.avatar}</span>
+                        <span className="text-white font-bold text-[10px]">{emp.name.split(' ')[0]}</span>
+                        <span className="text-text-tertiary text-[8px] font-bold uppercase">{emp.role}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={() => setSwapStep(1)} className="mt-4 text-text-tertiary text-[10px] font-bold underline">← Retour</button>
+                </div>
+              )}
+
+              {/* Step 3: Reason + Submit */}
+              {swapStep === 3 && swapSelectedShift && swapTargetEmp && (
+                <div>
+                  <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-4">3. Raison de l'échange</p>
+                  <textarea
+                    value={swapReason}
+                    onChange={e => setSwapReason(e.target.value)}
+                    placeholder="Ex: RDV médical, contrainte personnelle..."
+                    className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-white text-sm resize-none h-24 placeholder:text-white/20 focus:outline-none focus:border-orange/50"
+                  />
+                  <button
+                    onClick={() => {
+                      if (!swapReason.trim()) return;
+                      const shift = shifts.find(s => s.id === swapSelectedShift);
+                      addSwapRequest({
+                        fromEmployeeId: currentEmployee.id,
+                        toEmployeeId: swapTargetEmp,
+                        shiftId: swapSelectedShift,
+                        date: shift?.date || '',
+                        reason: swapReason,
+                      });
+                      setShowSwapForm(false);
+                    }}
+                    disabled={!swapReason.trim()}
+                    className="w-full mt-4 py-4 rounded-2xl bg-orange text-white font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-transform disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-orange/20">
+                    <RefreshCw size={18} /> Envoyer la demande
+                  </button>
+                  <button onClick={() => setSwapStep(2)} className="mt-3 w-full text-text-tertiary text-[10px] font-bold underline text-center">← Retour</button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Quick Add Shift Modal */}
       <AnimatePresence>

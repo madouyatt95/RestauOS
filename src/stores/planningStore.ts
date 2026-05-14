@@ -18,7 +18,7 @@ export interface SwapRequest {
   shiftId: string;
   date: string;
   reason: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending_colleague' | 'pending_manager' | 'approved' | 'rejected';
   createdAt: string;
 }
 
@@ -31,7 +31,8 @@ interface PlanningState {
   getShiftsByDate: (date: string) => Shift[];
   getShiftsByEmployee: (employeeId: string) => Shift[];
   addSwapRequest: (req: Omit<SwapRequest, 'id' | 'status' | 'createdAt'>) => void;
-  updateSwapStatus: (id: string, status: 'approved' | 'rejected') => void;
+  colleagueRespond: (id: string, accept: boolean) => void;
+  managerRespond: (id: string, accept: boolean) => void;
 }
 
 export const usePlanningStore = create<PlanningState>()(
@@ -47,31 +48,26 @@ export const usePlanningStore = create<PlanningState>()(
           return dt.toISOString().split('T')[0];
         };
         return [
-          // Mamadou Diop - Cuisinier (principalement midi)
           { id: 's01', employeeId: 'e1', date: d(0), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
           { id: 's02', employeeId: 'e1', date: d(1), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
           { id: 's03', employeeId: 'e1', date: d(2), type: 'journee' as ShiftType, hours: '10:00 - 22:00' },
           { id: 's04', employeeId: 'e1', date: d(3), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
           { id: 's05', employeeId: 'e1', date: d(5), type: 'journee' as ShiftType, hours: '10:00 - 22:00' },
-          // Awa Fall - Serveuse (soir principalement)
           { id: 's06', employeeId: 'e2', date: d(0), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
           { id: 's07', employeeId: 'e2', date: d(1), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
           { id: 's08', employeeId: 'e2', date: d(3), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
           { id: 's09', employeeId: 'e2', date: d(4), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
           { id: 's10', employeeId: 'e2', date: d(5), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
-          // Ibrahima Ba - Caissier (midi)
           { id: 's11', employeeId: 'e3', date: d(0), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
           { id: 's12', employeeId: 'e3', date: d(1), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
           { id: 's13', employeeId: 'e3', date: d(2), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
           { id: 's14', employeeId: 'e3', date: d(4), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
           { id: 's15', employeeId: 'e3', date: d(5), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
-          // Pape Sow - Livreur (soir)
           { id: 's16', employeeId: 'e5', date: d(0), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
           { id: 's17', employeeId: 'e5', date: d(2), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
           { id: 's18', employeeId: 'e5', date: d(3), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
           { id: 's19', employeeId: 'e5', date: d(5), type: 'journee' as ShiftType, hours: '10:00 - 22:00' },
           { id: 's20', employeeId: 'e5', date: d(6), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
-          // Seynabou Kane - Serveuse (midi/soir alternés)
           { id: 's21', employeeId: 'e6', date: d(0), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
           { id: 's22', employeeId: 'e6', date: d(1), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
           { id: 's23', employeeId: 'e6', date: d(2), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
@@ -92,26 +88,31 @@ export const usePlanningStore = create<PlanningState>()(
       getShiftsByEmployee: (employeeId) => get().shifts.filter(s => s.employeeId === employeeId),
 
       swapRequests: [
-        { id: 'sw1', fromEmployeeId: 'e2', toEmployeeId: 'e6', shiftId: 's08', date: new Date().toISOString().split('T')[0], reason: 'RDV médical jeudi soir', status: 'pending' as const, createdAt: new Date().toISOString() },
+        { id: 'sw1', fromEmployeeId: 'e2', toEmployeeId: 'e6', shiftId: 's08', date: new Date().toISOString().split('T')[0], reason: 'RDV médical jeudi soir', status: 'pending_colleague' as const, createdAt: new Date().toISOString() },
       ],
       addSwapRequest: (req) => set((state) => ({
-        swapRequests: [...state.swapRequests, { ...req, id: `sw${Date.now()}`, status: 'pending', createdAt: new Date().toISOString() }]
+        swapRequests: [...state.swapRequests, { ...req, id: `sw${Date.now()}`, status: 'pending_colleague', createdAt: new Date().toISOString() }]
       })),
-      updateSwapStatus: (id, status) => set((state) => {
-        const req = state.swapRequests.find(r => r.id === id);
-        if (status === 'approved' && req) {
-          // Swap the employeeId on the shift
-          const shift = state.shifts.find(s => s.id === req.shiftId);
-          if (shift) {
-            return {
-              swapRequests: state.swapRequests.map(r => r.id === id ? { ...r, status } : r),
-              shifts: state.shifts.map(s => s.id === req.shiftId ? { ...s, employeeId: req.toEmployeeId } : s),
-            };
-          }
+      // Step 2: Colleague accepts or declines
+      colleagueRespond: (id, accept) => set((state) => ({
+        swapRequests: state.swapRequests.map(r => r.id === id 
+          ? { ...r, status: accept ? 'pending_manager' as const : 'rejected' as const } 
+          : r
+        ),
+      })),
+      // Step 3: Manager final approval
+      managerRespond: (id, accept) => set((state) => {
+        if (!accept) {
+          return { swapRequests: state.swapRequests.map(r => r.id === id ? { ...r, status: 'rejected' as const } : r) };
         }
-        return {
-          swapRequests: state.swapRequests.map(r => r.id === id ? { ...r, status } : r),
-        };
+        const req = state.swapRequests.find(r => r.id === id);
+        if (req) {
+          return {
+            swapRequests: state.swapRequests.map(r => r.id === id ? { ...r, status: 'approved' as const } : r),
+            shifts: state.shifts.map(s => s.id === req.shiftId ? { ...s, employeeId: req.toEmployeeId } : s),
+          };
+        }
+        return {};
       }),
     }),
     { name: 'restauos-planning' }
