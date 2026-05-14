@@ -6,6 +6,7 @@ import { Plus, Phone, Clock, RefreshCw, Check } from 'lucide-react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
+import listPlugin from '@fullcalendar/list';
 import interactionPlugin from '@fullcalendar/interaction';
 
 const statusConfig = {
@@ -118,13 +119,13 @@ export default function Personnel() {
             .fc-h-event .fc-event-main { color: white; }
           `}</style>
           <FullCalendar
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="dayGridMonth"
+            plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
+            initialView="listWeek"
             locale="fr"
             headerToolbar={{
               left: 'prev,next',
               center: 'title',
-              right: 'dayGridMonth,timeGridWeek'
+              right: 'listWeek,dayGridMonth'
             }}
             height={500}
             editable={isManager}

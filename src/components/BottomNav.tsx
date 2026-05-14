@@ -26,6 +26,7 @@ export default function BottomNav() {
       navItems = [
         { path: '/caisse', icon: ShoppingBag, label: 'Caisse' },
         { path: '/fidelite', icon: Users, label: 'Fidélité' },
+        { path: '/personnel', icon: Calendar, label: 'Planning' },
         { path: '/plus', icon: MoreHorizontal, label: 'Plus' },
       ];
       break;

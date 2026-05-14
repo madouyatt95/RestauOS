@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import BottomNav from './components/BottomNav';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -18,7 +18,8 @@ import Wallet from './pages/Wallet';
 import './index.css';
 
 function AppContent() {
-  const isLanding = window.location.pathname === '/';
+  const location = useLocation();
+  const isLanding = location.pathname === '/';
   return (
     <>
       <AnimatePresence mode="wait">
