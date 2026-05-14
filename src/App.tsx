@@ -12,6 +12,7 @@ import Livraisons from './pages/Livraisons';
 import Fidelite from './pages/Fidelite';
 import Plus from './pages/Plus';
 import Cuisine from './pages/Cuisine';
+import ClientHome from './pages/ClientHome';
 import './index.css';
 
 function AppContent() {
@@ -42,8 +43,11 @@ function AppContent() {
           <Route path="/livraisons" element={
             <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Livreur']}><Livraisons /></ProtectedRoute>
           } />
+          <Route path="/client" element={
+            <ProtectedRoute allowedRoles={['Client']}><ClientHome /></ProtectedRoute>
+          } />
           <Route path="/fidelite" element={
-            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier', 'Serveur']}><Fidelite /></ProtectedRoute>
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier', 'Serveur', 'Client']}><Fidelite /></ProtectedRoute>
           } />
           <Route path="/plus" element={
             <ProtectedRoute><Plus /></ProtectedRoute>

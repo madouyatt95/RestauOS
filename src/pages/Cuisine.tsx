@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOrderStore } from '../stores/orderStore';
+import { useDeliveryStore } from '../stores/deliveryStore';
 import { Check, Clock, ChefHat } from 'lucide-react';
 
 const getWaitMinutes = (dateString: string) => {
@@ -9,6 +10,7 @@ const getWaitMinutes = (dateString: string) => {
 
 export default function Cuisine() {
   const { orders, updateOrderStatus } = useOrderStore();
+  const { addDelivery } = useDeliveryStore();
   const [, setTick] = useState(0);
 
   // Re-render every minute to update wait times
@@ -87,7 +89,21 @@ export default function Cuisine() {
                   </div>
 
                   <button
-                    onClick={() => updateOrderStatus(order.id, 'pret')}
+                    onClick={() => {
+                      updateOrderStatus(order.id, 'pret');
+                      if (order.type === 'livraison') {
+                        addDelivery({
+                          orderId: order.id,
+                          clientName: order.clientId ? 'Ousmane Thiam' : 'Client Inconnu',
+                          address: 'Dakar (Adresse de livraison)',
+                          driverId: 'u6', // Pape Sow
+                          driverName: 'Pape Sow',
+                          status: 'preparation',
+                          estimatedTime: 25,
+                          createdAt: new Date().toISOString()
+                        });
+                      }
+                    }}
                     className="w-full py-3 rounded-xl bg-gradient-to-r from-green to-emerald-600 text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
                   >
                     <Check size={18} /> Marquer prêt

@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware';
 export interface UserProfile {
   id: string;
   name: string;
-  role: 'Admin' | 'Gérant' | 'Caissier' | 'Serveur' | 'Chef cuisine' | 'Livreur';
+  role: 'Admin' | 'Gérant' | 'Caissier' | 'Serveur' | 'Chef cuisine' | 'Livreur' | 'Client';
   avatar?: string;
 }
 
@@ -15,6 +15,7 @@ export const DEMO_USERS: UserProfile[] = [
   { id: 'u4', name: 'Awa Fall', role: 'Serveur' },
   { id: 'u5', name: 'Mamadou Diop', role: 'Chef cuisine' },
   { id: 'u6', name: 'Pape Sow', role: 'Livreur' },
+  { id: 'c1', name: 'Ousmane Thiam', role: 'Client' },
 ];
 
 interface AuthState {

@@ -42,6 +42,13 @@ export default function BottomNav() {
         { path: '/plus', icon: MoreHorizontal, label: 'Plus' },
       ];
       break;
+    case 'Client':
+      navItems = [
+        { path: '/client', icon: Home, label: 'Accueil' },
+        { path: '/fidelite', icon: Users, label: 'Fidélité' },
+        { path: '/plus', icon: MoreHorizontal, label: 'Plus' },
+      ];
+      break;
     default:
       return null;
   }

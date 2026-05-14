@@ -13,6 +13,7 @@ export default function ProtectedRoute({ children, allowedRoles }: { children: R
     if (user.role === 'Livreur') return <Navigate to="/livraisons" replace />;
     if (user.role === 'Chef cuisine') return <Navigate to="/cuisine" replace />;
     if (user.role === 'Caissier' || user.role === 'Serveur') return <Navigate to="/caisse" replace />;
+    if (user.role === 'Client') return <Navigate to="/client" replace />;
     return <Navigate to="/dashboard" replace />;
   }
 
