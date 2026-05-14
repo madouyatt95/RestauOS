@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../stores/authStore';
+import { useReservationStore } from '../stores/reservationStore';
 import { Calendar as CalendarIcon, Clock, Users, Check } from 'lucide-react';
 
 export default function Reservations() {
   const { user } = useAuthStore();
+  const { addReservation } = useReservationStore();
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [guests, setGuests] = useState(2);
@@ -12,6 +14,14 @@ export default function Reservations() {
 
   const handleReserve = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    addReservation({
+      clientName: user?.name || 'Client Web',
+      date,
+      time,
+      guests
+    });
+
     setShowSuccess(true);
     setTimeout(() => {
       setShowSuccess(false);
@@ -20,6 +30,7 @@ export default function Reservations() {
       setGuests(2);
     }, 3000);
   };
+
 
   return (
     <div className="page-content pt-8 pb-32 bg-[#070A0F] min-h-screen">

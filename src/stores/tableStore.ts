@@ -9,7 +9,9 @@ export interface Table {
   capacity: number;
   status: TableStatus;
   currentOrderId?: string;
+  reservedFor?: string;
 }
+
 
 interface TableState {
   tables: Table[];
