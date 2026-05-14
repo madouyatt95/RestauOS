@@ -90,7 +90,11 @@ export const useTableStore = create<TableState>()(
       })),
 
       updateTableCapacity: (id, capacity) => set(state => ({
-        tables: state.tables.map(t => t.id === id ? { ...t, capacity } : t)
+        tables: state.tables.map(t => t.id === id ? { 
+          ...t, 
+          capacity,
+          shape: capacity <= 2 ? 'round' : capacity <= 4 ? 'square' : 'rectangle'
+        } : t)
       })),
       updateTableFloor: (id, floor, zone) => set(state => ({
         tables: state.tables.map(t => t.id === id ? { ...t, floor, zone: zone || t.zone } : t)

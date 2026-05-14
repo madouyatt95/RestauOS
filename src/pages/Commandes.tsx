@@ -7,30 +7,83 @@ import { useReservationStore, type Reservation } from '../stores/reservationStor
 import { Search, ShoppingCart, X, ChefHat, Calendar, UserPlus, Phone, Plus, Minus, Trash2, Layout, Layers, Map as MapIcon, User } from 'lucide-react';
 
 
-const Chairs = ({ count, shape }: { count: number, shape: string }) => {
-  const chairs = Array.from({ length: count });
-  return (
-    <>
-      {chairs.map((_, i) => {
-        let style = {};
-        const angle = (i * 360) / count;
-        if (shape === 'round') {
-          style = { transform: `rotate(${angle}deg) translateY(-42px)` };
-        } else if (shape === 'rectangle') {
-          const side = i % 2 === 0 ? -1 : 1;
-          const offset = Math.floor(i / 2) * 30 - ((count / 2 - 1) * 15);
-          style = { transform: `translate(${offset}px, ${side * 35}px)` };
-        } else {
-          const sideAngle = Math.floor(i / (count / 4)) * 90;
-          style = { transform: `rotate(${sideAngle}deg) translateY(-38px)` };
-        }
-        return (
-          <div key={i} className="absolute w-4 h-3 bg-white/20 rounded-t-lg border border-white/10" style={style} />
-        );
-      })}
-    </>
-  );
+const Chairs = ({ count, shape }: { count: number, shape: 'round' | 'square' | 'rectangle' }) => {
+  const chairs = [];
+  
+  if (shape === 'round') {
+    // Round: distribute chairs evenly around the circle
+    for (let i = 0; i < count; i++) {
+      const angle = (i * 360) / count - 90;
+      const rad = (angle * Math.PI) / 180;
+      const radius = 32;
+      chairs.push(
+        <div key={i} className="absolute w-[10px] h-[6px] bg-[#555] rounded-[3px] border border-[#666]" 
+          style={{ 
+            left: `calc(50% + ${Math.cos(rad) * radius}px - 5px)`, 
+            top: `calc(50% + ${Math.sin(rad) * radius}px - 3px)`,
+            transform: `rotate(${angle + 90}deg)`
+          }} />
+      );
+    }
+  } else if (shape === 'square') {
+    // Square: 1 per side, clockwise from top
+    const positions = [
+      { x: 0, y: -30, rot: 0 },    // top
+      { x: 30, y: 0, rot: 90 },     // right
+      { x: 0, y: 30, rot: 180 },    // bottom
+      { x: -30, y: 0, rot: 270 },   // left
+    ];
+    for (let i = 0; i < Math.min(count, 4); i++) {
+      const p = positions[i];
+      chairs.push(
+        <div key={i} className="absolute w-[10px] h-[6px] bg-[#555] rounded-[3px] border border-[#666]" 
+          style={{ 
+            left: `calc(50% + ${p.x}px - 5px)`, 
+            top: `calc(50% + ${p.y}px - 3px)`,
+            transform: `rotate(${p.rot}deg)`
+          }} />
+      );
+    }
+  } else {
+    // Rectangle: distribute along long sides (top/bottom), then short sides
+    const perSide = Math.ceil(count / 2);
+    for (let i = 0; i < count; i++) {
+      const isTop = i < perSide;
+      const sideIndex = isTop ? i : i - perSide;
+      const sideCount = isTop ? perSide : count - perSide;
+      const spacing = 100 / (sideCount + 1);
+      const xPct = spacing * (sideIndex + 1);
+      
+      chairs.push(
+        <div key={i} className="absolute w-[10px] h-[6px] bg-[#555] rounded-[3px] border border-[#666]" 
+          style={{ 
+            left: `${xPct}%`, 
+            top: isTop ? '-10px' : 'calc(100% + 4px)',
+            transform: `translateX(-5px) rotate(${isTop ? 0 : 180}deg)`
+          }} />
+      );
+    }
+  }
+  
+  return <>{chairs}</>;
 };
+
+// Derive visual shape from capacity
+const getVisualShape = (capacity: number): 'round' | 'square' | 'rectangle' => {
+  if (capacity <= 2) return 'round';
+  if (capacity <= 4) return 'square';
+  return 'rectangle';
+};
+
+// Derive visual dimensions from capacity
+const getTableDimensions = (capacity: number): { w: number, h: number } => {
+  if (capacity <= 2) return { w: 48, h: 48 };
+  if (capacity <= 4) return { w: 52, h: 52 };
+  if (capacity <= 6) return { w: 90, h: 44 };
+  if (capacity <= 8) return { w: 110, h: 46 };
+  return { w: 130, h: 48 };
+};
+
 
 export default function Commandes() {
   const { cart, addToCart, updateQuantity, clearCart, checkout } = useOrderStore();
@@ -238,10 +291,9 @@ export default function Commandes() {
             const isSelected = showTableOptions === t.id;
             const isEditing = editingTable?.id === t.id;
             
-            // Dynamic sizing based on capacity
-            const scale = t.capacity <= 2 ? 0.85 : t.capacity <= 4 ? 1 : t.capacity <= 6 ? 1.2 : 1.4;
-            const baseWidth = t.shape === 'rectangle' ? 80 : 56;
-            const baseHeight = t.shape === 'rectangle' ? 48 : 56;
+            // Auto-derive visual shape and size from capacity
+            const vShape = getVisualShape(t.capacity);
+            const dims = getTableDimensions(t.capacity);
 
             return (
               <motion.div
@@ -260,24 +312,28 @@ export default function Commandes() {
                 className="absolute"
                 style={{ left: `${t.x}%`, top: `${t.y}%`, transform: 'translate(-50%, -50%)', zIndex: isEditing ? 50 : 10 }}
               >
-                <div className="relative flex items-center justify-center">
-                  <Chairs count={t.capacity} shape={t.shape} />
+                <div className="relative" style={{ width: `${dims.w + 24}px`, height: `${dims.h + 24}px` }}>
+                  <Chairs count={t.capacity} shape={vShape} />
                   <motion.div 
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className={`relative flex items-center justify-center transition-all duration-300 border-2 ${
-                      t.shape === 'round' ? 'rounded-full aspect-square' : 'rounded-xl'
+                    className={`absolute transition-all duration-300 border-2 flex items-center justify-center ${
+                      vShape === 'round' ? 'rounded-full' : 'rounded-xl'
                     } ${
                     t.status === 'libre' ? 'bg-[#1a1c22] border-green/40 text-green shadow-[0_0_15px_rgba(34,197,94,0.05)]' :
                     t.status === 'occupee' ? 'bg-[#1a1c22] border-red/50 text-red shadow-[0_0_20px_rgba(239,68,68,0.2)]' :
                     'bg-[#1a1c22] border-blue/50 text-blue shadow-[0_0_20px_rgba(59,130,246,0.2)]'
                   } ${isSelected || isEditing ? 'border-white ring-4 ring-white/10' : ''}`}
                   style={{ 
-                    width: `${baseWidth * scale}px`, 
-                    height: `${baseHeight * scale}px` 
+                    width: `${dims.w}px`, 
+                    height: `${dims.h}px`,
+                    left: '50%',
+                    top: '50%',
+                    transform: 'translate(-50%, -50%)',
                   }}>
                     <div className="flex flex-col items-center">
-                      <span className="text-lg font-black" style={{ fontSize: `${18 * scale}px` }}>{t.number}</span>
+                      <span className="font-black text-sm">{t.number}</span>
+                      <span className="text-[8px] opacity-60 font-bold">{t.capacity}p</span>
                     </div>
                   </motion.div>
                 </div>
@@ -329,14 +385,19 @@ export default function Commandes() {
                       <div className="flex items-center justify-between bg-white/5 rounded-2xl px-4 py-3 border border-white/5">
                         <button onClick={() => {
                           const newCap = Math.max(1, editingTable.capacity - 1);
+                          const newShape = getVisualShape(newCap);
                           updateTableCapacity(editingTable.id, newCap);
-                          setEditingTable({ ...editingTable, capacity: newCap });
+                          setEditingTable({ ...editingTable, capacity: newCap, shape: newShape });
                         }} className="text-white"><Minus size={18} /></button>
-                        <span className="text-2xl font-black text-white">{editingTable.capacity}</span>
+                        <div className="text-center">
+                          <span className="text-2xl font-black text-white">{editingTable.capacity}</span>
+                          <span className="text-[8px] text-text-tertiary block uppercase font-bold">{getVisualShape(editingTable.capacity) === 'round' ? 'Ronde' : getVisualShape(editingTable.capacity) === 'square' ? 'Carrée' : 'Rectangle'}</span>
+                        </div>
                         <button onClick={() => {
                           const newCap = editingTable.capacity + 1;
+                          const newShape = getVisualShape(newCap);
                           updateTableCapacity(editingTable.id, newCap);
-                          setEditingTable({ ...editingTable, capacity: newCap });
+                          setEditingTable({ ...editingTable, capacity: newCap, shape: newShape });
                         }} className="text-white"><Plus size={18} /></button>
                       </div>
 
