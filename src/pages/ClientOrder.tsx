@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PRODUCTS, useOrderStore, type CartItem } from '../stores/orderStore';
+import { useNotificationStore } from '../stores/notificationStore';
 import { Search, ChefHat, Plus, Minus, ArrowRight, Check } from 'lucide-react';
 
 const CATEGORIES = ['Toutes', 'Plats', 'Entrées', 'Desserts', 'Boissons'];
@@ -36,10 +37,22 @@ export default function ClientOrder() {
       if (ex) return prev.map(i => i.product.id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
       return [...prev, { product, quantity: 1, options: [] }];
     });
+
+    if (tableId) {
+      useNotificationStore.getState().addNotification({
+        title: `Table ${tableId.replace('t', '')}`,
+        message: `Le client a ajouté: ${product.name}`,
+        type: 'order',
+        targetRole: 'Serveur'
+      });
+      // Synchronisation directe avec le panier en cours du serveur (pour la démo locale)
+      useOrderStore.getState().addToCart(product);
+    }
   };
 
   const updateQty = (id: string, delta: number) => {
     setCart(prev => prev.map(i => i.product.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i).filter(i => i.quantity > 0));
+    // For demo purposes, we do not decrement the global store here to avoid complex state sync logic without websockets
   };
 
   const confirmOrder = () => {
