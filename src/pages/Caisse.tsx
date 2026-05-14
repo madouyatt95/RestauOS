@@ -19,6 +19,19 @@ export default function Caisse() {
   const [catFilter, setCatFilter] = useState<string>('Tout');
   const [showPayment, setShowPayment] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [splitCount, setSplitCount] = useState(1);
+  const [showUpsell, setShowUpsell] = useState(false);
+
+  const handleAddToCart = (p: typeof PRODUCTS[0]) => {
+    addToCart(p);
+    if (p.name.includes('Thiéboudienne') || p.name.includes('Yassa')) {
+      const hasBissap = cart.some(c => c.product.name.includes('Bissap'));
+      if (!hasBissap) {
+        setShowUpsell(true);
+        setTimeout(() => setShowUpsell(false), 4000);
+      }
+    }
+  };
 
   const filtered = PRODUCTS.filter(p => {
     const matchCat = catFilter === 'Tout' || p.category === catFilter.toLowerCase();
@@ -113,7 +126,7 @@ export default function Caisse() {
                     <span className="text-white font-bold text-sm w-5 text-center">{qty}</span>
                   </>
                 )}
-                <button onClick={() => addToCart(p)}
+                <button onClick={() => handleAddToCart(p)}
                   className="w-8 h-8 rounded-lg bg-orange/20 flex items-center justify-center text-orange active:bg-orange/30">
                   <Plus size={14} />
                 </button>
@@ -172,6 +185,21 @@ export default function Caisse() {
                 ))}
               </div>
 
+              {/* Split Bill */}
+              <div className="glass-card p-3 mb-6 flex items-center justify-between border-blue/30">
+                <span className="text-white text-sm font-semibold">Diviser l'addition</span>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setSplitCount(Math.max(1, splitCount - 1))} className="w-8 h-8 rounded bg-white/10 text-white">-</button>
+                  <span className="text-white font-bold">{splitCount}</span>
+                  <button onClick={() => setSplitCount(splitCount + 1)} className="w-8 h-8 rounded bg-white/10 text-white">+</button>
+                </div>
+              </div>
+              {splitCount > 1 && (
+                <div className="mb-4 text-center text-orange font-bold">
+                  {fmt(cartTotal / splitCount)} FCFA / personne
+                </div>
+              )}
+
               <p className="text-text-tertiary text-xs font-semibold mb-3 uppercase tracking-wider">Mode de paiement</p>
               <div className="grid grid-cols-2 gap-3">
                 {[
@@ -213,6 +241,29 @@ export default function Caisse() {
               className="text-white text-xl font-bold">Paiement confirmé !</motion.p>
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
               className="text-text-secondary text-sm mt-2">Ticket généré avec succès</motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Upsell Toast */}
+      <AnimatePresence>
+        {showUpsell && (
+          <motion.div initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -50 }}
+            className="fixed top-20 left-4 right-4 z-[10002] glass-card p-4 border border-violet/30 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-violet/20 flex items-center justify-center">
+              <span className="text-xl">🍹</span>
+            </div>
+            <div className="flex-1">
+              <p className="text-white font-bold text-sm">IA Suggestion</p>
+              <p className="text-text-secondary text-xs">80% des clients prennent un Jus de Bissap avec ce plat !</p>
+            </div>
+            <button onClick={() => {
+              const bissap = PRODUCTS.find(p => p.name.includes('Bissap'));
+              if (bissap) addToCart(bissap);
+              setShowUpsell(false);
+            }} className="px-3 py-1.5 rounded-lg bg-violet text-white text-xs font-bold">
+              Ajouter
+            </button>
           </motion.div>
         )}
       </AnimatePresence>

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, ShoppingBag, Package, Users, MoreHorizontal, Truck, ChefHat } from 'lucide-react';
+import { Home, ShoppingBag, Package, Users, MoreHorizontal, Truck, ChefHat, Calendar, Wallet } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 
 export default function BottomNav() {
@@ -45,8 +45,8 @@ export default function BottomNav() {
     case 'Client':
       navItems = [
         { path: '/client', icon: Home, label: 'Accueil' },
-        { path: '/fidelite', icon: Users, label: 'Fidélité' },
-        { path: '/plus', icon: MoreHorizontal, label: 'Plus' },
+        { path: '/reservations', icon: Calendar, label: 'Réserver' },
+        { path: '/wallet', icon: Wallet, label: 'Wallet' },
       ];
       break;
     default:

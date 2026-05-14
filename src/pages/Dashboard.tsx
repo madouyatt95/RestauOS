@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { useOrderStore } from '../stores/orderStore';
 import { useAuthStore } from '../stores/authStore';
-import { ShoppingBag, Users, Receipt, ArrowDown, Bell, ChevronRight } from 'lucide-react';
+import { ShoppingBag, Users, Receipt, ArrowDown, Bell, ChevronRight, ShieldAlert } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 
@@ -110,6 +110,21 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* Security Alerts */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+        className="glass-card p-4 mb-6 border-red/30 bg-red/5 flex items-start gap-3">
+        <div className="w-8 h-8 rounded-full bg-red/20 flex items-center justify-center shrink-0 text-red">
+          <ShieldAlert size={16} />
+        </div>
+        <div className="flex-1">
+          <h3 className="text-white font-bold text-sm mb-1 flex justify-between">
+            Alerte Anti-Fraude
+            <span className="text-xs text-text-tertiary">Il y a 10 min</span>
+          </h3>
+          <p className="text-text-secondary text-xs">Le ticket <strong>#ord-1102</strong> a été annulé en caisse après son impression physique. Veuillez vérifier avec Ibrahima Ba.</p>
+        </div>
+      </motion.div>
+
       {/* Top Products */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -135,8 +150,11 @@ export default function Dashboard() {
                 <div className="text-white font-semibold text-sm truncate">{p.name}</div>
                 <div className="text-text-tertiary text-[10px]">{p.sales} ventes</div>
               </div>
-              <div className="text-right">
-                <div className="text-white font-bold text-sm">{fmt(p.revenue)} FCFA</div>
+              <div className="text-right flex items-center gap-4">
+                <div>
+                  <div className="text-white font-bold text-sm">{fmt(p.revenue)} FCFA</div>
+                  <div className="text-green text-[10px] font-bold mt-0.5">Marge : 62%</div>
+                </div>
               </div>
             </div>
           ))}

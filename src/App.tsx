@@ -13,6 +13,8 @@ import Fidelite from './pages/Fidelite';
 import Plus from './pages/Plus';
 import Cuisine from './pages/Cuisine';
 import ClientHome from './pages/ClientHome';
+import Reservations from './pages/Reservations';
+import Wallet from './pages/Wallet';
 import './index.css';
 
 function AppContent() {
@@ -46,8 +48,14 @@ function AppContent() {
           <Route path="/client" element={
             <ProtectedRoute allowedRoles={['Client']}><ClientHome /></ProtectedRoute>
           } />
+          <Route path="/reservations" element={
+            <ProtectedRoute allowedRoles={['Client']}><Reservations /></ProtectedRoute>
+          } />
+          <Route path="/wallet" element={
+            <ProtectedRoute allowedRoles={['Client']}><Wallet /></ProtectedRoute>
+          } />
           <Route path="/fidelite" element={
-            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier', 'Serveur', 'Client']}><Fidelite /></ProtectedRoute>
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier', 'Serveur']}><Fidelite /></ProtectedRoute>
           } />
           <Route path="/plus" element={
             <ProtectedRoute><Plus /></ProtectedRoute>

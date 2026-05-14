@@ -14,6 +14,9 @@ export default function Livraisons() {
   const { deliveries, updateStatus } = useDeliveryStore();
   const { user } = useAuthStore();
   const [selected, setSelected] = useState<Delivery | null>(null);
+  const [showSignature, setShowSignature] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [optimized, setOptimized] = useState(false);
 
   const filteredDeliveries = user?.role === 'Livreur' 
     ? deliveries.filter(d => d.driverName === user.name)
@@ -26,8 +29,18 @@ export default function Livraisons() {
     <div className="page-content pt-14 pb-28">
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-black text-white">Livraisons</h1>
-        <div className="glass-card px-3 py-1.5 text-xs text-text-secondary flex items-center gap-1">
-          <Truck size={14} className="text-orange" /> {enCours.length} en cours
+        <div className="flex gap-2">
+          {user?.role === 'Livreur' && enCours.length > 1 && (
+            <button 
+              onClick={handleOptimize}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${optimized ? 'bg-green/20 text-green' : 'glass-card text-white'}`}
+            >
+              {isOptimizing ? 'Calcul IA...' : optimized ? 'Trajet Optimisé ✓' : 'Optimiser Trajet'}
+            </button>
+          )}
+          <div className="glass-card px-3 py-1.5 text-xs text-text-secondary flex items-center gap-1">
+            <Truck size={14} className="text-orange" /> {enCours.length} en cours
+          </div>
         </div>
       </div>
 
@@ -146,18 +159,57 @@ export default function Livraisons() {
               </div>
 
               <p className="text-text-tertiary text-xs font-semibold mb-3 uppercase tracking-wider">Changer le statut</p>
-              <div className="grid grid-cols-3 gap-2">
-                {(Object.entries(statusConfig) as [Delivery['status'], typeof statusConfig.preparation][]).map(([key, cfg]) => (
-                  <button key={key} onClick={() => { updateStatus(selected.id, key); setSelected({ ...selected, status: key }); }}
-                    className={`py-3 rounded-xl text-[10px] font-bold transition-all flex flex-col items-center gap-1 ${selected.status === key ? 'ring-2 ring-offset-1 ring-offset-bg-card' : ''}`}
-                    style={{ background: cfg.bg, color: cfg.color }}>
-                    <cfg.icon size={16} />
-                    {cfg.label}
+              <div className="flex gap-2">
+                {selected.status === 'en_route' && (
+                  <button
+                    onClick={() => setShowSignature(true)}
+                    className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue to-indigo-600 text-white font-bold text-sm"
+                  >
+                    Remettre au client
                   </button>
-                ))}
+                )}
+                {selected.status !== 'livre' && selected.status !== 'en_route' && (
+                  <button
+                    onClick={() => updateStatus(selected.id, 'en_route')}
+                    className="flex-1 py-3 rounded-xl bg-white/10 text-white font-bold text-sm"
+                  >
+                    Commencer la course
+                  </button>
+                )}
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Signature Modal */}
+      <AnimatePresence>
+        {showSignature && (
+          <div className="modal-overlay" onClick={() => setShowSignature(false)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <h3 className="text-white font-bold text-lg mb-2">Preuve de livraison</h3>
+              <p className="text-text-secondary text-sm mb-4">Veuillez faire signer le client pour confirmer la réception.</p>
+              
+              <div className="w-full h-40 bg-white/5 border border-white/10 rounded-xl mb-6 flex flex-col items-center justify-center relative overflow-hidden">
+                <span className="text-text-tertiary text-sm absolute">Zone de signature</span>
+                {/* Fake signature line for demo */}
+                <svg className="w-full h-full relative z-10 opacity-50" viewBox="0 0 200 100">
+                  <path d="M 20 50 Q 40 20 60 50 T 100 50 T 140 30 T 180 50" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => setShowSignature(false)} className="flex-1 py-3 rounded-xl bg-white/10 text-white font-bold">
+                  Annuler
+                </button>
+                <button onClick={handleSignAndComplete} className="flex-1 py-3 rounded-xl bg-green text-white font-bold flex items-center justify-center gap-2">
+                  <Check size={18} /> Valider
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

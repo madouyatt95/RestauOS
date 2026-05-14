@@ -32,6 +32,18 @@ export default function Cuisine() {
         </div>
       </div>
 
+      {/* IA Forecast Banner */}
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
+        className="glass-card p-4 mb-6 border-violet/30 bg-violet/5 flex items-start gap-3">
+        <div className="w-8 h-8 rounded-full bg-violet/20 flex items-center justify-center shrink-0">
+          <span className="text-sm">🤖</span>
+        </div>
+        <div>
+          <h3 className="text-white font-bold text-sm mb-1">Prévisions IA (Vendredi)</h3>
+          <p className="text-text-secondary text-xs">Météo : 30°C. Prévoyez <strong>+40%</strong> de commandes Yassa aujourd'hui par rapport à la moyenne. Pensez à vérifier le stock d'oignons.</p>
+        </div>
+      </motion.div>
+
       {activeOrders.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 text-text-tertiary">
           <ChefHat size={48} className="mb-4 opacity-20" />
