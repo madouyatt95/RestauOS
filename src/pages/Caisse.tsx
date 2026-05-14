@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOrderStore, PRODUCTS } from '../stores/orderStore';
 import { useStockStore } from '../stores/stockStore';
-import { Search, Plus, Minus, ShoppingCart, Check, CreditCard, Smartphone, Banknote, Wallet, Wifi, Flame, CloudUpload } from 'lucide-react';
+import { Search, Plus, Minus, ShoppingCart, Check, CreditCard, Smartphone, Banknote, Wallet, Wifi, Flame, CloudUpload, ClipboardList } from 'lucide-react';
 import { syncOrderToERP } from '../services/erpConnector';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
@@ -25,6 +25,13 @@ export default function Caisse() {
   const [showSoftPOS, setShowSoftPOS] = useState(false);
   const [showPingChef, setShowPingChef] = useState(false);
   const [isSyncingERP, setIsSyncingERP] = useState(false);
+  const [showPending, setShowPending] = useState(false);
+
+  // Mockup data for pending server orders
+  const pendingOrders = [
+    { id: 'ORD-102', server: 'Awa F.', table: 'Table 4', total: 12500, time: 'Il y a 2 min' },
+    { id: 'ORD-103', server: 'Ibrahima B.', table: 'Table 12', total: 34000, time: 'Il y a 5 min' },
+  ];
 
   const handleAddToCart = (p: typeof PRODUCTS[0]) => {
     addToCart(p);
@@ -82,6 +89,10 @@ export default function Caisse() {
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-black text-white">Caisse</h1>
         <div className="flex gap-2">
+          <button onClick={() => setShowPending(true)} className="w-9 h-9 glass-card flex items-center justify-center rounded-full relative">
+            <ClipboardList size={16} className="text-blue" />
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue rounded-full text-[9px] text-white font-bold flex items-center justify-center">2</span>
+          </button>
           <button onClick={() => { setShowPingChef(true); setTimeout(() => setShowPingChef(false), 3000); }}
             className="w-9 h-9 glass-card flex items-center justify-center rounded-full active:bg-red/20 transition-colors">
             <Flame size={16} className="text-red" />
@@ -245,6 +256,43 @@ export default function Caisse() {
                 className="mt-4 w-full text-center text-red text-xs font-semibold py-2">
                 Vider le panier
               </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Pending Orders Modal */}
+      <AnimatePresence>
+        {showPending && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setShowPending(false)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25 }}
+              className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-white font-bold text-lg">Commandes Serveurs</h3>
+                <span className="bg-blue/20 text-blue px-2 py-1 rounded text-xs font-bold">Live Synchro</span>
+              </div>
+              <p className="text-text-secondary text-sm mb-6">Ces commandes ont été prises par les serveurs en salle. Validez-les pour l'encaissement.</p>
+              
+              <div className="space-y-3">
+                {pendingOrders.map(o => (
+                  <div key={o.id} className="glass-card p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <span className="text-white font-bold text-sm">{o.table}</span>
+                        <span className="text-text-tertiary text-xs ml-2">par {o.server}</span>
+                      </div>
+                      <span className="text-text-secondary text-xs">{o.time}</span>
+                    </div>
+                    <div className="flex justify-between items-end">
+                      <span className="text-orange font-bold text-lg">{fmt(o.total)} FCFA</span>
+                      <button onClick={() => { setShowPending(false); setShowPayment(true); }} className="px-4 py-2 rounded-xl bg-blue text-white text-xs font-bold">
+                        Encaisser
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </motion.div>
           </motion.div>
         )}

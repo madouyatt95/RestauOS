@@ -112,7 +112,8 @@ export default function Personnel() {
             .fc-toolbar-title { font-size: 1.1rem !important; font-weight: 900 !important; color: white !important; text-transform: capitalize; }
             .fc-button-primary { background: var(--color-orange) !important; border: none !important; font-weight: bold !important; text-transform: capitalize; border-radius: 8px !important; }
             .fc-button-primary:not(:disabled):active, .fc-button-primary:not(:disabled).fc-button-active { background: #E67A00 !important; }
-            .fc-daygrid-day-number { color: #A1A1AA !important; font-weight: 600; text-decoration: none; }
+            .fc-daygrid-day-number { color: white !important; font-weight: 600; text-decoration: none; padding: 4px; }
+            .fc-daygrid-day-top { flex-direction: row !important; }
             .fc-col-header-cell-cushion { color: #A1A1AA !important; font-weight: 800; padding: 8px !important; text-transform: uppercase; font-size: 0.75rem; }
             .fc-theme-standard td, .fc-theme-standard th { border-color: rgba(255,255,255,0.1) !important; }
             .fc-list-day-cushion { background: rgba(255,255,255,0.05) !important; }
@@ -120,6 +121,10 @@ export default function Personnel() {
             .fc-list-event-title, .fc-list-event-time { color: white !important; }
             .fc-event { border-radius: 4px; border: none; padding: 2px 4px; font-size: 0.7rem; font-weight: bold; cursor: pointer; }
             .fc-h-event .fc-event-main { color: white; }
+            .fc-timegrid-slot-label-cushion { color: #A1A1AA !important; font-size: 0.75rem; }
+            .fc-timegrid-axis-cushion { color: #A1A1AA !important; }
+            .fc-timegrid-now-indicator-line { border-color: var(--color-red) !important; }
+            .fc-scrollgrid { border-color: rgba(255,255,255,0.1) !important; }
           `}</style>
           <FullCalendar
             plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
@@ -128,15 +133,21 @@ export default function Personnel() {
             headerToolbar={{
               left: 'prev,next',
               center: 'title',
-              right: 'listWeek,dayGridMonth'
+              right: 'listWeek,dayGridMonth,timeGridDay'
             }}
             height={500}
             editable={isManager}
             selectable={isManager}
+            nowIndicator={true}
             events={[
               { title: 'Awa F. (08h-16h)', date: new Date().toISOString().split('T')[0], color: '#3B82F6' },
               { title: 'Ibrahima B. (16h-23h)', date: new Date().toISOString().split('T')[0], color: '#F59E0B' },
+              { title: 'Ousmane C. (09h-17h)', date: new Date().toISOString().split('T')[0], color: '#10B981' },
               { title: 'Fatou N. (08h-16h)', date: new Date(Date.now() + 86400000).toISOString().split('T')[0], color: '#EC4899' },
+              { title: 'Cheikh T. (16h-23h)', date: new Date(Date.now() + 86400000).toISOString().split('T')[0], color: '#8B5CF6' },
+              { title: 'Moussa D. (Repos)', date: new Date(Date.now() + 86400000).toISOString().split('T')[0], color: '#6B7280' },
+              { title: 'Awa F. (08h-16h)', date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0], color: '#3B82F6' },
+              { title: 'Ibrahima B. (Repos)', date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0], color: '#6B7280' },
             ]}
           />
         </div>
