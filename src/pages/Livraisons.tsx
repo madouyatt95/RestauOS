@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDeliveryStore, type Delivery } from '../stores/deliveryStore';
 import { useAuthStore } from '../stores/authStore';
-import { MapPin, Clock, Truck, Check, ChefHat, Package } from 'lucide-react';
+import { MapPin, Clock, Truck, Check, ChefHat, Phone, Navigation, Wallet, X } from 'lucide-react';
+
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -22,7 +23,7 @@ const statusConfig = {
 };
 
 export default function Livraisons() {
-  const { deliveries, updateStatus } = useDeliveryStore();
+  const { deliveries, updateStatus, updatePaymentStatus } = useDeliveryStore();
   const { user } = useAuthStore();
   const [selected, setSelected] = useState<Delivery | null>(null);
   const [showSignature, setShowSignature] = useState(false);
@@ -47,109 +48,120 @@ export default function Livraisons() {
   };
 
   const handleSignAndComplete = () => {
-    if (selected) updateStatus(selected.id, 'livre');
+    if (selected) {
+      updateStatus(selected.id, 'livre');
+      if (selected.paymentStatus === 'en_attente') updatePaymentStatus(selected.id, 'paye');
+    }
     setShowSignature(false);
     setSelected(null);
   };
 
   return (
-    <div className="page-content pt-14 pb-28">
-      <div className="flex items-center justify-between mb-5">
+    <div className="page-content pt-14 pb-28 bg-[#0a0c10] min-h-screen">
+      <div className="flex items-center justify-between mb-6 px-4">
         <div>
-          <h1 className="text-xl font-black text-white">Livraisons</h1>
-          {isGerant && <span className="text-[10px] font-black text-blue uppercase tracking-widest bg-blue/10 px-2 py-0.5 rounded">Supervision</span>}
+          <h1 className="text-white font-black text-2xl">Courses</h1>
+          <p className="text-text-secondary text-xs uppercase tracking-widest font-bold">Logistique & Livraisons</p>
         </div>
-        <div className="flex gap-2">
-          {!isGerant && user?.role === 'Livreur' && enCours.length > 1 && (
-            <button 
-              onClick={handleOptimize}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${optimized ? 'bg-green/20 text-green' : 'glass-card text-white'}`}
-            >
-              {isOptimizing ? 'Calcul IA...' : optimized ? 'Trajet Optimisé ✓' : 'Optimiser Trajet'}
-            </button>
-          )}
-          <div className="glass-card px-3 py-1.5 text-xs text-text-secondary flex items-center gap-1">
-            <Truck size={14} className="text-orange" /> {enCours.length} en cours
-          </div>
+        {!isGerant && user?.role === 'Livreur' && enCours.length > 1 && (
+          <button 
+            onClick={handleOptimize}
+            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg ${optimized ? 'bg-green text-white shadow-green/20' : 'bg-white/10 text-white border border-white/10'}`}
+          >
+            {isOptimizing ? 'Calcul...' : optimized ? 'Optimisé ✓' : 'Optimiser'}
+          </button>
+        )}
+      </div>
+
+      {/* Map Preview */}
+      <div className="px-4 mb-8">
+        <div className="rounded-[2.5rem] overflow-hidden h-52 border border-white/10 shadow-2xl relative z-0">
+          <MapContainer center={[14.6928, -17.4467]} zoom={13} scrollWheelZoom={false} style={{ width: '100%', height: '100%' }}>
+            <TileLayer
+              attribution='&copy; CARTO'
+              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            />
+            {enCours.map((d, i) => {
+              const offsets = [[0.01, 0.02], [-0.015, 0.01], [0.02, -0.01]];
+              const pos = [14.6928 + offsets[i % 3][0], -17.4467 + offsets[i % 3][1]] as [number, number];
+              return (
+                <Marker key={d.id} position={pos}>
+                  <Popup>
+                    <div className="p-1 font-bold">{d.clientName}</div>
+                  </Popup>
+                </Marker>
+              );
+            })}
+          </MapContainer>
         </div>
       </div>
 
-      {/* GPS Map */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-        className="glass-card-lg mb-6 overflow-hidden relative z-0" style={{ height: 250 }}>
-        <MapContainer center={[14.6928, -17.4467]} zoom={13} scrollWheelZoom={false} style={{ width: '100%', height: '100%' }}>
-          <TileLayer
-            attribution='&copy; OpenStreetMap'
-            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          />
-          <Marker position={[14.6928, -17.4467]}>
-            <Popup>📍 RestauOS (Cuisine)</Popup>
-          </Marker>
-          {enCours.map((d, i) => {
-            const offsets = [[0.01, 0.02], [-0.015, 0.01], [0.02, -0.01]];
-            const pos = [14.6928 + offsets[i % 3][0], -17.4467 + offsets[i % 3][1]] as [number, number];
-            return (
-              <Marker key={d.id} position={pos}>
-                <Popup>
-                  <strong>{d.clientName}</strong><br/>
-                  {d.address}<br/>
-                  <small>Livreur: {d.driverName}</small>
-                </Popup>
-              </Marker>
-            );
-          })}
-        </MapContainer>
-      </motion.div>
+      {/* Deliveries List */}
+      <div className="px-4 space-y-6">
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-white/60 font-black text-[10px] uppercase tracking-[0.2em]">En cours de traitement</h3>
+            <span className="text-orange font-black text-xs">{enCours.length} Commandes</span>
+          </div>
+          <div className="space-y-4">
+            {enCours.map(d => {
+              const cfg = statusConfig[d.status];
+              return (
+                <motion.div key={d.id} layout className="glass-card p-5 border-white/5 active:scale-98 transition-all" onClick={() => setSelected(d)}>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border border-white/5" style={{ background: cfg.bg }}>
+                        <cfg.icon size={22} style={{ color: cfg.color }} />
+                      </div>
+                      <div>
+                        <h4 className="text-white font-black text-base">{d.clientName}</h4>
+                        <div className="flex items-center gap-1.5 text-text-tertiary text-[10px] font-bold uppercase mt-0.5">
+                          <MapPin size={10} /> {d.address}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-sm" style={{ color: cfg.color, background: cfg.bg }}>
+                      {cfg.label}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between pt-4 border-t border-white/5">
+                    <div className="flex items-center gap-2">
+                      <Wallet size={14} className={d.paymentStatus === 'paye' ? 'text-green' : 'text-orange'} />
+                      <span className="text-white font-black text-sm">{d.amount.toLocaleString()} F</span>
+                      <span className={`text-[9px] font-bold uppercase ${d.paymentStatus === 'paye' ? 'text-green' : 'text-orange'}`}>
+                        • {d.paymentStatus === 'paye' ? 'Payé' : 'À encaisser'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-text-tertiary">
+                      <Clock size={12} />
+                      <span className="text-[10px] font-bold">{d.estimatedTime} min</span>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
 
-      {/* En cours */}
-      <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
-        <Package size={16} className="text-orange" /> En cours ({enCours.length})
-      </h3>
-      <div className="space-y-3 mb-6">
-        {enCours.map(d => {
-          const cfg = statusConfig[d.status];
-          return (
-            <motion.div key={d.id} layout className="glass-card p-4 flex items-center gap-3 cursor-pointer active:border-orange/30 transition-colors"
-              onClick={() => setSelected(d)}>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: cfg.bg }}>
-                <cfg.icon size={18} style={{ color: cfg.color }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-white font-semibold text-sm">{d.clientName}</div>
-                <div className="text-text-tertiary text-xs flex items-center gap-1">
-                  <MapPin size={10} /> {d.address}
+        {terminees.length > 0 && (
+          <div>
+            <h3 className="text-white/40 font-black text-[10px] uppercase tracking-[0.2em] mb-4">Livraisons terminées</h3>
+            <div className="space-y-3">
+              {terminees.slice(0, 3).map(d => (
+                <div key={d.id} className="glass-card p-4 flex items-center gap-4 opacity-50 border-white/5">
+                  <div className="w-10 h-10 rounded-xl bg-green/10 flex items-center justify-center text-green border border-green/10">
+                    <Check size={18} />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-white font-bold text-sm">{d.clientName}</h4>
+                    <p className="text-text-tertiary text-[10px]">{d.address}</p>
+                  </div>
                 </div>
-                {isGerant && <div className="text-blue text-[10px] font-bold mt-1">Livreur: {d.driverName}</div>}
-              </div>
-              <div className="text-right">
-                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full" style={{ color: cfg.color, background: cfg.bg }}>
-                  {cfg.label}
-                </span>
-                <div className="text-text-tertiary text-[10px] mt-1 flex items-center gap-0.5 justify-end">
-                  <Clock size={10} /> {d.estimatedTime} min
-                </div>
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
-
-      {/* Terminées */}
-      <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
-        <Check size={16} className="text-green" /> Terminées ({terminees.length})
-      </h3>
-      <div className="space-y-3">
-        {terminees.slice(0, 3).map(d => (
-          <div key={d.id} className="glass-card p-4 flex items-center gap-3 opacity-60">
-            <div className="w-10 h-10 rounded-xl bg-green-light flex items-center justify-center shrink-0">
-              <Check size={18} className="text-green" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-white font-semibold text-sm">{d.clientName}</div>
-              <div className="text-text-tertiary text-xs">{d.address}</div>
+              ))}
             </div>
           </div>
-        ))}
+        )}
       </div>
 
       {/* Detail Modal */}
@@ -159,41 +171,54 @@ export default function Livraisons() {
             <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25 }}
               className="modal-sheet" onClick={e => e.stopPropagation()}>
               <div className="modal-handle" />
-              <h3 className="text-white font-bold text-lg mb-1">{selected.clientName}</h3>
-              <p className="text-text-secondary text-sm mb-4 flex items-center gap-1"><MapPin size={14} /> {selected.address}</p>
-
-              <div className="glass-card p-3 flex items-center gap-3 mb-4">
-                <Truck size={16} className="text-blue" />
-                <span className="text-white text-sm">Livreur : {selected.driverName}</span>
+              
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="text-white font-black text-2xl mb-1">{selected.clientName}</h3>
+                  <p className="text-text-secondary text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
+                    <MapPin size={12} /> {selected.address}
+                  </p>
+                </div>
+                <button onClick={() => setSelected(null)} className="w-10 h-10 rounded-xl bg-white/5 text-white flex items-center justify-center"><X size={20} /></button>
               </div>
 
-              {isGerant ? (
-                <div className="p-4 bg-blue/5 border border-blue/20 rounded-xl">
-                  <p className="text-blue font-bold text-xs">MODE SUPERVISION</p>
-                  <p className="text-text-secondary text-[10px] mt-1">Vous ne pouvez pas effectuer d'actions directes sur cette livraison.</p>
+              <div className="grid grid-cols-2 gap-3 mb-8">
+                <a href={`tel:${selected.clientPhone}`} className="p-4 rounded-2xl bg-blue/10 border border-blue/20 flex flex-col items-center gap-2 text-blue active:scale-95 transition-transform">
+                  <Phone size={24} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Appeler</span>
+                </a>
+                <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selected.address)}`} target="_blank" rel="noreferrer" className="p-4 rounded-2xl bg-orange/10 border border-orange/20 flex flex-col items-center gap-2 text-orange active:scale-95 transition-transform">
+                  <Navigation size={24} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Itinéraire</span>
+                </a>
+              </div>
+
+              <div className="glass-card p-5 mb-8 border-white/5">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Total Commande</span>
+                  <span className="text-white font-black text-xl">{selected.amount.toLocaleString()} F</span>
                 </div>
-              ) : (
-                <>
-                  <p className="text-text-tertiary text-xs font-semibold mb-3 uppercase tracking-wider">Changer le statut</p>
-                  <div className="flex gap-2">
-                    {selected.status === 'en_route' && (
-                      <button
-                        onClick={() => setShowSignature(true)}
-                        className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue to-indigo-600 text-white font-bold text-sm"
-                      >
-                        Remettre au client
-                      </button>
-                    )}
-                    {selected.status !== 'livre' && selected.status !== 'en_route' && (
-                      <button
-                        onClick={() => updateStatus(selected.id, 'en_route')}
-                        className="flex-1 py-3 rounded-xl bg-white/10 text-white font-bold text-sm"
-                      >
-                        Commencer la course
-                      </button>
-                    )}
-                  </div>
-                </>
+                <div className="flex justify-between items-center">
+                  <span className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">État du paiement</span>
+                  <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${selected.paymentStatus === 'paye' ? 'bg-green/10 text-green' : 'bg-orange/10 text-orange'}`}>
+                    {selected.paymentStatus === 'paye' ? 'Déjà Payé' : 'À encaisser'}
+                  </span>
+                </div>
+              </div>
+
+              {!isGerant && user?.role === 'Livreur' && (
+                <div className="space-y-3">
+                  {selected.status === 'preparation' && (
+                    <button onClick={() => updateStatus(selected.id, 'en_route')} className="w-full py-5 rounded-[2rem] bg-blue text-white font-black text-base shadow-xl shadow-blue/20 active:scale-95 transition-transform">
+                      Récupérer & Commencer la livraison
+                    </button>
+                  )}
+                  {selected.status === 'en_route' && (
+                    <button onClick={() => setShowSignature(true)} className="w-full py-5 rounded-[2rem] bg-gradient-to-r from-green-600 to-green-500 text-white font-black text-base shadow-xl shadow-green/20 active:scale-95 transition-transform">
+                      Valider la livraison (Signature)
+                    </button>
+                  )}
+                </div>
               )}
             </motion.div>
           </motion.div>
@@ -207,23 +232,22 @@ export default function Livraisons() {
             <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
               className="modal-sheet" onClick={e => e.stopPropagation()}>
               <div className="modal-handle" />
-              <h3 className="text-white font-bold text-lg mb-2">Preuve de livraison</h3>
-              <p className="text-text-secondary text-sm mb-4">Veuillez faire signer le client pour confirmer la réception.</p>
+              <h3 className="text-white font-black text-xl mb-2 text-center">Preuve de Livraison</h3>
+              <p className="text-text-secondary text-sm mb-6 text-center">Faites signer le client pour confirmer le paiement de <span className="text-white font-bold">{selected?.amount.toLocaleString()} F</span></p>
               
-              <div className="w-full h-40 bg-white/5 border border-white/10 rounded-xl mb-6 flex flex-col items-center justify-center relative overflow-hidden">
-                <span className="text-text-tertiary text-sm absolute">Zone de signature</span>
-                {/* Fake signature line for demo */}
-                <svg className="w-full h-full relative z-10 opacity-50" viewBox="0 0 200 100">
-                  <path d="M 20 50 Q 40 20 60 50 T 100 50 T 140 30 T 180 50" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" />
+              <div className="w-full h-48 bg-white/5 border border-white/10 rounded-[2.5rem] mb-8 flex flex-col items-center justify-center relative overflow-hidden">
+                <span className="text-text-tertiary text-[10px] font-black uppercase tracking-widest absolute opacity-20">Zone de signature</span>
+                <svg className="w-full h-full relative z-10 opacity-60" viewBox="0 0 200 100">
+                  <path d="M 30 60 Q 50 30 70 60 T 110 60 T 150 40 T 170 60" fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </div>
 
-              <div className="flex gap-3">
-                <button onClick={() => setShowSignature(false)} className="flex-1 py-3 rounded-xl bg-white/10 text-white font-bold">
+              <div className="flex gap-4">
+                <button onClick={() => setShowSignature(false)} className="flex-1 py-4 rounded-2xl bg-white/5 text-white font-black text-sm border border-white/10 uppercase tracking-widest">
                   Annuler
                 </button>
-                <button onClick={handleSignAndComplete} className="flex-1 py-3 rounded-xl bg-green text-white font-bold flex items-center justify-center gap-2">
-                  <Check size={18} /> Valider
+                <button onClick={handleSignAndComplete} className="flex-1 py-4 rounded-2xl bg-green text-white font-black text-sm flex items-center justify-center gap-2 shadow-xl shadow-green/20 uppercase tracking-widest">
+                  <Check size={20} /> Valider
                 </button>
               </div>
             </motion.div>
@@ -233,4 +257,3 @@ export default function Livraisons() {
     </div>
   );
 }
-

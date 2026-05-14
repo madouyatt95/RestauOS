@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useStaffStore, type Employee } from '../stores/staffStore';
 import { useAuthStore } from '../stores/authStore';
 import { usePlanningStore } from '../stores/planningStore';
-import { Phone, Clock, RefreshCw, Check, Calendar as CalendarIcon } from 'lucide-react';
+import { Phone, Clock, RefreshCw, Check, Calendar as CalendarIcon, List } from 'lucide-react';
 
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -24,25 +24,32 @@ export default function Personnel() {
   const { user } = useAuthStore();
   
   const [activeTab, setActiveTab] = useState<'presences' | 'calendrier' | 'remplacements'>('presences');
+  const [calendarView, setCalendarView] = useState<'list' | 'grid'>('list');
   const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
   const [showAddShift, setShowAddShift] = useState(false);
   const [newShift, setNewShift] = useState({ empId: '', date: '', type: 'midi' as any });
+  const [filterMyShifts, setFilterMyShifts] = useState(false);
 
   const isManager = ['Admin', 'Gérant'].includes(user?.role || '');
 
   const calendarEvents = useMemo(() => {
-    return shifts.map(s => {
+    let s = shifts;
+    if (filterMyShifts && user) {
+      const emp = employees.find(e => e.name === user.name);
+      if (emp) s = s.filter(x => x.employeeId === emp.id);
+    }
+    return s.map(s => {
       const emp = employees.find(e => e.id === s.employeeId);
       return {
         id: s.id,
         title: `${emp?.name || 'Inconnu'} (${s.type.toUpperCase()})`,
-        start: `${s.date}${s.type === 'midi' ? 'T11:00:00' : 'T18:00:00'}`,
-        end: `${s.date}${s.type === 'midi' ? 'T16:00:00' : 'T23:00:00'}`,
+        start: `${s.date}${s.type === 'midi' ? 'T11:00:00' : s.type === 'soir' ? 'T18:00:00' : 'T10:00:00'}`,
+        end: `${s.date}${s.type === 'midi' ? 'T16:00:00' : s.type === 'soir' ? 'T23:00:00' : 'T22:00:00'}`,
         color: s.type === 'midi' ? '#F59E0B' : s.type === 'soir' ? '#3B82F6' : '#8B5CF6',
         extendedProps: { employeeId: s.employeeId }
       };
     });
-  }, [shifts, employees]);
+  }, [shifts, employees, filterMyShifts, user]);
 
   const handleDateClick = (info: any) => {
     if (!isManager) return;
@@ -76,13 +83,18 @@ export default function Personnel() {
           <h1 className="text-white font-black text-2xl">Personnel</h1>
           <p className="text-text-secondary text-xs uppercase tracking-widest font-bold">Équipe & Planning</p>
         </div>
+        {!isManager && (
+          <button onClick={() => setFilterMyShifts(!filterMyShifts)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filterMyShifts ? 'bg-orange text-white' : 'bg-white/10 text-white'}`}>
+            {filterMyShifts ? 'Voir tout' : 'Mon Planning'}
+          </button>
+        )}
       </div>
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6 px-4">
         {[
           { id: 'presences', label: 'Présences', icon: Check },
-          { id: 'calendrier', label: 'Calendrier', icon: CalendarIcon },
+          { id: 'calendrier', label: 'Planning', icon: CalendarIcon },
           { id: 'remplacements', label: 'Échanges', icon: RefreshCw },
         ].map(tab => (
           <button
@@ -126,26 +138,35 @@ export default function Personnel() {
 
       {activeTab === 'calendrier' && (
         <div className="px-2">
+          <div className="flex gap-2 mb-4 px-2">
+            <button onClick={() => setCalendarView('list')} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 ${calendarView === 'list' ? 'bg-white/10 text-white' : 'text-text-tertiary'}`}>
+              <List size={14} /> Liste
+            </button>
+            <button onClick={() => setCalendarView('grid')} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 ${calendarView === 'grid' ? 'bg-white/10 text-white' : 'text-text-tertiary'}`}>
+              <CalendarIcon size={14} /> Calendrier
+            </button>
+          </div>
           <div className="glass-card p-4">
             <FullCalendar
               plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
-              initialView="listWeek"
+              initialView={calendarView === 'list' ? 'listWeek' : 'dayGridMonth'}
               locale="fr"
               headerToolbar={{
                 left: 'prev,next',
                 center: 'title',
-                right: 'listWeek,dayGridMonth'
+                right: ''
               }}
               height="auto"
               events={calendarEvents}
               dateClick={handleDateClick}
               eventClick={handleEventClick}
               editable={false}
+              key={calendarView} // Force re-render on view change
             />
           </div>
           {isManager && (
             <p className="text-[10px] text-text-tertiary italic text-center mt-4">
-              * Cliquez sur une date pour ajouter un service. Cliquez sur un service pour le supprimer.
+              * Cliquez sur une date pour ajouter un service.
             </p>
           )}
         </div>
@@ -157,17 +178,16 @@ export default function Personnel() {
         </div>
       )}
 
-      {/* Add Shift Modal (Manager) */}
+      {/* Add Shift Modal */}
       <AnimatePresence>
         {showAddShift && isManager && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setShowAddShift(false)}>
             <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
               <div className="modal-handle" />
-              <h3 className="text-white font-black text-xl mb-6">Ajouter au Planning</h3>
-              
+              <h3 className="text-white font-black text-xl mb-6 text-center">Ajouter au Planning</h3>
               <div className="space-y-6">
                 <div>
-                  <label className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-3 block">Employé</label>
+                  <label className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-3 block">1. Choisir l'employé</label>
                   <div className="grid grid-cols-3 gap-2">
                     {employees.map(emp => (
                       <button key={emp.id} onClick={() => setNewShift({ ...newShift, empId: emp.id })} className={`p-3 rounded-xl border transition-all text-center ${newShift.empId === emp.id ? 'bg-orange/20 border-orange text-orange' : 'bg-white/5 border-transparent text-white'}`}>
@@ -177,13 +197,13 @@ export default function Personnel() {
                     ))}
                   </div>
                 </div>
-
                 <div>
-                  <label className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-3 block">Type de Service</label>
+                  <label className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-3 block">2. Type de Service</label>
                   <div className="grid grid-cols-2 gap-3">
                     {[
                       { id: 'midi', label: 'Service Midi', hours: '11:00 - 16:00' },
                       { id: 'soir', label: 'Service Soir', hours: '18:00 - 23:00' },
+                      { id: 'journee', label: 'Journée', hours: '10:00 - 22:00' },
                     ].map(st => (
                       <button key={st.id} onClick={() => {
                         if (!newShift.empId) return alert("Sélectionnez un employé");

@@ -317,10 +317,19 @@ export default function Commandes() {
                     <div>
                       <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Capacité</label>
                       <div className="flex items-center justify-between bg-white/5 rounded-2xl px-4 py-3 border border-white/5">
-                        <button onClick={() => updateTableCapacity(editingTable.id, Math.max(1, editingTable.capacity - 1))} className="text-white"><Minus size={18} /></button>
+                        <button onClick={() => {
+                          const newCap = Math.max(1, editingTable.capacity - 1);
+                          updateTableCapacity(editingTable.id, newCap);
+                          setEditingTable({ ...editingTable, capacity: newCap });
+                        }} className="text-white"><Minus size={18} /></button>
                         <span className="text-2xl font-black text-white">{editingTable.capacity}</span>
-                        <button onClick={() => updateTableCapacity(editingTable.id, editingTable.capacity + 1)} className="text-white"><Plus size={18} /></button>
+                        <button onClick={() => {
+                          const newCap = editingTable.capacity + 1;
+                          updateTableCapacity(editingTable.id, newCap);
+                          setEditingTable({ ...editingTable, capacity: newCap });
+                        }} className="text-white"><Plus size={18} /></button>
                       </div>
+
                     </div>
                     <div>
                       <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Déplacer vers Zone</label>

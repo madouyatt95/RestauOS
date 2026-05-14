@@ -128,13 +128,18 @@ export default function Cuisine() {
                         addDelivery({
                           orderId: order.id,
                           clientName: order.clientId ? 'Ousmane Thiam' : 'Client Inconnu',
+                          clientPhone: '77 000 00 00',
                           address: 'Dakar (Adresse de livraison)',
+                          amount: order.total,
+                          paymentStatus: order.status === 'paye' ? 'paye' : 'en_attente',
+
                           driverId: 'u6', // Pape Sow
                           driverName: 'Pape Sow',
                           status: 'preparation',
                           estimatedTime: 25,
                           createdAt: new Date().toISOString()
                         });
+
                       }
                     }}
                     className="w-full py-4 rounded-xl bg-gradient-to-r from-green to-emerald-600 text-white font-black text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg shadow-green/10"
