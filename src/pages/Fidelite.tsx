@@ -18,18 +18,30 @@ export default function Fidelite() {
   const [search, setSearch] = useState('');
   const [showQR, setShowQR] = useState(false);
   const [showUsePoints, setShowUsePoints] = useState(false);
+  const [showOTP, setShowOTP] = useState(false);
   const [pointsToUse, setPointsToUse] = useState('');
+  const [otpCode, setOtpCode] = useState('');
 
   const filtered = clients.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
 
-  const handleUsePoints = () => {
+  const handleRequestPoints = () => {
     if (!selected || !pointsToUse) return;
     const pts = Number(pointsToUse);
     if (pts > selected.points) return;
+    // Hide usage modal, show OTP modal
+    setShowUsePoints(false);
+    setShowOTP(true);
+    setOtpCode('');
+  };
+
+  const handleValidateOTP = () => {
+    if (!selected || otpCode.length < 4) return;
+    const pts = Number(pointsToUse);
+    
     usePoints(selected.id, pts, `Réduction ${fmt(pts * 5)} FCFA`);
     setSelected({ ...selected, points: selected.points - pts });
     setPointsToUse('');
-    setShowUsePoints(false);
+    setShowOTP(false);
   };
 
   if (selected) {
@@ -150,10 +162,34 @@ export default function Fidelite() {
                 {pointsToUse && (
                   <p className="text-orange text-sm font-semibold mb-4">Réduction : {fmt(Number(pointsToUse) * 5)} FCFA</p>
                 )}
-                <button onClick={handleUsePoints}
+                <button onClick={handleRequestPoints}
                   className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-orange to-amber-600 text-white font-bold text-sm"
                   disabled={!pointsToUse || Number(pointsToUse) > selected.points}>
-                  Confirmer
+                  Continuer
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* OTP Modal */}
+        <AnimatePresence>
+          {showOTP && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setShowOTP(false)}>
+              <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25 }}
+                className="modal-sheet" onClick={e => e.stopPropagation()}>
+                <div className="modal-handle" />
+                <h3 className="text-white font-bold text-lg mb-2 text-center">Validation Sécurité</h3>
+                <p className="text-text-secondary text-sm mb-6 text-center">
+                  Un code SMS a été envoyé au +221 77 *** ** **.<br/>
+                  Demandez au client de vous le dicter pour valider la transaction.
+                </p>
+                <input type="text" placeholder="Entrez le code (ex: 1234)" value={otpCode} onChange={e => setOtpCode(e.target.value)} maxLength={4}
+                  className="w-full px-4 py-4 glass-card text-white text-center font-black text-2xl tracking-[1em] bg-transparent border-orange/50 mb-6" />
+                <button onClick={handleValidateOTP}
+                  className="w-full py-3.5 rounded-2xl bg-green text-white font-bold text-sm"
+                  disabled={otpCode.length < 4}>
+                  Valider et déduire
                 </button>
               </motion.div>
             </motion.div>
