@@ -18,8 +18,10 @@ export default function BottomNav() {
         { path: '/commandes', icon: ShoppingBag, label: 'Salle' },
         { path: '/caisse', icon: Wallet, label: 'Caisse' },
         { path: '/stocks', icon: Package, label: 'Stocks' },
-        { path: '/personnel', icon: Users, label: 'RH' },
+        { path: '/personnel', icon: Users, label: 'Personnel' },
+        { path: '/plus', icon: MoreHorizontal, label: 'Plus' },
       ];
+
 
       break;
     case 'Caissier':
