@@ -15,11 +15,12 @@ export default function BottomNav() {
     case 'Gérant':
       navItems = [
         { path: '/dashboard', icon: Home, label: 'Accueil' },
-        { path: '/caisse', icon: ShoppingBag, label: 'Caisse' },
+        { path: '/commandes', icon: ShoppingBag, label: 'Salle' },
+        { path: '/caisse', icon: Wallet, label: 'Caisse' },
         { path: '/stocks', icon: Package, label: 'Stocks' },
-        { path: '/personnel', icon: Users, label: 'Personnel' },
-        { path: '/plus', icon: MoreHorizontal, label: 'Plus' },
+        { path: '/personnel', icon: Users, label: 'RH' },
       ];
+
       break;
     case 'Caissier':
       navItems = [

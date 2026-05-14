@@ -1,10 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOrderStore, PRODUCTS } from '../stores/orderStore';
 import { useTableStore, type Table } from '../stores/tableStore';
 import { useAuthStore } from '../stores/authStore';
 import { useReservationStore, type Reservation } from '../stores/reservationStore';
-import { Search, ShoppingCart, X, ChefHat, Calendar, UserPlus, Phone, Move, Plus, Minus, Trash2, Layout } from 'lucide-react';
+import { Search, ShoppingCart, X, ChefHat, Calendar, UserPlus, Phone, Plus, Minus, Trash2, Layout, Layers, Map as MapIcon, User } from 'lucide-react';
+
 
 const Chairs = ({ count, shape }: { count: number, shape: string }) => {
   const chairs = Array.from({ length: count });
@@ -45,11 +46,24 @@ export default function Commandes() {
   const [showResList, setShowResList] = useState(false);
   const [assigningRes, setAssigningRes] = useState<Reservation | null>(null);
   const [showTableOptions, setShowTableOptions] = useState<string | null>(null);
+  
   const [selectedFloor, setSelectedFloor] = useState('RDC');
+  const [selectedZone, setSelectedZone] = useState<string | null>(null);
   
   const [designMode, setDesignMode] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  const zones = useMemo(() => {
+    const floorTables = tables.filter(t => t.floor === selectedFloor);
+    const z = Array.from(new Set(floorTables.map(t => t.zone)));
+    return z;
+  }, [tables, selectedFloor]);
+
+  // Set default zone if none selected
+  if (!selectedZone && zones.length > 0) setSelectedZone(zones[0]);
+
+  const floorTables = tables.filter(t => t.floor === selectedFloor && t.zone === selectedZone);
 
   const filteredProducts = PRODUCTS.filter(p => 
     (category === 'tous' || p.category === category) &&
@@ -113,6 +127,7 @@ export default function Commandes() {
       status: 'libre',
       shape: 'square',
       floor: selectedFloor,
+      zone: selectedZone || 'Principale',
       x: 50,
       y: 50
     };
@@ -145,16 +160,15 @@ export default function Commandes() {
   };
 
   const todayRes = getTodayReservations().filter(r => r.status === 'en_attente' || r.status === 'confirmee');
-  const floorTables = tables.filter(t => t.floor === selectedFloor);
 
   if (!selectedTableId) {
     return (
       <div className="page-content pt-8 pb-32 h-screen flex flex-col overflow-hidden bg-[#0a0c10]">
-        <div className="flex items-center justify-between mb-6 px-4">
+        <div className="flex items-center justify-between mb-4 px-4">
           <div>
-            <h1 className="text-white font-black text-2xl mb-1">Salle Live</h1>
-            <p className="text-text-secondary text-sm">
-              {designMode ? '🛠️ Studio Salle' : assigningRes ? `Attribuer à ${assigningRes.clientName}` : 'Plan de salle interactif'}
+            <h1 className="text-white font-black text-2xl mb-1">Plan de Salle</h1>
+            <p className="text-text-secondary text-xs">
+              {designMode ? '🎨 Studio Mode : Configurez vos zones' : assigningRes ? `Attribuer à ${assigningRes.clientName}` : 'Gérez vos tables en temps réel'}
             </p>
           </div>
           <div className="flex gap-2">
@@ -164,7 +178,7 @@ export default function Commandes() {
                 className={`px-4 h-11 rounded-xl flex items-center gap-2 shadow-lg transition-all ${designMode ? 'bg-orange text-white shadow-orange/30' : 'bg-white/10 text-white border border-white/10'}`}
               >
                 <Layout size={18} />
-                <span className="text-xs font-bold">{designMode ? 'Quitter Studio' : 'Studio Salle'}</span>
+                <span className="text-xs font-bold">{designMode ? 'Quitter Studio' : 'Studio'}</span>
               </button>
             )}
             <button onClick={() => setShowResList(true)} className="w-11 h-11 rounded-xl bg-blue/10 border border-blue/20 flex items-center justify-center text-blue relative">
@@ -178,22 +192,48 @@ export default function Commandes() {
           </div>
         </div>
 
-        {/* Floor Selection */}
-        <div className="flex gap-2 px-4 mb-4">
-          {['RDC', 'ETAGE', 'TERRASSE'].map(f => (
-            <button
-              key={f}
-              onClick={() => setSelectedFloor(f)}
-              className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${selectedFloor === f ? 'bg-white/20 text-white border border-white/20' : 'bg-white/5 text-text-tertiary border border-transparent'}`}
-            >
-              {f === 'ETAGE' ? 'Étage' : f}
-            </button>
-          ))}
+        {/* Level & Zone Navigation */}
+        <div className="px-4 space-y-3 mb-4">
+          <div className="flex gap-2 p-1 bg-white/5 rounded-2xl border border-white/5">
+            {['RDC', 'ETAGE', 'TERRASSE'].map(f => (
+              <button
+                key={f}
+                onClick={() => { setSelectedFloor(f); setSelectedZone(null); }}
+                className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${selectedFloor === f ? 'bg-white/10 text-white shadow-sm' : 'text-text-tertiary hover:text-text-secondary'}`}
+              >
+                {f === 'ETAGE' ? '1er Étage' : f}
+              </button>
+            ))}
+          </div>
+          
+          <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
+            {zones.map(z => (
+              <button
+                key={z}
+                onClick={() => setSelectedZone(z)}
+                className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all border ${selectedZone === z ? 'bg-blue/10 border-blue text-blue' : 'bg-white/5 border-transparent text-text-tertiary'}`}
+              >
+                {z}
+              </button>
+            ))}
+            {designMode && (
+              <button onClick={() => {
+                const newZone = prompt("Nom de la nouvelle salle ?");
+                if (newZone) setSelectedZone(newZone);
+              }} className="px-3 py-2 rounded-xl bg-white/5 border border-dashed border-white/20 text-white/40"><Plus size={14} /></button>
+            )}
+          </div>
         </div>
 
+        {/* Visual Floor Plan Canvas */}
         <div className="flex-1 relative bg-black/60 rounded-[3rem] border border-white/10 mx-4 mb-4 overflow-hidden shadow-2xl" ref={canvasRef}>
           <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
           
+          <div className="absolute top-4 left-6 flex items-center gap-2 opacity-40">
+            <MapIcon size={14} className="text-white" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white">{selectedFloor} • {selectedZone}</span>
+          </div>
+
           {floorTables.map(t => {
             const isSelected = showTableOptions === t.id;
             const isEditing = editingTable?.id === t.id;
@@ -223,13 +263,12 @@ export default function Commandes() {
                     t.shape === 'round' ? 'rounded-full aspect-square w-14' : 
                     t.shape === 'rectangle' ? 'rounded-xl w-20 h-12' : 'rounded-xl w-14 h-14'
                   } border-2 ${
-                    t.status === 'libre' ? 'bg-[#1a1c22] border-green/40 text-green' :
+                    t.status === 'libre' ? 'bg-[#1a1c22] border-green/40 text-green shadow-[0_0_15px_rgba(34,197,94,0.05)]' :
                     t.status === 'occupee' ? 'bg-[#1a1c22] border-red/50 text-red shadow-[0_0_20px_rgba(239,68,68,0.2)]' :
                     'bg-[#1a1c22] border-blue/50 text-blue shadow-[0_0_20px_rgba(59,130,246,0.2)]'
                   } ${isSelected || isEditing ? 'border-white ring-4 ring-white/10' : ''}`}>
                     <div className="flex flex-col items-center">
                       <span className="text-lg font-black">{t.number}</span>
-                      <span className="text-[8px] font-bold opacity-60 uppercase tracking-tighter">{t.capacity}P</span>
                     </div>
                   </motion.div>
                 </div>
@@ -238,69 +277,68 @@ export default function Commandes() {
           })}
         </div>
 
-        {/* Legend */}
-        <div className="px-8 flex justify-center gap-8 mb-6">
-          <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green" /><span className="text-[10px] font-bold text-text-secondary uppercase">Libre</span></div>
-          <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-red shadow-[0_0_8px_red]" /><span className="text-[10px] font-bold text-text-secondary uppercase">Occupée</span></div>
-          <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue shadow-[0_0_8px_blue]" /><span className="text-[10px] font-bold text-text-secondary uppercase">Réservée</span></div>
+        {/* Legend & Stats */}
+        <div className="px-8 flex justify-between items-center mb-6">
+          <div className="flex gap-6">
+            <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green" /><span className="text-[10px] font-bold text-text-secondary uppercase">Libre</span></div>
+            <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-red shadow-[0_0_8px_red]" /><span className="text-[10px] font-bold text-text-secondary uppercase">Occupée</span></div>
+          </div>
+          <div className="text-text-tertiary text-[10px] font-bold uppercase tracking-widest">{floorTables.length} Tables dans cette salle</div>
         </div>
 
-        {/* Studio Panel */}
+        {/* Studio Control Panel */}
         <AnimatePresence>
           {designMode && (
-            <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} className="fixed bottom-24 left-4 right-4 z-[100] glass-card p-4 border-orange/30">
+            <motion.div initial={{ y: 200 }} animate={{ y: 0 }} exit={{ y: 200 }} className="fixed bottom-24 left-4 right-4 z-[100] glass-card p-5 border-orange/40 shadow-2xl">
               {!editingTable ? (
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-orange/10 flex items-center justify-center text-orange"><Move size={20} /></div>
-                    <div className="text-white font-bold text-sm">Studio : {selectedFloor}</div>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-orange/10 flex items-center justify-center text-orange"><Layers size={24} /></div>
+                    <div>
+                      <p className="text-white font-black text-sm uppercase tracking-wider">Studio Salle</p>
+                      <p className="text-text-tertiary text-[10px]">Configurez vos tables et zones</p>
+                    </div>
                   </div>
-                  <button onClick={handleAddTable} className="px-6 py-2.5 rounded-xl bg-orange text-white text-xs font-bold flex items-center gap-2"><Plus size={16} /> Ajouter Table</button>
+                  <button onClick={handleAddTable} className="px-6 py-3 rounded-2xl bg-orange text-white text-xs font-black flex items-center gap-2 shadow-lg shadow-orange/20"><Plus size={18} /> Ajouter Table</button>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-white font-black text-lg">Table {editingTable.number}</h3>
-                      <span className="px-2 py-0.5 rounded bg-white/10 text-text-tertiary text-[10px] font-bold">{editingTable.floor}</span>
+                <div className="space-y-5">
+                  <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-white font-black text-xl">Table {editingTable.number}</h3>
+                      <span className="px-3 py-1 rounded-full bg-blue/10 text-blue text-[9px] font-black uppercase tracking-widest">{editingTable.floor} • {editingTable.zone}</span>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => handleDeleteTable(editingTable.id)} className="w-9 h-9 rounded-lg bg-red/10 text-red flex items-center justify-center"><Trash2 size={16} /></button>
-                      <button onClick={() => setEditingTable(null)} className="w-9 h-9 rounded-lg bg-white/5 text-white flex items-center justify-center"><X size={16} /></button>
+                      <button onClick={() => handleDeleteTable(editingTable.id)} className="w-10 h-10 rounded-xl bg-red/10 text-red flex items-center justify-center transition-colors hover:bg-red/20"><Trash2 size={18} /></button>
+                      <button onClick={() => setEditingTable(null)} className="w-10 h-10 rounded-xl bg-white/5 text-white flex items-center justify-center"><X size={18} /></button>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-text-secondary text-[10px] font-bold uppercase mb-2">Couverts</p>
-                      <div className="flex items-center gap-4 bg-white/5 rounded-xl px-4 py-2">
-                        <button onClick={() => updateTableCapacity(editingTable.id, Math.max(1, editingTable.capacity - 1))}><Minus size={16} className="text-white" /></button>
-                        <span className="text-xl font-black text-white flex-1 text-center">{editingTable.capacity}</span>
-                        <button onClick={() => updateTableCapacity(editingTable.id, editingTable.capacity + 1)}><Plus size={16} className="text-white" /></button>
+                      <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Capacité</label>
+                      <div className="flex items-center justify-between bg-white/5 rounded-2xl px-4 py-3 border border-white/5">
+                        <button onClick={() => updateTableCapacity(editingTable.id, Math.max(1, editingTable.capacity - 1))} className="text-white"><Minus size={18} /></button>
+                        <span className="text-2xl font-black text-white">{editingTable.capacity}</span>
+                        <button onClick={() => updateTableCapacity(editingTable.id, editingTable.capacity + 1)} className="text-white"><Plus size={18} /></button>
                       </div>
                     </div>
                     <div>
-                      <p className="text-text-secondary text-[10px] font-bold uppercase mb-2">Étage</p>
-                      <div className="flex gap-1 bg-white/5 rounded-xl p-1">
-                        {['RDC', 'ETAGE', 'TERRASSE'].map(f => (
-                          <button key={f} onClick={() => {
-                            updateTableFloor(editingTable.id, f);
-                            setEditingTable({ ...editingTable, floor: f });
-                          }} className={`flex-1 py-2 rounded-lg text-[8px] font-bold uppercase ${editingTable.floor === f ? 'bg-orange text-white' : 'text-text-tertiary'}`}>{f === 'ETAGE' ? 'Etg' : f}</button>
+                      <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Déplacer vers Zone</label>
+                      <div className="flex gap-1 bg-white/5 rounded-2xl p-1 border border-white/5 h-[52px] items-center px-2">
+                        {zones.slice(0, 3).map(z => (
+                          <button key={z} onClick={() => {
+                            updateTableFloor(editingTable.id, editingTable.floor, z);
+                            setEditingTable({ ...editingTable, zone: z });
+                          }} className={`flex-1 py-2 rounded-xl text-[8px] font-black uppercase transition-all ${editingTable.zone === z ? 'bg-orange text-white shadow-md' : 'text-text-tertiary hover:text-text-secondary'}`}>{z.substring(0, 4)}</button>
                         ))}
                       </div>
                     </div>
                   </div>
                   <div>
-                    <p className="text-text-secondary text-[10px] font-bold uppercase mb-2">Forme</p>
-                    <div className="flex gap-1 bg-white/5 rounded-xl p-1">
-                      {(['square', 'round', 'rectangle'] as const).map(shape => (
-                        <button key={shape} onClick={() => {
-                          const store = useTableStore.getState();
-                          store.tables = store.tables.map(t => t.id === editingTable.id ? { ...t, shape } : t);
-                          setEditingTable({ ...editingTable, shape });
-                        }} className={`flex-1 py-2 rounded-lg text-[8px] font-bold uppercase ${editingTable.shape === shape ? 'bg-orange text-white' : 'text-text-tertiary'}`}>{shape}</button>
-                      ))}
-                    </div>
+                    <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Affecter Serveur (Planning)</label>
+                    <button className="w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-white text-xs font-bold flex items-center justify-center gap-2">
+                      <User size={16} className="text-orange" /> Choisir un responsable de zone
+                    </button>
                   </div>
                 </div>
               )}
@@ -308,7 +346,7 @@ export default function Commandes() {
           )}
         </AnimatePresence>
 
-        {/* Modals */}
+        {/* Modals for Reservations/Options */}
         <AnimatePresence>
           {showTableOptions && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setShowTableOptions(null)}>
@@ -316,13 +354,13 @@ export default function Commandes() {
                 <div className="modal-handle" />
                 <h3 className="text-white font-black text-xl mb-6 text-center">Table {tables.find(t => t.id === showTableOptions)?.number}</h3>
                 <div className="grid grid-cols-2 gap-4">
-                  <button onClick={() => handleInstallWalkIn(showTableOptions)} className="p-6 rounded-2xl bg-white/5 border border-white/10 flex flex-col items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-green/10 flex items-center justify-center text-green"><UserPlus size={24} /></div>
-                    <span className="text-white font-bold text-sm">Installer</span>
+                  <button onClick={() => handleInstallWalkIn(showTableOptions!)} className="p-6 rounded-2xl bg-white/5 border border-white/10 flex flex-col items-center gap-3 active:scale-95 transition-transform">
+                    <div className="w-14 h-14 rounded-2xl bg-green/10 flex items-center justify-center text-green shadow-inner"><UserPlus size={28} /></div>
+                    <span className="text-white font-black text-sm uppercase tracking-wider">Installer</span>
                   </button>
-                  <button onClick={() => handleManualReservation(showTableOptions)} className="p-6 rounded-2xl bg-white/5 border border-white/10 flex flex-col items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-blue/10 flex items-center justify-center text-blue"><Phone size={24} /></div>
-                    <span className="text-white font-bold text-sm">Réserver</span>
+                  <button onClick={() => handleManualReservation(showTableOptions!)} className="p-6 rounded-2xl bg-white/5 border border-white/10 flex flex-col items-center gap-3 active:scale-95 transition-transform">
+                    <div className="w-14 h-14 rounded-2xl bg-blue/10 flex items-center justify-center text-blue shadow-inner"><Phone size={28} /></div>
+                    <span className="text-white font-black text-sm uppercase tracking-wider">Réserver</span>
                   </button>
                 </div>
               </motion.div>
@@ -335,19 +373,22 @@ export default function Commandes() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setShowResList(false)}>
               <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
                 <div className="modal-handle" />
-                <h3 className="text-white font-black text-xl mb-6">Réservations du jour</h3>
-                <div className="space-y-4 max-h-[50vh] overflow-y-auto">
+                <h3 className="text-white font-black text-xl mb-6">Réservations attendues</h3>
+                <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
                   {todayRes.length === 0 ? (
-                    <div className="py-12 text-center text-text-tertiary italic">Aucune réservation</div>
+                    <div className="py-16 text-center text-text-tertiary italic">Aucune réservation pour le moment</div>
                   ) : (
                     todayRes.map(res => (
-                      <div key={res.id} className="glass-card p-4 flex justify-between items-center">
+                      <div key={res.id} className="glass-card p-5 flex justify-between items-center border-white/5 hover:border-blue/30 transition-colors">
                         <div>
-                          <h4 className="text-white font-bold">{res.clientName}</h4>
-                          <p className="text-text-tertiary text-[10px] mt-1">{res.time} • {res.guests} pers.</p>
+                          <h4 className="text-white font-black text-base">{res.clientName}</h4>
+                          <div className="flex gap-4 mt-1 text-[10px] text-text-tertiary font-bold uppercase tracking-widest">
+                            <span>{res.time}</span>
+                            <span>{res.guests} Personnes</span>
+                          </div>
                         </div>
                         {res.status === 'en_attente' && (
-                          <button onClick={() => { setAssigningRes(res); setShowResList(false); }} className="px-4 py-2 rounded-xl bg-blue text-white text-xs font-bold">Attribuer</button>
+                          <button onClick={() => { setAssigningRes(res); setShowResList(false); }} className="px-5 py-2.5 rounded-xl bg-blue text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue/20">Attribuer</button>
                         )}
                       </div>
                     ))
@@ -367,23 +408,45 @@ export default function Commandes() {
   return (
     <div className="page-content pt-8 pb-32">
       <div className="flex items-center justify-between mb-6 px-4">
-        <div className="flex items-center gap-3">
-          <button onClick={() => setSelectedTableId(null)} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white"><X size={20} /></button>
-          <div><h1 className="text-white font-black text-xl">Table {currentTable?.number}</h1><p className="text-text-secondary text-xs">{currentRes ? `Réservée : ${currentRes.clientName}` : 'Commande'}</p></div>
+        <div className="flex items-center gap-4">
+          <button onClick={() => setSelectedTableId(null)} className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white border border-white/10"><X size={24} /></button>
+          <div>
+            <h1 className="text-white font-black text-2xl tracking-tight">Table {currentTable?.number}</h1>
+            <p className="text-text-secondary text-xs font-bold uppercase tracking-wider">{currentRes ? `Réservée : ${currentRes.clientName}` : 'Prise de commande'}</p>
+          </div>
         </div>
-        <button onClick={() => setShowCart(true)} className="relative w-12 h-12 rounded-2xl bg-orange flex items-center justify-center text-white"><ShoppingCart size={22} />{cart.length > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-white text-orange text-[10px] font-bold flex items-center justify-center border-2 border-orange">{cart.length}</span>}</button>
+        <button onClick={() => setShowCart(true)} className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-orange to-amber-600 flex items-center justify-center text-white shadow-xl shadow-orange/20">
+          <ShoppingCart size={28} />
+          {cart.length > 0 && (
+            <span className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-white text-orange text-xs font-black flex items-center justify-center border-4 border-[#070A0F]">
+              {cart.reduce((s, i) => s + i.quantity, 0)}
+            </span>
+          )}
+        </button>
       </div>
 
-      <div className="space-y-4 mb-6 px-4">
-        <div className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary" size={18} /><input type="text" placeholder="Rechercher..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 pl-11 pr-4 text-white" /></div>
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">{['tous', 'plats', 'boissons', 'desserts'].map(cat => (<button key={cat} onClick={() => setCategory(cat)} className={`px-5 py-2 rounded-xl text-xs font-bold ${category === cat ? 'bg-orange text-white' : 'bg-white/5 text-text-secondary'}`}>{cat}</button>))}</div>
+      <div className="space-y-4 mb-8 px-4">
+        <div className="relative">
+          <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-text-tertiary" size={20} />
+          <input type="text" placeholder="Rechercher un plat..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-14 pr-6 text-white focus:border-orange/50 transition-colors" />
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+          {['tous', 'plats', 'boissons', 'desserts'].map(cat => (
+            <button key={cat} onClick={() => setCategory(cat)} className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${category === cat ? 'bg-orange text-white shadow-lg shadow-orange/20' : 'bg-white/5 text-text-secondary border border-white/5'}`}>{cat}</button>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 px-4">
         {filteredProducts.map(product => (
-          <motion.div key={product.id} whileTap={{ scale: 0.98 }} onClick={() => addToCart(product)} className="glass-card overflow-hidden flex flex-col">
-            <div className="h-28 bg-white/5 flex items-center justify-center text-3xl">{product.image.startsWith('/') ? <img src={product.image} className="w-full h-full object-cover" /> : product.image}</div>
-            <div className="p-3 flex-1 flex flex-col"><h3 className="text-white font-bold text-sm mb-1 line-clamp-1">{product.name}</h3><p className="text-orange font-black text-xs mt-auto">{product.price.toLocaleString()} F</p></div>
+          <motion.div key={product.id} whileTap={{ scale: 0.96 }} onClick={() => addToCart(product)} className="glass-card overflow-hidden flex flex-col group active:border-orange/30">
+            <div className="h-32 bg-white/5 flex items-center justify-center text-4xl group-hover:scale-110 transition-transform duration-500 overflow-hidden">
+              {product.image.startsWith('/') ? <img src={product.image} className="w-full h-full object-cover" /> : product.image}
+            </div>
+            <div className="p-4 flex-1 flex flex-col">
+              <h3 className="text-white font-black text-sm mb-1 leading-tight">{product.name}</h3>
+              <p className="text-orange font-black text-sm mt-auto">{product.price.toLocaleString()} F</p>
+            </div>
           </motion.div>
         ))}
       </div>
@@ -393,24 +456,35 @@ export default function Commandes() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setShowCart(false)}>
             <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25 }} className="modal-sheet" onClick={e => e.stopPropagation()}>
               <div className="modal-handle" />
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-white font-black text-xl">Panier - Table {currentTable?.number}</h3>
-                <button onClick={clearCart} className="text-text-tertiary text-xs font-bold uppercase">Vider</button>
+              <div className="flex items-center justify-between mb-8">
+                <h3 className="text-white font-black text-2xl">Panier • T{currentTable?.number}</h3>
+                <button onClick={clearCart} className="text-text-tertiary text-xs font-black uppercase tracking-widest hover:text-red transition-colors">Vider</button>
               </div>
-              <div className="space-y-4 mb-8 max-h-[40vh] overflow-y-auto pr-2">
+              <div className="space-y-5 mb-8 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
                 {cart.map(item => (
-                  <div key={item.product.id} className="flex items-center gap-4">
-                    <div className="flex-1 min-w-0"><h4 className="text-white font-bold text-sm truncate">{item.product.name}</h4><p className="text-text-tertiary text-xs">{(item.product.price * item.quantity).toLocaleString()} F</p></div>
-                    <div className="flex items-center gap-3 bg-white/5 rounded-lg px-2 py-1">
-                      <button onClick={() => updateQuantity(item.product.id, item.quantity - 1)} className="text-white font-bold">-</button>
-                      <span className="text-white font-bold text-sm">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.product.id, item.quantity + 1)} className="text-white font-bold">+</button>
+                  <div key={item.product.id} className="flex items-center gap-5">
+                    <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-2xl shrink-0 border border-white/10">
+                      {item.product.image.startsWith('/') ? <img src={item.product.image} className="w-full h-full object-cover rounded-2xl" alt="" /> : item.product.image}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-white font-black text-sm truncate">{item.product.name}</h4>
+                      <p className="text-text-tertiary text-xs font-bold uppercase tracking-wider">{(item.product.price * item.quantity).toLocaleString()} F</p>
+                    </div>
+                    <div className="flex items-center gap-4 bg-white/10 rounded-xl px-3 py-2 border border-white/5">
+                      <button onClick={() => updateQuantity(item.product.id, item.quantity - 1)} className="text-white"><Minus size={18} /></button>
+                      <span className="text-white font-black text-base w-5 text-center">{item.quantity}</span>
+                      <button onClick={() => updateQuantity(item.product.id, item.quantity + 1)} className="text-white"><Plus size={18} /></button>
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="flex justify-between items-center mb-4"><span className="text-text-secondary font-bold">Total</span><span className="text-white font-black text-2xl">{cartTotal.toLocaleString()} F</span></div>
-              <button onClick={handleSendToKitchen} disabled={sending} className="w-full py-4 rounded-2xl bg-orange text-white font-black flex items-center justify-center gap-3">{sending ? 'Envoi...' : <><ChefHat size={20} /> Envoyer en cuisine</>}</button>
+              <div className="flex justify-between items-center mb-6 px-2">
+                <span className="text-text-secondary font-black uppercase tracking-[0.2em] text-xs">Total à payer</span>
+                <span className="text-white font-black text-3xl">{cartTotal.toLocaleString()} <span className="text-sm opacity-40">F</span></span>
+              </div>
+              <button onClick={handleSendToKitchen} disabled={sending} className="w-full py-5 rounded-[2rem] bg-gradient-to-r from-orange to-amber-600 text-white font-black text-lg shadow-xl shadow-orange/20 flex items-center justify-center gap-4 active:scale-95 transition-transform disabled:opacity-50">
+                {sending ? 'Envoi en cours...' : <><ChefHat size={24} /> Envoyer en cuisine</>}
+              </button>
             </motion.div>
           </motion.div>
         )}
