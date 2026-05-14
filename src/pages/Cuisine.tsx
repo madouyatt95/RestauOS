@@ -1,11 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useOrderStore, type Order } from '../stores/orderStore';
+import { useOrderStore } from '../stores/orderStore';
 import { Check, Clock, ChefHat } from 'lucide-react';
-
-const formatTime = (isoString: string) => {
-  return new Date(isoString).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-};
 
 const getWaitMinutes = (dateString: string) => {
   return Math.floor((Date.now() - new Date(dateString).getTime()) / 60000);
