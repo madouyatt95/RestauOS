@@ -3,6 +3,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useDeliveryStore, type Delivery } from '../stores/deliveryStore';
 import { useAuthStore } from '../stores/authStore';
 import { MapPin, Clock, Truck, Check, ChefHat, Package } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet default icon paths
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
 const statusConfig = {
   preparation: { label: 'En préparation', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', icon: ChefHat },
@@ -58,53 +69,30 @@ export default function Livraisons() {
         </div>
       </div>
 
-      {/* Fake Map */}
+      {/* GPS Map */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-        className="glass-card-lg mb-6 overflow-hidden relative" style={{ height: 200 }}>
-        <div className="absolute inset-0" style={{
-          background: `
-            radial-gradient(circle at 30% 40%, rgba(255,138,0,0.15) 0%, transparent 50%),
-            radial-gradient(circle at 70% 60%, rgba(59,130,246,0.1) 0%, transparent 40%),
-            linear-gradient(135deg, #0a0f1a 0%, #111827 100%)
-          `,
-        }}>
-          {/* Grid overlay */}
-          <div className="absolute inset-0" style={{
-            backgroundImage: 'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
-          }} />
-
-          {/* Delivery markers */}
+        className="glass-card-lg mb-6 overflow-hidden relative z-0" style={{ height: 250 }}>
+        <MapContainer center={[14.6928, -17.4467]} zoom={13} scrollWheelZoom={false} style={{ width: '100%', height: '100%' }}>
+          <TileLayer
+            attribution='&copy; OpenStreetMap'
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          />
+          <Marker position={[14.6928, -17.4467]}>
+            <Popup>📍 RestauOS (Cuisine)</Popup>
+          </Marker>
           {enCours.map((d, i) => {
-            const positions = [{ x: '30%', y: '35%' }, { x: '65%', y: '50%' }, { x: '45%', y: '70%' }];
-            const pos = positions[i % 3];
-            const cfg = statusConfig[d.status];
+            const offsets = [[0.01, 0.02], [-0.015, 0.01], [0.02, -0.01]];
+            const pos = [14.6928 + offsets[i % 3][0], -17.4467 + offsets[i % 3][1]] as [number, number];
             return (
-              <motion.div key={d.id}
-                initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2 + i * 0.1 }}
-                className="absolute flex flex-col items-center"
-                style={{ left: pos.x, top: pos.y, transform: 'translate(-50%, -50%)' }}>
-                <div className="w-8 h-8 rounded-full flex items-center justify-center shadow-lg"
-                  style={{ background: cfg.color }}>
-                  <cfg.icon size={14} className="text-white" />
-                </div>
-                <span className="mt-1 text-[8px] text-white font-bold bg-bg-card/80 px-1.5 py-0.5 rounded-full">{d.clientName.split(' ')[0]}</span>
-              </motion.div>
+              <Marker key={d.id} position={pos}>
+                <Popup>
+                  <strong>{d.clientName}</strong><br/>
+                  {d.address}
+                </Popup>
+              </Marker>
             );
           })}
-
-          {/* Restaurant marker */}
-          <div className="absolute" style={{ left: '50%', top: '30%', transform: 'translate(-50%, -50%)' }}>
-            <div className="w-6 h-6 rounded-full bg-orange flex items-center justify-center shadow-lg ring-4 ring-orange/20">
-              <MapPin size={12} className="text-white" />
-            </div>
-          </div>
-
-          {/* Label */}
-          <div className="absolute bottom-3 left-3 glass-card px-3 py-1.5 text-[10px] text-text-secondary">
-            📍 Dakar, Sénégal
-          </div>
-        </div>
+        </MapContainer>
       </motion.div>
 
       {/* En cours */}

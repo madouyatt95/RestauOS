@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOrderStore, PRODUCTS } from '../stores/orderStore';
 import { useStockStore } from '../stores/stockStore';
-import { Search, Plus, Minus, ShoppingCart, Check, CreditCard, Smartphone, Banknote, Wallet, Wifi, Flame } from 'lucide-react';
+import { Search, Plus, Minus, ShoppingCart, Check, CreditCard, Smartphone, Banknote, Wallet, Wifi, Flame, CloudUpload } from 'lucide-react';
+import { syncOrderToERP } from '../services/erpConnector';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 const categories = ['Tout', 'Plats', 'Boissons', 'Desserts'] as const;
@@ -23,6 +24,7 @@ export default function Caisse() {
   const [showUpsell, setShowUpsell] = useState(false);
   const [showSoftPOS, setShowSoftPOS] = useState(false);
   const [showPingChef, setShowPingChef] = useState(false);
+  const [isSyncingERP, setIsSyncingERP] = useState(false);
 
   const handleAddToCart = (p: typeof PRODUCTS[0]) => {
     addToCart(p);
@@ -58,12 +60,20 @@ export default function Caisse() {
     finalizeOrder(payment);
   };
 
-  const finalizeOrder = (payment: 'especes' | 'wave' | 'orange_money' | 'carte') => {
+  const finalizeOrder = async (payment: 'especes' | 'wave' | 'orange_money' | 'carte') => {
     const newOrder = checkout(payment);
-    if (newOrder) consumeStockForOrder(newOrder.items, newOrder.id);
-    setShowPayment(false);
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 2500);
+    if (newOrder) {
+      consumeStockForOrder(newOrder.items, newOrder.id);
+      
+      setShowPayment(false);
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 2000);
+
+      // Lancement de la synchro ERP en arrière-plan
+      setIsSyncingERP(true);
+      await syncOrderToERP(newOrder.id, newOrder.total, newOrder.items);
+      setTimeout(() => setIsSyncingERP(false), 2000);
+    }
   };
 
   return (
@@ -315,6 +325,17 @@ export default function Caisse() {
               <p className="text-red font-black text-sm uppercase tracking-wide">Alerte envoyée</p>
               <p className="text-white text-xs font-semibold">La cuisine vient d'être notifiée de l'urgence !</p>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ERP Sync Toast */}
+      <AnimatePresence>
+        {isSyncingERP && (
+          <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[10005] bg-bg-card border border-blue/30 px-4 py-2 rounded-full flex items-center gap-2 shadow-[0_4px_20px_rgba(59,130,246,0.3)]">
+            <CloudUpload size={16} className="text-blue animate-bounce" />
+            <span className="text-white text-xs font-bold">Synchro Odoo en cours...</span>
           </motion.div>
         )}
       </AnimatePresence>

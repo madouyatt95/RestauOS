@@ -2,7 +2,11 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStaffStore, type Employee } from '../stores/staffStore';
 import { useAuthStore } from '../stores/authStore';
-import { Plus, ChevronLeft, ChevronRight, Phone, Clock, RefreshCw, Check } from 'lucide-react';
+import { Plus, Phone, Clock, RefreshCw, Check } from 'lucide-react';
+import FullCalendar from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import interactionPlugin from '@fullcalendar/interaction';
 
 const statusConfig = {
   present: { label: 'Présent', color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
@@ -16,29 +20,12 @@ export default function Personnel() {
   const { user } = useAuthStore();
   const [showAdd, setShowAdd] = useState(false);
   const [showRequestSwap, setShowSwapRequest] = useState(false);
-  const [activeTab, setActiveTab] = useState<'employes' | 'plannings'>('employes');
+  const [activeTab, setActiveTab] = useState<'employes' | 'calendrier' | 'remplacements'>('employes');
   const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
   const [newEmp, setNewEmp] = useState({ name: '', role: '', phone: '', schedule: '' });
-  const [weekOffset, setWeekOffset] = useState(0);
   const [swapRequests, setSwapRequests] = useState([
     { id: 1, from: 'Awa Fall', role: 'Serveur/se', date: 'Jeudi Soir', status: 'pending' }
   ]);
-
-  const now = new Date();
-  now.setDate(now.getDate() + weekOffset * 7);
-  const month = now.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-
-  // Generate calendar days around the selected week
-  const days: { num: number; day: string; isToday: boolean }[] = [];
-  for (let i = -3; i <= 3; i++) {
-    const d = new Date(now);
-    d.setDate(d.getDate() + i);
-    days.push({
-      num: d.getDate(),
-      day: d.toLocaleDateString('fr-FR', { weekday: 'short' }).slice(0, 3),
-      isToday: weekOffset === 0 && i === 0,
-    });
-  }
 
   const isManager = ['Admin', 'Gérant'].includes(user?.role || '');
 
@@ -68,34 +55,25 @@ export default function Personnel() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 p-1 bg-white/5 rounded-2xl">
+      <div className="flex gap-2 mb-6 p-1 bg-white/5 rounded-2xl overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
         <button onClick={() => setActiveTab('employes')}
-          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'employes' ? 'bg-bg-card shadow text-white' : 'text-text-secondary'}`}>
-          Équipe
+          className={`flex-1 min-w-[100px] py-2.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'employes' ? 'bg-bg-card shadow text-white' : 'text-text-secondary'}`}>
+          Présences
         </button>
-        <button onClick={() => setActiveTab('plannings')}
-          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'plannings' ? 'bg-bg-card shadow text-white' : 'text-text-secondary'}`}>
-          Échange de shifts
+        <button onClick={() => setActiveTab('calendrier')}
+          className={`flex-1 min-w-[100px] py-2.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'calendrier' ? 'bg-bg-card shadow text-white' : 'text-text-secondary'}`}>
+          Planning complet
+        </button>
+        <button onClick={() => setActiveTab('remplacements')}
+          className={`flex-1 min-w-[100px] py-2.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'remplacements' ? 'bg-bg-card shadow text-white' : 'text-text-secondary'}`}>
+          Échanges
         </button>
       </div>
 
-      {activeTab === 'employes' ? (
+      {activeTab === 'employes' && (
         <>
-          {/* Calendar */}
-          <div className="glass-card-lg p-4 mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <button onClick={() => setWeekOffset(w => w - 1)} className="text-text-tertiary"><ChevronLeft size={18} /></button>
-              <span className="text-white font-bold text-sm capitalize">{month}</span>
-              <button onClick={() => setWeekOffset(w => w + 1)} className="text-text-tertiary"><ChevronRight size={18} /></button>
-            </div>
-            <div className="flex justify-between">
-              {days.map((d) => (
-                <div key={d.num} className={`flex flex-col items-center gap-1 py-2 px-2.5 rounded-2xl transition-all ${d.isToday ? 'bg-orange text-white' : ''}`}>
-                  <span className={`text-[10px] font-semibold ${d.isToday ? 'text-white' : 'text-text-tertiary'}`}>{d.day}</span>
-                  <span className={`text-sm font-black ${d.isToday ? 'text-white' : 'text-text-secondary'}`}>{d.num}</span>
-                </div>
-              ))}
-            </div>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-white font-bold text-sm">Aujourd'hui, {new Date().toLocaleDateString('fr-FR')}</h3>
           </div>
 
           {/* Employee List */}
@@ -124,8 +102,43 @@ export default function Personnel() {
             })}
           </div>
         </>
-      ) : (
-        /* Shift Swapping Tab */
+      )}
+
+      {activeTab === 'calendrier' && (
+        <div className="glass-card-lg p-4 bg-white rounded-2xl overflow-hidden">
+          <style>{`
+            .fc { font-family: 'Inter', sans-serif; }
+            .fc-toolbar-title { font-size: 1.1rem !important; font-weight: 900 !important; color: #111827 !important; text-transform: capitalize; }
+            .fc-button-primary { background: var(--color-orange) !important; border: none !important; font-weight: bold !important; text-transform: capitalize; border-radius: 8px !important; }
+            .fc-button-primary:not(:disabled):active, .fc-button-primary:not(:disabled).fc-button-active { background: #E67A00 !important; }
+            .fc-daygrid-day-number { color: #4B5563 !important; font-weight: 600; text-decoration: none; }
+            .fc-col-header-cell-cushion { color: #111827 !important; font-weight: 800; padding: 8px !important; text-transform: uppercase; font-size: 0.75rem; }
+            .fc-theme-standard td, .fc-theme-standard th { border-color: #E5E7EB; }
+            .fc-event { border-radius: 4px; border: none; padding: 2px 4px; font-size: 0.7rem; font-weight: bold; cursor: pointer; }
+            .fc-h-event .fc-event-main { color: white; }
+          `}</style>
+          <FullCalendar
+            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+            initialView="dayGridMonth"
+            locale="fr"
+            headerToolbar={{
+              left: 'prev,next',
+              center: 'title',
+              right: 'dayGridMonth,timeGridWeek'
+            }}
+            height={500}
+            editable={isManager}
+            selectable={isManager}
+            events={[
+              { title: 'Awa F. (08h-16h)', date: new Date().toISOString().split('T')[0], color: '#3B82F6' },
+              { title: 'Ibrahima B. (16h-23h)', date: new Date().toISOString().split('T')[0], color: '#F59E0B' },
+              { title: 'Fatou N. (08h-16h)', date: new Date(Date.now() + 86400000).toISOString().split('T')[0], color: '#EC4899' },
+            ]}
+          />
+        </div>
+      )}
+
+      {activeTab === 'remplacements' && (
         <div className="space-y-6">
           <div className="glass-card p-5 border-blue/30">
             <div className="flex items-center gap-3 mb-4">
