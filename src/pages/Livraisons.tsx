@@ -25,6 +25,20 @@ export default function Livraisons() {
   const enCours = filteredDeliveries.filter(d => d.status !== 'livre');
   const terminees = filteredDeliveries.filter(d => d.status === 'livre');
 
+  const handleOptimize = () => {
+    setIsOptimizing(true);
+    setTimeout(() => {
+      setIsOptimizing(false);
+      setOptimized(true);
+    }, 1500);
+  };
+
+  const handleSignAndComplete = () => {
+    if (selected) updateStatus(selected.id, 'livre');
+    setShowSignature(false);
+    setSelected(null);
+  };
+
   return (
     <div className="page-content pt-14 pb-28">
       <div className="flex items-center justify-between mb-5">

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet as WalletIcon, CreditCard, ArrowDownToLine, Check, LogOut } from 'lucide-react';
+import { Wallet as WalletIcon, CreditCard, ArrowDownToLine, LogOut } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
 
