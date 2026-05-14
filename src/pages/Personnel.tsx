@@ -264,7 +264,7 @@ export default function Personnel() {
             const sc = statusConfig[emp.status];
             const todayShifts = getTodayShifts(emp.id);
             return (
-              <motion.div key={emp.id} layout className="glass-card p-4 flex items-center gap-4 border-white/5 active:scale-98 transition-all" onClick={() => setSelectedEmp(emp)}>
+              <motion.div key={emp.id} layout className={`glass-card p-4 flex items-center gap-4 border-white/5 transition-all ${isManager ? 'active:scale-98 cursor-pointer' : ''}`} onClick={() => isManager && setSelectedEmp(emp)}>
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-white/10 to-transparent flex items-center justify-center text-2xl border border-white/5 shadow-inner">
                   {emp.avatar}
                 </div>

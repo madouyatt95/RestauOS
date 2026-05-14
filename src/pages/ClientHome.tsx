@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../stores/authStore';
 import { useOrderStore, PRODUCTS } from '../stores/orderStore';
 import { useDeliveryStore } from '../stores/deliveryStore';
-import { QrCode, ShoppingBag, Plus, Minus, MapPin, Check, Truck, Clock } from 'lucide-react';
+import { QrCode, ShoppingBag, Plus, Minus, MapPin, Check, Truck, Clock, LogOut, MessageCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
@@ -13,6 +14,12 @@ export default function ClientHome() {
   const { deliveries } = useDeliveryStore();
   const [showCart, setShowCart] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    useAuthStore.getState().logout();
+    navigate('/');
+  };
 
   // Client's active orders from orderStore (not yet delivery)
   const myOrders = orders.filter(o => o.clientId === user?.id && o.status !== 'servi');
@@ -34,14 +41,19 @@ export default function ClientHome() {
   return (
     <div className="page-content pt-8 pb-32 bg-[#070A0F] min-h-screen">
       {/* Header Profile */}
-      <div className="flex items-center gap-4 mb-8">
-        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-violet to-purple-600 flex items-center justify-center text-white text-xl font-black shadow-[0_4px_20px_rgba(139,92,246,0.4)]">
-          {user?.name.charAt(0)}
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-violet to-purple-600 flex items-center justify-center text-white text-xl font-black shadow-[0_4px_20px_rgba(139,92,246,0.4)]">
+            {user?.name.charAt(0)}
+          </div>
+          <div>
+            <p className="text-text-secondary text-xs font-semibold uppercase tracking-wider">Bonjour,</p>
+            <h1 className="text-white font-black text-xl">{user?.name}</h1>
+          </div>
         </div>
-        <div>
-          <p className="text-text-secondary text-xs font-semibold uppercase tracking-wider">Bonjour,</p>
-          <h1 className="text-white font-black text-xl">{user?.name}</h1>
-        </div>
+        <button onClick={handleLogout} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white active:scale-95 transition-transform">
+          <LogOut size={18} />
+        </button>
       </div>
 
       {/* Loyalty Card */}
@@ -66,6 +78,19 @@ export default function ClientHome() {
           </div>
           <div className="mt-3 w-full h-2 bg-black/20 rounded-full overflow-hidden">
             <div className="h-full bg-white rounded-full w-3/4" />
+          </div>
+        </div>
+      </motion.div>
+
+      {/* WhatsApp Bot Banner */}
+      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className="mb-8" onClick={() => navigate('/whatsapp-bot')}>
+        <div className="bg-[#128C7E] rounded-2xl p-4 flex items-center gap-4 active:scale-95 cursor-pointer transition-transform shadow-[0_8px_32px_rgba(18,140,126,0.3)]">
+          <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shrink-0">
+            <MessageCircle size={28} className="text-[#128C7E]" />
+          </div>
+          <div>
+            <h3 className="text-white font-bold text-sm">Tester le Bot WhatsApp</h3>
+            <p className="text-white/80 text-xs mt-0.5">Commandez facilement via WhatsApp</p>
           </div>
         </div>
       </motion.div>

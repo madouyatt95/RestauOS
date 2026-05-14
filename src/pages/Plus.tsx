@@ -7,7 +7,7 @@ import { useThemeStore } from '../stores/themeStore';
 import {
   User, Building2, CreditCard, Users, Settings, HelpCircle, LogOut,
   ChevronRight, BarChart3, Heart, Truck, QrCode, X, Database,
-  Bell, Tag, Sun, Moon, Palette, Check, AlertCircle, ShoppingBag, Star, Trash2, Edit2, MessageCircle
+  Bell, Tag, Sun, Moon, Palette, Check, AlertCircle, ShoppingBag, Star, Trash2, Edit2
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useState } from 'react';
@@ -90,8 +90,7 @@ export default function Plus() {
                 { icon: Heart, label: 'Fidélité', path: '/fidelite', color: '#EF4444' },
                 { icon: Truck, label: 'Livraisons', path: '/livraisons', color: '#3B82F6' },
                 { icon: ShoppingBag, label: 'Menu', path: '/menu-builder', color: '#8B5CF6' },
-                { icon: Building2, label: 'Compta', path: '/factures', color: '#F59E0B' },
-                { icon: HelpCircle, label: 'Tuto PWA', path: '/onboarding', color: '#EC4899' },
+                { icon: Database, label: 'Paramètres', path: '/settings', color: '#F59E0B' },
               ].map((link, i) => (
                 <motion.button key={link.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.05 }}
                   onClick={() => navigate(link.path)}
@@ -112,7 +111,6 @@ export default function Plus() {
                 { icon: Users, label: 'Utilisateurs', color: '#06B6D4' },
                 { icon: QrCode, label: 'Générer QR Menu', color: '#8B5CF6', action: 'qr' },
                 { icon: Database, label: 'Connecteur ERP', color: '#3B82F6', action: 'erp' },
-                { icon: MessageCircle, label: 'Bot WhatsApp', color: '#25D366', path: '/whatsapp-bot' },
               ] : []),
               { icon: Users, label: 'Personnel & Plannings', color: '#EC4899', path: '/personnel' },
               { icon: HelpCircle, label: 'Aide & Support', color: '#F59E0B' },
