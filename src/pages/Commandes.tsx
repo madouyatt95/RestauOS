@@ -6,7 +6,6 @@ import { useAuthStore } from '../stores/authStore';
 import { useReservationStore, type Reservation } from '../stores/reservationStore';
 import { Search, ShoppingCart, X, ChefHat, Calendar, UserPlus, Phone, Move, Plus, Minus, Trash2, Layout } from 'lucide-react';
 
-// Helper to render chairs around a table
 const Chairs = ({ count, shape }: { count: number, shape: string }) => {
   const chairs = Array.from({ length: count });
   return (
@@ -34,7 +33,7 @@ const Chairs = ({ count, shape }: { count: number, shape: string }) => {
 
 export default function Commandes() {
   const { cart, addToCart, updateQuantity, clearCart, checkout } = useOrderStore();
-  const { tables, updateTableStatus, updateTablePosition, updateTableCapacity } = useTableStore();
+  const { tables, updateTableStatus, updateTablePosition, updateTableCapacity, updateTableFloor } = useTableStore();
   const { reservations, updateReservationStatus, addReservation, getTodayReservations } = useReservationStore();
   const { user } = useAuthStore();
   
@@ -46,6 +45,7 @@ export default function Commandes() {
   const [showResList, setShowResList] = useState(false);
   const [assigningRes, setAssigningRes] = useState<Reservation | null>(null);
   const [showTableOptions, setShowTableOptions] = useState<string | null>(null);
+  const [selectedFloor, setSelectedFloor] = useState('RDC');
   
   const [designMode, setDesignMode] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
@@ -78,14 +78,12 @@ export default function Commandes() {
   };
 
   const handleInstallWalkIn = (tableId: string) => {
-    const guests = prompt("Nombre de personnes ?", "2") || "2";
+    const g = prompt("Nombre de personnes ?", "2");
+    if (!g) return;
     updateTableStatus(tableId, 'occupee');
-    // We could store the guest count in the order later, but for now we just update the table capacity if needed?
-    // Or just mark it as occupied.
     setSelectedTableId(tableId);
     setShowTableOptions(null);
   };
-
 
   const handleManualReservation = (tableId: string) => {
     const name = prompt("Nom du client ?") || "Client Téléphone";
@@ -97,7 +95,6 @@ export default function Commandes() {
       time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
       guests
     });
-
     setTimeout(() => {
       const state = useReservationStore.getState();
       const newRes = state.reservations[0];
@@ -108,13 +105,14 @@ export default function Commandes() {
   };
 
   const handleAddTable = () => {
-    const nextNum = Math.max(...tables.map(t => t.number)) + 1;
+    const nextNum = Math.max(...tables.map(t => t.number), 0) + 1;
     const newTable: Table = {
       id: `t${Date.now()}`,
       number: nextNum,
       capacity: 4,
       status: 'libre',
       shape: 'square',
+      floor: selectedFloor,
       x: 50,
       y: 50
     };
@@ -147,6 +145,7 @@ export default function Commandes() {
   };
 
   const todayRes = getTodayReservations().filter(r => r.status === 'en_attente' || r.status === 'confirmee');
+  const floorTables = tables.filter(t => t.floor === selectedFloor);
 
   if (!selectedTableId) {
     return (
@@ -169,7 +168,6 @@ export default function Commandes() {
               </button>
             )}
             <button onClick={() => setShowResList(true)} className="w-11 h-11 rounded-xl bg-blue/10 border border-blue/20 flex items-center justify-center text-blue relative">
-
               <Calendar size={20} />
               {todayRes.filter(r => r.status === 'en_attente').length > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 bg-red rounded-full text-[10px] text-white font-bold flex items-center justify-center border-2 border-[#0a0c10]">
@@ -180,12 +178,23 @@ export default function Commandes() {
           </div>
         </div>
 
+        {/* Floor Selection */}
+        <div className="flex gap-2 px-4 mb-4">
+          {['RDC', 'ETAGE', 'TERRASSE'].map(f => (
+            <button
+              key={f}
+              onClick={() => setSelectedFloor(f)}
+              className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${selectedFloor === f ? 'bg-white/20 text-white border border-white/20' : 'bg-white/5 text-text-tertiary border border-transparent'}`}
+            >
+              {f === 'ETAGE' ? 'Étage' : f}
+            </button>
+          ))}
+        </div>
+
         <div className="flex-1 relative bg-black/60 rounded-[3rem] border border-white/10 mx-4 mb-4 overflow-hidden shadow-2xl" ref={canvasRef}>
           <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 px-6 py-1.5 bg-white/5 border-x border-b border-white/10 rounded-b-2xl text-[10px] font-black uppercase text-text-tertiary tracking-[0.2em]">Entrée</div>
-          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 px-6 py-1.5 bg-white/5 border-x border-t border-white/10 rounded-t-2xl text-[10px] font-black uppercase text-text-tertiary tracking-[0.2em]">Cuisine</div>
           
-          {tables.map(t => {
+          {floorTables.map(t => {
             const isSelected = showTableOptions === t.id;
             const isEditing = editingTable?.id === t.id;
             return (
@@ -236,7 +245,7 @@ export default function Commandes() {
           <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue shadow-[0_0_8px_blue]" /><span className="text-[10px] font-bold text-text-secondary uppercase">Réservée</span></div>
         </div>
 
-        {/* Design Mode Panel */}
+        {/* Studio Panel */}
         <AnimatePresence>
           {designMode && (
             <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} className="fixed bottom-24 left-4 right-4 z-[100] glass-card p-4 border-orange/30">
@@ -244,39 +253,53 @@ export default function Commandes() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-orange/10 flex items-center justify-center text-orange"><Move size={20} /></div>
-                    <div className="text-white font-bold text-sm">Studio Salle</div>
+                    <div className="text-white font-bold text-sm">Studio : {selectedFloor}</div>
                   </div>
                   <button onClick={handleAddTable} className="px-6 py-2.5 rounded-xl bg-orange text-white text-xs font-bold flex items-center gap-2"><Plus size={16} /> Ajouter Table</button>
                 </div>
               ) : (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-white font-black">Table {editingTable.number}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-white font-black text-lg">Table {editingTable.number}</h3>
+                      <span className="px-2 py-0.5 rounded bg-white/10 text-text-tertiary text-[10px] font-bold">{editingTable.floor}</span>
+                    </div>
                     <div className="flex gap-2">
                       <button onClick={() => handleDeleteTable(editingTable.id)} className="w-9 h-9 rounded-lg bg-red/10 text-red flex items-center justify-center"><Trash2 size={16} /></button>
                       <button onClick={() => setEditingTable(null)} className="w-9 h-9 rounded-lg bg-white/5 text-white flex items-center justify-center"><X size={16} /></button>
                     </div>
                   </div>
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <p className="text-text-secondary text-[10px] font-bold uppercase mb-2">Capacité</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-text-secondary text-[10px] font-bold uppercase mb-2">Couverts</p>
                       <div className="flex items-center gap-4 bg-white/5 rounded-xl px-4 py-2">
                         <button onClick={() => updateTableCapacity(editingTable.id, Math.max(1, editingTable.capacity - 1))}><Minus size={16} className="text-white" /></button>
                         <span className="text-xl font-black text-white flex-1 text-center">{editingTable.capacity}</span>
                         <button onClick={() => updateTableCapacity(editingTable.id, editingTable.capacity + 1)}><Plus size={16} className="text-white" /></button>
                       </div>
                     </div>
-                    <div className="flex-1 text-center">
-                      <p className="text-text-secondary text-[10px] font-bold uppercase mb-2">Forme</p>
+                    <div>
+                      <p className="text-text-secondary text-[10px] font-bold uppercase mb-2">Étage</p>
                       <div className="flex gap-1 bg-white/5 rounded-xl p-1">
-                        {(['square', 'round', 'rectangle'] as const).map(shape => (
-                          <button key={shape} onClick={() => {
-                            const store = useTableStore.getState();
-                            store.tables = store.tables.map(t => t.id === editingTable.id ? { ...t, shape } : t);
-                            setEditingTable({ ...editingTable, shape });
-                          }} className={`flex-1 py-2 rounded-lg text-[8px] font-bold uppercase ${editingTable.shape === shape ? 'bg-orange text-white' : 'text-text-tertiary'}`}>{shape}</button>
+                        {['RDC', 'ETAGE', 'TERRASSE'].map(f => (
+                          <button key={f} onClick={() => {
+                            updateTableFloor(editingTable.id, f);
+                            setEditingTable({ ...editingTable, floor: f });
+                          }} className={`flex-1 py-2 rounded-lg text-[8px] font-bold uppercase ${editingTable.floor === f ? 'bg-orange text-white' : 'text-text-tertiary'}`}>{f === 'ETAGE' ? 'Etg' : f}</button>
                         ))}
                       </div>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-text-secondary text-[10px] font-bold uppercase mb-2">Forme</p>
+                    <div className="flex gap-1 bg-white/5 rounded-xl p-1">
+                      {(['square', 'round', 'rectangle'] as const).map(shape => (
+                        <button key={shape} onClick={() => {
+                          const store = useTableStore.getState();
+                          store.tables = store.tables.map(t => t.id === editingTable.id ? { ...t, shape } : t);
+                          setEditingTable({ ...editingTable, shape });
+                        }} className={`flex-1 py-2 rounded-lg text-[8px] font-bold uppercase ${editingTable.shape === shape ? 'bg-orange text-white' : 'text-text-tertiary'}`}>{shape}</button>
+                      ))}
                     </div>
                   </div>
                 </div>
