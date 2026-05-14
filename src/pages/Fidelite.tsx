@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useClientStore, type Client } from '../stores/clientStore';
-import { Star, Gift, History, QrCode, ArrowUp, ArrowDown, ChevronRight, Search } from 'lucide-react';
+import { Star, Gift, History, QrCode, ArrowUp, ArrowDown, ChevronRight, Search, Plus } from 'lucide-react';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
@@ -13,8 +13,10 @@ const tierConfig = {
 };
 
 export default function Fidelite() {
-  const { clients, usePoints } = useClientStore();
+  const { clients, usePoints, addClient } = useClientStore();
   const [selected, setSelected] = useState<Client | null>(null);
+  const [showAddClient, setShowAddClient] = useState(false);
+  const [newClient, setNewClient] = useState({ name: '', phone: '' });
   const [search, setSearch] = useState('');
   const [showQR, setShowQR] = useState(false);
   const [showUsePoints, setShowUsePoints] = useState(false);
@@ -42,6 +44,20 @@ export default function Fidelite() {
     setSelected({ ...selected, points: selected.points - pts });
     setPointsToUse('');
     setShowOTP(false);
+  };
+
+  const handleAddClient = () => {
+    if (!newClient.name || !newClient.phone) return;
+    addClient({
+      name: newClient.name,
+      phone: newClient.phone,
+      points: 0,
+      totalSpent: 0,
+      tier: 'bronze',
+      visits: 0,
+    });
+    setShowAddClient(false);
+    setNewClient({ name: '', phone: '' });
   };
 
   if (selected) {
@@ -203,8 +219,13 @@ export default function Fidelite() {
     <div className="page-content pt-14 pb-28">
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-black text-white">Fidélité</h1>
-        <div className="glass-card px-3 py-1.5 text-xs text-text-secondary flex items-center gap-1">
-          <Star size={14} className="text-orange" /> {clients.length} clients
+        <div className="flex gap-2">
+          <div className="glass-card px-3 py-1.5 text-xs text-text-secondary flex items-center gap-1">
+            <Star size={14} className="text-orange" /> {clients.length}
+          </div>
+          <button onClick={() => setShowAddClient(true)} className="w-8 h-8 rounded-full bg-blue flex items-center justify-center">
+            <Plus size={16} className="text-white" />
+          </button>
         </div>
       </div>
 
@@ -240,6 +261,33 @@ export default function Fidelite() {
           );
         })}
       </div>
+
+      {/* Add Client Modal */}
+      <AnimatePresence>
+        {showAddClient && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setShowAddClient(false)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25 }}
+              className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <h3 className="text-white font-bold text-lg mb-2">Nouveau Client</h3>
+              <p className="text-text-secondary text-sm mb-6">Inscrivez ce client au programme de fidélité pour qu'il commence à cumuler des points.</p>
+              
+              <div className="space-y-3">
+                <input type="text" placeholder="Nom et Prénom" value={newClient.name} onChange={e => setNewClient(p => ({ ...p, name: e.target.value }))}
+                  className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+                <input type="tel" placeholder="Numéro de téléphone" value={newClient.phone} onChange={e => setNewClient(p => ({ ...p, phone: e.target.value }))}
+                  className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+                
+                <button onClick={handleAddClient}
+                  className="w-full py-3.5 rounded-2xl bg-blue text-white font-bold text-sm mt-2"
+                  disabled={!newClient.name || !newClient.phone}>
+                  Inscrire le client
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
