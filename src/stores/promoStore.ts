@@ -22,6 +22,7 @@ interface PromoState {
   addPromo: (p: Omit<Promo, 'id'>) => void;
   togglePromo: (id: string) => void;
   removePromo: (id: string) => void;
+  updatePromo: (id: string, updates: Partial<Promo>) => void;
   getActivePromos: () => Promo[];
 }
 
@@ -37,6 +38,7 @@ export const usePromoStore = create<PromoState>()(
       addPromo: (p) => set((s) => ({ promos: [...s.promos, { ...p, id: `p${Date.now()}` }] })),
       togglePromo: (id) => set((s) => ({ promos: s.promos.map(p => p.id === id ? { ...p, active: !p.active } : p) })),
       removePromo: (id) => set((s) => ({ promos: s.promos.filter(p => p.id !== id) })),
+      updatePromo: (id, updates) => set((s) => ({ promos: s.promos.map(p => p.id === id ? { ...p, ...updates } : p) })),
       getActivePromos: () => get().promos.filter(p => p.active),
     }),
     { name: 'restauos-promos' }

@@ -7,10 +7,11 @@ import { useThemeStore } from '../stores/themeStore';
 import {
   User, Building2, CreditCard, Users, Settings, HelpCircle, LogOut,
   ChevronRight, BarChart3, Heart, Truck, QrCode, X, Database,
-  Bell, Tag, Sun, Moon, Palette, Check, AlertCircle, ShoppingBag, Star, Trash2
+  Bell, Tag, Sun, Moon, Palette, Check, AlertCircle, ShoppingBag, Star, Trash2, Edit2
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useState } from 'react';
+import { PRODUCTS } from '../stores/orderStore';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
@@ -29,7 +30,9 @@ const NOTIF_ICONS: Record<string, { icon: any; color: string }> = {
 export default function Plus() {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
-  const { promos, togglePromo, removePromo } = usePromoStore();
+  const { promos, togglePromo, removePromo, updatePromo } = usePromoStore();
+  const [editingPromoId, setEditingPromoId] = useState<string | null>(null);
+  const [selectedPromoProducts, setSelectedPromoProducts] = useState<string[]>([]);
   const { notifications, markRead, markAllRead, getUnreadCount } = useNotificationStore();
   const { mode, accent, toggleMode, setAccent } = useThemeStore();
   const [showQRModal, setShowQRModal] = useState(false);
@@ -191,10 +194,16 @@ export default function Plus() {
                 <div className="flex items-center justify-between mt-3">
                   <span className="text-orange font-black text-xs">
                     {p.discountType === 'percent' ? `-${p.discount}%` : `-${fmt(p.discount)} F`}
+                    {p.productIds && p.productIds.length > 0 && ` • ${p.productIds.length} articles`}
                   </span>
-                  <button onClick={() => removePromo(p.id)} className="text-red/50 hover:text-red transition-colors">
-                    <Trash2 size={14} />
-                  </button>
+                  <div className="flex gap-3">
+                    <button onClick={() => { setEditingPromoId(p.id); setSelectedPromoProducts(p.productIds || []); }} className="text-blue/80 hover:text-blue transition-colors">
+                      <Edit2 size={14} />
+                    </button>
+                    <button onClick={() => removePromo(p.id)} className="text-red/50 hover:text-red transition-colors">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -285,6 +294,44 @@ export default function Plus() {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── PROMO EDIT MODAL ─── */}
+      <AnimatePresence>
+        {editingPromoId && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay z-[100]" onClick={() => setEditingPromoId(null)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <h3 className="text-white font-black text-xl mb-2">Connecter Promo</h3>
+              <p className="text-text-secondary text-sm mb-6">Sélectionnez les articles auxquels cette promotion s'applique.</p>
+              
+              <div className="space-y-2 mb-8 max-h-[50vh] overflow-y-auto custom-scrollbar">
+                {PRODUCTS.map(prod => (
+                  <label key={prod.id} className="flex items-center gap-3 p-3 glass-card rounded-xl cursor-pointer active:scale-95 transition-transform">
+                    <input type="checkbox" className="hidden" checked={selectedPromoProducts.includes(prod.id)} onChange={(e) => {
+                      if (e.target.checked) setSelectedPromoProducts([...selectedPromoProducts, prod.id]);
+                      else setSelectedPromoProducts(selectedPromoProducts.filter(id => id !== prod.id));
+                    }} />
+                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedPromoProducts.includes(prod.id) ? 'bg-orange border-orange text-white' : 'border-white/20 text-transparent'}`}>
+                      <Check size={12} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-white text-sm font-bold">{prod.name}</p>
+                      <p className="text-text-tertiary text-[10px] uppercase">{prod.category}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              
+              <button onClick={() => {
+                updatePromo(editingPromoId, { productIds: selectedPromoProducts });
+                setEditingPromoId(null);
+              }} className="w-full py-4 rounded-2xl bg-orange text-white font-black text-sm uppercase tracking-widest shadow-lg shadow-orange/20 active:scale-95 transition-transform">
+                Sauvegarder
+              </button>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

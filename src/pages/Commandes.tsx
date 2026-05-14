@@ -485,22 +485,6 @@ export default function Commandes() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        <AnimatePresence>
-          {showQR && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay z-[200]" onClick={() => setShowQR(null)}>
-              <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-white p-6 rounded-3xl flex flex-col items-center" onClick={e => e.stopPropagation()}>
-                <div className="w-12 h-1 bg-gray-200 rounded-full mb-4 opacity-50" />
-                <h3 className="text-[#0a0c10] font-black text-xl mb-6 text-center">Table {tables.find(t => t.id === showQR)?.number}<br/><span className="text-sm font-bold text-gray-500">Commande Autonome</span></h3>
-                <div className="p-4 bg-gray-50 rounded-2xl shadow-inner border border-gray-100">
-                  <QRCodeSVG value={`${window.location.origin}/client-order?table=${showQR}`} size={200} />
-                </div>
-                <p className="text-[#0a0c10]/60 text-xs mt-6 max-w-[200px] text-center font-bold">Le client peut scanner ce code pour rejoindre la commande.</p>
-                <button onClick={() => setShowQR(null)} className="mt-6 w-full py-3 bg-[#0a0c10] text-white rounded-xl font-black text-xs uppercase tracking-widest">Fermer</button>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     );
   }
@@ -597,6 +581,22 @@ export default function Commandes() {
               <button onClick={handleSendToKitchen} disabled={sending} className="w-full py-5 rounded-[2rem] bg-gradient-to-r from-orange to-amber-600 text-white font-black text-lg shadow-xl shadow-orange/20 flex items-center justify-center gap-4 active:scale-95 transition-transform disabled:opacity-50">
                 {sending ? 'Envoi en cours...' : <><ChefHat size={24} /> Envoyer en cuisine</>}
               </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showQR && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay z-[200]" onClick={() => setShowQR(null)}>
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-white p-6 rounded-3xl flex flex-col items-center" onClick={e => e.stopPropagation()}>
+              <div className="w-12 h-1 bg-gray-200 rounded-full mb-4 opacity-50" />
+              <h3 className="text-[#0a0c10] font-black text-xl mb-6 text-center">Table {tables.find(t => t.id === showQR)?.number}<br/><span className="text-sm font-bold text-gray-500">Commande Autonome</span></h3>
+              <div className="p-4 bg-gray-50 rounded-2xl shadow-inner border border-gray-100">
+                <QRCodeSVG value={`${window.location.origin}/client-order?table=${showQR}`} size={200} />
+              </div>
+              <p className="text-[#0a0c10]/60 text-xs mt-6 max-w-[200px] text-center font-bold">Le client peut scanner ce code pour rejoindre la commande.</p>
+              <button onClick={() => setShowQR(null)} className="mt-6 w-full py-3 bg-[#0a0c10] text-white rounded-xl font-black text-xs uppercase tracking-widest">Fermer</button>
             </motion.div>
           </motion.div>
         )}
