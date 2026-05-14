@@ -10,6 +10,7 @@ export interface Product {
   stock: number;
   cost: number;
   recipe?: { stockItemId: string; amount: number }[];
+  allergens?: string[];
 }
 
 export interface CartItem {

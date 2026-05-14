@@ -47,6 +47,13 @@ export default function Livraisons() {
     }, 1500);
   };
 
+  const driverBalances = Array.from(new Set(terminees.map(d => d.driverName))).map(name => {
+    const driverDeliveries = terminees.filter(d => d.driverName === name);
+    const owedToDriver = driverDeliveries.filter(d => d.paymentMethod === 'wave').reduce((s, d) => s + d.deliveryFee, 0);
+    const owedToRestaurant = driverDeliveries.filter(d => d.paymentMethod === 'especes').reduce((s, d) => s + d.amount, 0);
+    return { name, owedToDriver, owedToRestaurant };
+  });
+
   const handleSignAndComplete = () => {
     if (selected) {
       updateStatus(selected.id, 'livre');
@@ -95,6 +102,29 @@ export default function Livraisons() {
           </MapContainer>
         </div>
       </div>
+
+      {/* Driver Balances for Manager */}
+      {isGerant && driverBalances.length > 0 && (
+        <div className="px-4 mb-8">
+          <h3 className="text-white/60 font-black text-[10px] uppercase tracking-[0.2em] mb-4">Soldes Livreurs (Pass-through)</h3>
+          <div className="space-y-3">
+            {driverBalances.map(b => (
+              <div key={b.name} className="glass-card p-4 flex items-center justify-between border-white/5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-orange/20 flex items-center justify-center text-orange font-black">
+                    {b.name.charAt(0)}
+                  </div>
+                  <span className="text-white font-bold">{b.name}</span>
+                </div>
+                <div className="text-right text-xs">
+                  <p className="text-text-secondary"><span className="text-orange font-bold">Dette resto :</span> {b.owedToDriver.toLocaleString()} F</p>
+                  <p className="text-text-secondary"><span className="text-green font-bold">À ramener :</span> {b.owedToRestaurant.toLocaleString()} F</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Deliveries List */}
       <div className="px-4 space-y-6">
@@ -194,15 +224,31 @@ export default function Livraisons() {
               </div>
 
               <div className="glass-card p-5 mb-8 border-white/5">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Total Commande</span>
-                  <span className="text-white font-black text-xl">{selected.amount.toLocaleString()} F</span>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Repas</span>
+                  <span className="text-white font-bold">{selected.amount.toLocaleString()} F</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">État du paiement</span>
-                  <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${selected.paymentStatus === 'paye' ? 'bg-green/10 text-green' : 'bg-orange/10 text-orange'}`}>
-                    {selected.paymentStatus === 'paye' ? 'Déjà Payé' : 'À encaisser'}
-                  </span>
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Livraison</span>
+                  <span className="text-white font-bold">{selected.deliveryFee.toLocaleString()} F</span>
+                </div>
+                <div className="flex justify-between items-center pt-4 border-t border-white/10 mb-4">
+                  <span className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Total Client</span>
+                  <span className="text-white font-black text-xl">{(selected.amount + selected.deliveryFee).toLocaleString()} F</span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-white/5 flex flex-col gap-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Paiement Client</span>
+                    <span className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest ${selected.paymentMethod === 'wave' ? 'bg-blue/10 text-blue' : 'bg-green/10 text-green'}`}>
+                      {selected.paymentMethod === 'wave' ? 'Wave (Payé)' : 'Espèces (À encaisser)'}
+                    </span>
+                  </div>
+                  {selected.paymentMethod === 'wave' ? (
+                    <div className="text-[10px] text-orange font-bold text-right mt-1">Le resto vous reversera vos <span className="text-white">{selected.deliveryFee} F</span> de livraison</div>
+                  ) : (
+                    <div className="text-[10px] text-green font-bold text-right mt-1">Gardez <span className="text-white">{selected.deliveryFee} F</span>, ramenez <span className="text-white">{selected.amount} F</span> au resto</div>
+                  )}
                 </div>
               </div>
 
@@ -233,7 +279,7 @@ export default function Livraisons() {
               className="modal-sheet" onClick={e => e.stopPropagation()}>
               <div className="modal-handle" />
               <h3 className="text-white font-black text-xl mb-2 text-center">Preuve de Livraison</h3>
-              <p className="text-text-secondary text-sm mb-6 text-center">Faites signer le client pour confirmer le paiement de <span className="text-white font-bold">{selected?.amount.toLocaleString()} F</span></p>
+              <p className="text-text-secondary text-sm mb-6 text-center">Faites signer le client pour confirmer le paiement de <span className="text-white font-bold">{(selected?.amount! + selected?.deliveryFee!).toLocaleString()} F</span></p>
               
               <div className="w-full h-48 bg-white/5 border border-white/10 rounded-[2.5rem] mb-8 flex flex-col items-center justify-center relative overflow-hidden">
                 <span className="text-text-tertiary text-[10px] font-black uppercase tracking-widest absolute opacity-20">Zone de signature</span>

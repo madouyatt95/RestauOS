@@ -7,8 +7,10 @@ export interface Delivery {
   clientName: string;
   clientPhone: string;
   address: string;
-  amount: number;
+  amount: number; // Montant du repas uniquement
+  deliveryFee: number; // Frais de livraison (1000 - 2000 FCFA)
   paymentStatus: 'paye' | 'en_attente';
+  paymentMethod: 'especes' | 'wave';
   driverId: string;
   driverName: string;
   status: 'preparation' | 'en_route' | 'livre';
@@ -27,11 +29,11 @@ export const useDeliveryStore = create<DeliveryState>()(
   persist(
     (set) => ({
       deliveries: [
-        { id: 'd1', orderId: 'ord-0-1', clientName: 'Ibrahima Sarr', clientPhone: '77 123 45 67', address: 'Mermoz, Dakar', amount: 15500, paymentStatus: 'en_attente', driverId: 'e5', driverName: 'Pape Sow', status: 'en_route', estimatedTime: 15, createdAt: new Date().toISOString() },
-        { id: 'd2', orderId: 'ord-0-2', clientName: 'Abdoulaye Diop', clientPhone: '78 987 65 43', address: 'Almadies, Dakar', amount: 8900, paymentStatus: 'paye', driverId: 'e5', driverName: 'Pape Sow', status: 'preparation', estimatedTime: 25, createdAt: new Date().toISOString() },
-        { id: 'd3', orderId: 'ord-0-3', clientName: 'Malick Faye', clientPhone: '76 555 12 34', address: 'Ouakam, Dakar', amount: 12000, paymentStatus: 'en_attente', driverId: 'e5', driverName: 'Pape Sow', status: 'preparation', estimatedTime: 35, createdAt: new Date().toISOString() },
-        { id: 'd4', orderId: 'ord-1-1', clientName: 'Ndèye Aïssatou', clientPhone: '77 000 00 00', address: 'Plateau, Dakar', amount: 5000, paymentStatus: 'paye', driverId: 'e5', driverName: 'Pape Sow', status: 'livre', estimatedTime: 0, createdAt: new Date(Date.now() - 3600000).toISOString() },
-        { id: 'd5', orderId: 'ord-1-2', clientName: 'Cheikh Tidiane', clientPhone: '77 111 11 11', address: 'Yoff, Dakar', amount: 7500, paymentStatus: 'paye', driverId: 'e5', driverName: 'Pape Sow', status: 'livre', estimatedTime: 0, createdAt: new Date(Date.now() - 7200000).toISOString() },
+        { id: 'd1', orderId: 'ord-0-1', clientName: 'Ibrahima Sarr', clientPhone: '77 123 45 67', address: 'Mermoz, Dakar', amount: 14000, deliveryFee: 1500, paymentStatus: 'en_attente', paymentMethod: 'especes', driverId: 'e5', driverName: 'Pape Sow', status: 'en_route', estimatedTime: 15, createdAt: new Date().toISOString() },
+        { id: 'd2', orderId: 'ord-0-2', clientName: 'Abdoulaye Diop', clientPhone: '78 987 65 43', address: 'Almadies, Dakar', amount: 8900, deliveryFee: 1000, paymentStatus: 'paye', paymentMethod: 'wave', driverId: 'e5', driverName: 'Pape Sow', status: 'preparation', estimatedTime: 25, createdAt: new Date().toISOString() },
+        { id: 'd3', orderId: 'ord-0-3', clientName: 'Malick Faye', clientPhone: '76 555 12 34', address: 'Ouakam, Dakar', amount: 10000, deliveryFee: 2000, paymentStatus: 'en_attente', paymentMethod: 'especes', driverId: 'e5', driverName: 'Pape Sow', status: 'preparation', estimatedTime: 35, createdAt: new Date().toISOString() },
+        { id: 'd4', orderId: 'ord-1-1', clientName: 'Ndèye Aïssatou', clientPhone: '77 000 00 00', address: 'Plateau, Dakar', amount: 4000, deliveryFee: 1000, paymentStatus: 'paye', paymentMethod: 'wave', driverId: 'e5', driverName: 'Pape Sow', status: 'livre', estimatedTime: 0, createdAt: new Date(Date.now() - 3600000).toISOString() },
+        { id: 'd5', orderId: 'ord-1-2', clientName: 'Cheikh Tidiane', clientPhone: '77 111 11 11', address: 'Yoff, Dakar', amount: 6000, deliveryFee: 1500, paymentStatus: 'paye', paymentMethod: 'especes', driverId: 'e5', driverName: 'Pape Sow', status: 'livre', estimatedTime: 0, createdAt: new Date(Date.now() - 7200000).toISOString() },
       ],
 
       addDelivery: (d) => set((s) => ({

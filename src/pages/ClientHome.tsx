@@ -178,11 +178,21 @@ export default function ClientHome() {
               <div className="modal-handle" />
               <h3 className="text-white font-bold text-lg mb-4">Votre Commande</h3>
               
-              <div className="glass-card p-4 mb-6 border-orange/20 flex gap-3 items-center">
-                <MapPin className="text-orange" />
-                <div>
-                  <p className="text-white font-semibold text-sm">Livraison à Domicile</p>
-                  <p className="text-text-secondary text-xs">Mermoz, Dakar (Adresse par défaut)</p>
+              <div className="glass-card p-4 mb-6 border-orange/20 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <MapPin className="text-orange" />
+                    <div>
+                      <p className="text-white font-semibold text-sm">Mode de réception</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2 p-1 bg-white/5 rounded-xl">
+                  {['Livraison', 'Click & Collect'].map(m => (
+                    <button key={m} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${m === 'Livraison' ? 'bg-orange text-white' : 'text-text-tertiary'}`}>
+                      {m}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -201,8 +211,13 @@ export default function ClientHome() {
               </div>
 
               <button onClick={handleOrder}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange to-amber-600 text-white font-bold text-sm shadow-[0_4px_20px_rgba(255,138,0,0.4)]">
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange to-amber-600 text-white font-bold text-sm shadow-[0_4px_20px_rgba(255,138,0,0.4)] mb-3">
                 Commander avec Wave
+              </button>
+              
+              <button onClick={() => { setShowCart(false); window.location.href = '/client/review'; }}
+                className="w-full py-4 rounded-2xl glass-card text-white font-bold text-sm">
+                Laisser un avis
               </button>
             </motion.div>
           </div>

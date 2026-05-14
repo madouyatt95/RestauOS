@@ -15,6 +15,9 @@ export default function Caisse() {
   const [showPayment, setShowPayment] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [splitCount, setSplitCount] = useState(1);
+  const [splitMode, setSplitMode] = useState<'egal' | 'item' | 'custom'>('egal');
+  const [selectedItemsForSplit, setSelectedItemsForSplit] = useState<Record<string, boolean>>({});
+  const [customAmount, setCustomAmount] = useState('');
   const [showSoftPOS, setShowSoftPOS] = useState(false);
   const [isSyncingERP, setIsSyncingERP] = useState(false);
 
@@ -38,21 +41,34 @@ export default function Caisse() {
     if (!activeOrder) return;
 
 
-    // Update order status to 'paye'
+    // Calculate remaining total
+    let amountPaid = activeOrder.total;
+    if (splitMode === 'egal' && splitCount > 1) amountPaid = activeOrder.total / splitCount;
+    else if (splitMode === 'item') {
+      amountPaid = activeOrder.items.filter(it => selectedItemsForSplit[it.product.id]).reduce((s, it) => s + (it.product.price * it.quantity), 0);
+    }
+    else if (splitMode === 'custom' && customAmount) {
+      amountPaid = parseInt(customAmount);
+    }
+
+    // For demo purposes, we will just consider the entire order paid if any payment is made, 
+    // or we could partially pay it. To keep it simple, we mark it paid.
     updateOrderStatus(activeOrder.id, 'paye');
     
-    // Free the table if it was a table order
     if (activeOrder.tableId) {
       updateTableStatus(activeOrder.tableId, 'libre');
     }
 
-    // Sync to ERP
     setIsSyncingERP(true);
-    await syncOrderToERP(activeOrder.id, activeOrder.total, activeOrder.items);
+    await syncOrderToERP(activeOrder.id, amountPaid, activeOrder.items);
     setIsSyncingERP(false);
 
     setShowPayment(false);
     setShowSuccess(true);
+    setSplitCount(1);
+    setSplitMode('egal');
+    setSelectedItemsForSplit({});
+    setCustomAmount('');
     setTimeout(() => {
       setShowSuccess(false);
       setSelectedOrder(null);
@@ -160,19 +176,71 @@ export default function Caisse() {
               </div>
 
               {/* Split Bill */}
-              <div className="glass-card p-4 mb-8 flex items-center justify-between">
-                <span className="text-white text-sm font-bold">Division de l'addition</span>
-                <div className="flex items-center gap-4">
-                  <button onClick={() => setSplitCount(Math.max(1, splitCount - 1))} className="w-10 h-10 rounded-xl bg-white/5 text-white font-bold">-</button>
-                  <span className="text-white font-black text-xl w-6 text-center">{splitCount}</span>
-                  <button onClick={() => setSplitCount(splitCount + 1)} className="w-10 h-10 rounded-xl bg-white/5 text-white font-bold">+</button>
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-white text-sm font-bold">Division de l'addition</span>
+                </div>
+                
+                <div className="flex gap-2 mb-4 p-1 bg-white/5 rounded-xl">
+                  {[
+                    { id: 'egal', label: 'Égale' },
+                    { id: 'item', label: 'Par article' },
+                    { id: 'custom', label: 'Montant libre' }
+                  ].map(m => (
+                    <button key={m.id} onClick={() => setSplitMode(m.id as any)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${splitMode === m.id ? 'bg-orange text-white shadow-lg' : 'text-text-tertiary'}`}>
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Mode Égal */}
+                {splitMode === 'egal' && (
+                  <div className="glass-card p-4 flex items-center justify-between">
+                    <span className="text-text-secondary text-xs">Diviser par</span>
+                    <div className="flex items-center gap-4">
+                      <button onClick={() => setSplitCount(Math.max(1, splitCount - 1))} className="w-8 h-8 rounded-lg bg-white/5 text-white font-bold">-</button>
+                      <span className="text-white font-black text-lg w-6 text-center">{splitCount}</span>
+                      <button onClick={() => setSplitCount(splitCount + 1)} className="w-8 h-8 rounded-lg bg-white/5 text-white font-bold">+</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Mode Article */}
+                {splitMode === 'item' && (
+                  <div className="glass-card p-4 space-y-3 max-h-40 overflow-y-auto">
+                    {activeOrder.items.map(it => (
+                      <div key={it.product.id} className="flex items-center justify-between" onClick={() => setSelectedItemsForSplit(s => ({ ...s, [it.product.id]: !s[it.product.id] }))}>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedItemsForSplit[it.product.id] ? 'bg-orange border-orange text-white' : 'border-white/20'}`}>
+                            {selectedItemsForSplit[it.product.id] && <Check size={12} />}
+                          </div>
+                          <span className="text-white text-xs">{it.quantity}x {it.product.name}</span>
+                        </div>
+                        <span className="text-white font-bold text-xs">{fmt(it.product.price * it.quantity)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Mode Libre */}
+                {splitMode === 'custom' && (
+                  <div className="glass-card p-4">
+                    <input type="number" value={customAmount} onChange={e => setCustomAmount(e.target.value)} placeholder="Saisir un montant..."
+                      className="w-full bg-transparent border-b border-white/20 text-white text-2xl font-black focus:outline-none focus:border-orange text-center pb-2 placeholder:text-white/20" />
+                  </div>
+                )}
+
+                {/* Computed Split Amount */}
+                <div className="mt-4 text-center p-3 bg-orange/10 border border-orange/20 rounded-xl">
+                  <p className="text-orange font-black text-xl">
+                    {splitMode === 'egal' ? fmt(activeOrder.total / splitCount) :
+                     splitMode === 'item' ? fmt(activeOrder.items.filter(it => selectedItemsForSplit[it.product.id]).reduce((s, it) => s + (it.product.price * it.quantity), 0)) :
+                     splitMode === 'custom' ? fmt(parseInt(customAmount) || 0) : 0} F 
+                    <span className="text-xs"> à payer maintenant</span>
+                  </p>
                 </div>
               </div>
-              {splitCount > 1 && (
-                <div className="mb-6 text-center p-3 bg-orange/10 border border-orange/20 rounded-xl">
-                  <p className="text-orange font-black text-xl">{fmt(activeOrder.total / splitCount)} F <span className="text-xs">/ personne</span></p>
-                </div>
-              )}
 
               <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-4">Mode de règlement</p>
               <div className="grid grid-cols-2 gap-3 mb-4">

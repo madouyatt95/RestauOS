@@ -598,14 +598,14 @@ export default function Personnel() {
                   <div className="flex gap-2 flex-wrap">
                     {['👨‍🍳', '👩‍🍳', '🧑‍🍳', '👩‍🍽️', '🧑‍🍽️', '🧑‍💼', '💁‍♀️', '🍸', '🛵', '👩', '🧑'].map(av => (
                       <button key={av} onClick={() => setNewEmpAvatar(av)}
-                        className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl transition-all ${newEmpAvatar === av ? 'bg-orange/20 ring-2 ring-orange' : 'bg-white/5'}`}>
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition-all ${newEmpAvatar === av ? 'bg-orange shadow-lg shadow-orange/30 scale-110' : 'bg-white/5'}`}>
                         {av}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Name */}
+                    {/* Name */}
                 <div>
                   <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Nom complet</label>
                   <input type="text" value={newEmpName} onChange={e => setNewEmpName(e.target.value)}
@@ -617,7 +617,7 @@ export default function Personnel() {
                 <div>
                   <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Poste</label>
                   <div className="grid grid-cols-3 gap-2">
-                    {['Chef Cuisine', 'Second Cuisine', 'Commis', 'Serveur', 'Serveuse', 'Hôtesse', 'Caissier', 'Barman', 'Plongeur', 'Livreur'].map(r => (
+                    {['Chef Cuisine', 'Second Cuisine', 'Commis', 'Serveur', 'Serveuse', 'Hôtesse', 'Caissier', 'Barman', 'Plongeur', 'Livreur', 'Livreur Indépendant'].map(r => (
                       <button key={r} onClick={() => setNewEmpRole(r)}
                         className={`py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${newEmpRole === r ? 'bg-orange text-white' : 'bg-white/5 text-text-tertiary'}`}>
                         {r}
@@ -625,6 +625,13 @@ export default function Personnel() {
                     ))}
                   </div>
                 </div>
+
+                {newEmpRole === 'Livreur Indépendant' && (
+                  <div className="p-3 bg-blue/10 border border-blue/20 rounded-xl flex gap-3 text-blue text-xs items-start">
+                    <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                    <p>Un "Lien Magique" (QR) sera généré. Le livreur y verra ses courses et ses frais sans compte complet.</p>
+                  </div>
+                )}
 
                 {/* Phone */}
                 <div>
@@ -647,10 +654,11 @@ export default function Personnel() {
                       status: 'repos',
                     });
                     setShowAddEmployee(false);
+                    if (newEmpRole === 'Livreur Indépendant') alert("Lien magique copié pour " + newEmpName.trim());
                   }}
                   disabled={!newEmpName.trim()}
                   className="w-full py-4 rounded-2xl bg-orange text-white font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-transform disabled:opacity-30 shadow-lg shadow-orange/20">
-                  <UserPlus size={18} /> Ajouter à l'équipe
+                  <UserPlus size={18} /> {newEmpRole === 'Livreur Indépendant' ? 'Ajouter & Générer Lien' : 'Ajouter à l\'équipe'}
                 </button>
               </div>
             </motion.div>

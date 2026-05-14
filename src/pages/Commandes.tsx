@@ -88,7 +88,7 @@ const getTableDimensions = (capacity: number): { w: number, h: number } => {
 export default function Commandes() {
   const { cart, addToCart, updateQuantity, clearCart, checkout } = useOrderStore();
   const { tables, updateTableStatus, updateTablePosition, updateTableCapacity, updateTableFloor } = useTableStore();
-  const { reservations, updateReservationStatus, addReservation, getTodayReservations } = useReservationStore();
+  const { reservations, updateStatus, addReservation } = useReservationStore();
   const { user } = useAuthStore();
   
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
@@ -132,7 +132,7 @@ export default function Commandes() {
     }
     if (assigningRes) {
       if (t.status !== 'libre') return;
-      updateReservationStatus(assigningRes.id, 'confirmee', t.id);
+      updateStatus(assigningRes.id, 'confirmed', t.id);
       updateTableStatus(t.id, 'reservee');
       setAssigningRes(null);
       return;
@@ -158,14 +158,17 @@ export default function Commandes() {
     
     addReservation({
       clientName: name,
+      clientPhone: '000000000',
+      status: 'pending',
+      notes: '',
       date: new Date().toISOString().split('T')[0],
       time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
       guests
     });
     setTimeout(() => {
       const state = useReservationStore.getState();
-      const newRes = state.reservations[0];
-      updateReservationStatus(newRes.id, 'confirmee', tableId);
+      const newRes = state.reservations[state.reservations.length - 1];
+      if (newRes) updateStatus(newRes.id, 'confirmed', tableId);
       updateTableStatus(tableId, 'reservee');
       setShowTableOptions(null);
     }, 100);
@@ -202,8 +205,9 @@ export default function Commandes() {
       const order = checkout('especes', undefined, selectedTableId, user?.name);
       if (order) {
         updateTableStatus(selectedTableId, 'occupee', order.id);
-        const res = reservations.find(r => r.tableId === selectedTableId && r.status === 'confirmee');
-        if (res) updateReservationStatus(res.id, 'honoree');
+        const res = reservations.find(r => r.tableId === selectedTableId && r.status === 'confirmed');
+        if (res) updateStatus(res.id, 'confirmed'); // Mark as arrived/served, let's keep confirmed or add a new status.
+
       }
       setSending(false);
       clearCart();
@@ -212,7 +216,8 @@ export default function Commandes() {
     }, 1500);
   };
 
-  const todayRes = getTodayReservations().filter(r => r.status === 'en_attente' || r.status === 'confirmee');
+  const todayString = new Date().toISOString().split('T')[0];
+  const todayRes = reservations.filter(r => r.date === todayString && (r.status === 'pending' || r.status === 'confirmed'));
 
   if (!selectedTableId) {
     return (
@@ -236,9 +241,9 @@ export default function Commandes() {
             )}
             <button onClick={() => setShowResList(true)} className="w-11 h-11 rounded-xl bg-blue/10 border border-blue/20 flex items-center justify-center text-blue relative">
               <Calendar size={20} />
-              {todayRes.filter(r => r.status === 'en_attente').length > 0 && (
+              {todayRes.filter((r: Reservation) => r.status === 'pending').length > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 bg-red rounded-full text-[10px] text-white font-bold flex items-center justify-center border-2 border-[#0a0c10]">
-                  {todayRes.filter(r => r.status === 'en_attente').length}
+                  {todayRes.filter((r: Reservation) => r.status === 'pending').length}
                 </span>
               )}
             </button>
@@ -458,7 +463,7 @@ export default function Commandes() {
                   {todayRes.length === 0 ? (
                     <div className="py-16 text-center text-text-tertiary italic">Aucune réservation pour le moment</div>
                   ) : (
-                    todayRes.map(res => (
+                    todayRes.map((res: Reservation) => (
                       <div key={res.id} className="glass-card p-5 flex justify-between items-center border-white/5 hover:border-blue/30 transition-colors">
                         <div>
                           <h4 className="text-white font-black text-base">{res.clientName}</h4>
@@ -467,7 +472,7 @@ export default function Commandes() {
                             <span>{res.guests} Personnes</span>
                           </div>
                         </div>
-                        {res.status === 'en_attente' && (
+                        {res.status === 'pending' && (
                           <button onClick={() => { setAssigningRes(res); setShowResList(false); }} className="px-5 py-2.5 rounded-xl bg-blue text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue/20">Attribuer</button>
                         )}
                       </div>
@@ -483,7 +488,7 @@ export default function Commandes() {
   }
 
   const currentTable = tables.find(t => t.id === selectedTableId);
-  const currentRes = reservations.find(r => r.tableId === selectedTableId && r.status === 'confirmee');
+  const currentRes = reservations.find(r => r.tableId === selectedTableId && r.status === 'confirmed');
 
   return (
     <div className="page-content pt-8 pb-32">
