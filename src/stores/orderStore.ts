@@ -25,7 +25,9 @@ export interface Order {
   payment: 'especes' | 'wave' | 'orange_money' | 'carte';
   date: string;
   clientId?: string;
-  status: 'en_attente' | 'pret' | 'servi';
+  tableId?: string;
+  serveurName?: string;
+  status: 'en_attente' | 'pret' | 'servi' | 'paye';
 }
 
 export const PRODUCTS: Product[] = [
@@ -63,30 +65,55 @@ const generateOrders = (): Order[] => {
   const payments: Order['payment'][] = ['especes', 'wave', 'orange_money', 'carte'];
   const now = new Date();
 
-  for (let d = 6; d >= 0; d--) {
+  // Commandes passées (7 derniers jours)
+  for (let d = 7; d >= 1; d--) {
     const day = new Date(now);
     day.setDate(day.getDate() - d);
-    const count = d === 0 ? 128 : Math.floor(80 + Math.random() * 60);
+    const count = Math.floor(80 + Math.random() * 60);
     for (let i = 0; i < count; i++) {
       const itemCount = Math.floor(Math.random() * 3) + 1;
       const items: CartItem[] = [];
       for (let j = 0; j < itemCount; j++) {
         const p = PRODUCTS[Math.floor(Math.random() * PRODUCTS.length)];
-        const qty = Math.floor(Math.random() * 2) + 1;
-        items.push({ product: p, quantity: qty });
+        items.push({ product: p, quantity: Math.floor(Math.random() * 2) + 1 });
       }
-      const total = items.reduce((s, it) => s + it.product.price * it.quantity, 0);
       orders.push({
         id: `ord-${d}-${i}`,
         items,
-        total,
+        total: items.reduce((s, it) => s + it.product.price * it.quantity, 0),
         type: types[Math.floor(Math.random() * types.length)],
         payment: payments[Math.floor(Math.random() * payments.length)],
         date: day.toISOString(),
-        status: 'servi'
+        status: 'paye'
       });
     }
   }
+
+  // Commandes "Live" pour démo
+  orders.push({
+    id: 'cmd-live-1',
+    items: [{ product: PRODUCTS[0], quantity: 2 }, { product: PRODUCTS[6], quantity: 2 }],
+    total: 13000,
+    type: 'sur_place',
+    payment: 'especes',
+    date: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+    tableId: 't4',
+    serveurName: 'Awa F.',
+    status: 'en_attente'
+  });
+
+  orders.push({
+    id: 'cmd-live-2',
+    items: [{ product: PRODUCTS[1], quantity: 1 }, { product: PRODUCTS[7], quantity: 1 }],
+    total: 5500,
+    type: 'sur_place',
+    payment: 'wave',
+    date: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+    tableId: 't7',
+    serveurName: 'Ibrahima B.',
+    status: 'pret'
+  });
+
   return orders;
 };
 
@@ -99,7 +126,7 @@ interface OrderState {
   updateQuantity: (productId: string, qty: number) => void;
   clearCart: () => void;
   setOrderType: (type: Order['type']) => void;
-  checkout: (payment: Order['payment'], clientId?: string) => Order | null;
+  checkout: (payment: Order['payment'], clientId?: string, tableId?: string, serveurName?: string) => Order | null;
   updateOrderStatus: (orderId: string, status: Order['status']) => void;
   getCA: (daysAgo: number) => number;
   getOrderCount: (daysAgo?: number) => number;
@@ -138,7 +165,7 @@ export const useOrderStore = create<OrderState>()(
       clearCart: () => set({ cart: [] }),
       setOrderType: (type) => set({ orderType: type }),
 
-      checkout: (payment, clientId) => {
+      checkout: (payment, clientId, tableId, serveurName) => {
         const state = get();
         if (state.cart.length === 0) return null;
 
@@ -151,8 +178,10 @@ export const useOrderStore = create<OrderState>()(
           type: state.orderType,
           payment,
           clientId,
+          tableId,
+          serveurName,
           date: new Date().toISOString(),
-          status: 'en_attente',
+          status: tableId ? 'en_attente' : 'paye', // Direct payment if no table (takeaway)
         };
 
         set(state => ({
@@ -174,7 +203,7 @@ export const useOrderStore = create<OrderState>()(
         target.setDate(target.getDate() - daysAgo);
         const dayStr = target.toISOString().split('T')[0];
         return s.orders
-          .filter(o => o.date.startsWith(dayStr))
+          .filter(o => o.date.startsWith(dayStr) && o.status === 'paye')
           .reduce((sum, o) => sum + o.total, 0);
       },
 
@@ -184,7 +213,7 @@ export const useOrderStore = create<OrderState>()(
         const target = new Date(now);
         target.setDate(target.getDate() - daysAgo);
         const dayStr = target.toISOString().split('T')[0];
-        return s.orders.filter(o => o.date.startsWith(dayStr)).length;
+        return s.orders.filter(o => o.date.startsWith(dayStr) && o.status === 'paye').length;
       },
 
       getClientCount: (daysAgo = 0) => {
@@ -205,7 +234,7 @@ export const useOrderStore = create<OrderState>()(
           d.setDate(d.getDate() - i);
           const dayStr = d.toISOString().split('T')[0];
           const ca = get().orders
-            .filter(o => o.date.startsWith(dayStr))
+            .filter(o => o.date.startsWith(dayStr) && o.status === 'paye')
             .reduce((sum, o) => sum + o.total, 0);
           result.push({ day: days[d.getDay() === 0 ? 6 : d.getDay() - 1], ca });
         }
@@ -213,7 +242,7 @@ export const useOrderStore = create<OrderState>()(
       },
 
       getTypeDistribution: () => {
-        const orders = get().orders;
+        const orders = get().orders.filter(o => o.status === 'paye');
         const total = orders.length || 1;
         return {
           sur_place: Math.round(orders.filter(o => o.type === 'sur_place').length / total * 100),
@@ -224,7 +253,7 @@ export const useOrderStore = create<OrderState>()(
 
       getTopProducts: () => {
         const counts: Record<string, { name: string; image: string; sales: number; revenue: number }> = {};
-        get().orders.forEach(o => {
+        get().orders.filter(o => o.status === 'paye').forEach(o => {
           o.items.forEach(it => {
             if (!counts[it.product.id]) {
               counts[it.product.id] = { name: it.product.name, image: it.product.image, sales: 0, revenue: 0 };
@@ -239,3 +268,4 @@ export const useOrderStore = create<OrderState>()(
     { name: 'restauos-orders' }
   )
 );
+

@@ -29,6 +29,8 @@ export default function Livraisons() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [optimized, setOptimized] = useState(false);
 
+  const isGerant = ['Admin', 'Gérant'].includes(user?.role || '');
+
   const filteredDeliveries = user?.role === 'Livreur' 
     ? deliveries.filter(d => d.driverName === user.name)
     : deliveries;
@@ -53,9 +55,12 @@ export default function Livraisons() {
   return (
     <div className="page-content pt-14 pb-28">
       <div className="flex items-center justify-between mb-5">
-        <h1 className="text-xl font-black text-white">Livraisons</h1>
+        <div>
+          <h1 className="text-xl font-black text-white">Livraisons</h1>
+          {isGerant && <span className="text-[10px] font-black text-blue uppercase tracking-widest bg-blue/10 px-2 py-0.5 rounded">Supervision</span>}
+        </div>
         <div className="flex gap-2">
-          {user?.role === 'Livreur' && enCours.length > 1 && (
+          {!isGerant && user?.role === 'Livreur' && enCours.length > 1 && (
             <button 
               onClick={handleOptimize}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${optimized ? 'bg-green/20 text-green' : 'glass-card text-white'}`}
@@ -87,7 +92,8 @@ export default function Livraisons() {
               <Marker key={d.id} position={pos}>
                 <Popup>
                   <strong>{d.clientName}</strong><br/>
-                  {d.address}
+                  {d.address}<br/>
+                  <small>Livreur: {d.driverName}</small>
                 </Popup>
               </Marker>
             );
@@ -113,6 +119,7 @@ export default function Livraisons() {
                 <div className="text-text-tertiary text-xs flex items-center gap-1">
                   <MapPin size={10} /> {d.address}
                 </div>
+                {isGerant && <div className="text-blue text-[10px] font-bold mt-1">Livreur: {d.driverName}</div>}
               </div>
               <div className="text-right">
                 <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full" style={{ color: cfg.color, background: cfg.bg }}>
@@ -160,25 +167,34 @@ export default function Livraisons() {
                 <span className="text-white text-sm">Livreur : {selected.driverName}</span>
               </div>
 
-              <p className="text-text-tertiary text-xs font-semibold mb-3 uppercase tracking-wider">Changer le statut</p>
-              <div className="flex gap-2">
-                {selected.status === 'en_route' && (
-                  <button
-                    onClick={() => setShowSignature(true)}
-                    className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue to-indigo-600 text-white font-bold text-sm"
-                  >
-                    Remettre au client
-                  </button>
-                )}
-                {selected.status !== 'livre' && selected.status !== 'en_route' && (
-                  <button
-                    onClick={() => updateStatus(selected.id, 'en_route')}
-                    className="flex-1 py-3 rounded-xl bg-white/10 text-white font-bold text-sm"
-                  >
-                    Commencer la course
-                  </button>
-                )}
-              </div>
+              {isGerant ? (
+                <div className="p-4 bg-blue/5 border border-blue/20 rounded-xl">
+                  <p className="text-blue font-bold text-xs">MODE SUPERVISION</p>
+                  <p className="text-text-secondary text-[10px] mt-1">Vous ne pouvez pas effectuer d'actions directes sur cette livraison.</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-text-tertiary text-xs font-semibold mb-3 uppercase tracking-wider">Changer le statut</p>
+                  <div className="flex gap-2">
+                    {selected.status === 'en_route' && (
+                      <button
+                        onClick={() => setShowSignature(true)}
+                        className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue to-indigo-600 text-white font-bold text-sm"
+                      >
+                        Remettre au client
+                      </button>
+                    )}
+                    {selected.status !== 'livre' && selected.status !== 'en_route' && (
+                      <button
+                        onClick={() => updateStatus(selected.id, 'en_route')}
+                        className="flex-1 py-3 rounded-xl bg-white/10 text-white font-bold text-sm"
+                      >
+                        Commencer la course
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}
@@ -217,3 +233,4 @@ export default function Livraisons() {
     </div>
   );
 }
+

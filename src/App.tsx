@@ -9,6 +9,7 @@ import Stocks from './pages/Stocks';
 import Personnel from './pages/Personnel';
 import Rapports from './pages/Rapports';
 import Livraisons from './pages/Livraisons';
+import Commandes from './pages/Commandes';
 import Fidelite from './pages/Fidelite';
 import Plus from './pages/Plus';
 import Cuisine from './pages/Cuisine';
@@ -28,8 +29,11 @@ function AppContent() {
           <Route path="/dashboard" element={
             <ProtectedRoute allowedRoles={['Admin', 'Gérant']}><Dashboard /></ProtectedRoute>
           } />
+          <Route path="/commandes" element={
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Serveur']}><Commandes /></ProtectedRoute>
+          } />
           <Route path="/caisse" element={
-            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier', 'Serveur']}><Caisse /></ProtectedRoute>
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier']}><Caisse /></ProtectedRoute>
           } />
           <Route path="/cuisine" element={
             <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Chef cuisine']}><Cuisine /></ProtectedRoute>

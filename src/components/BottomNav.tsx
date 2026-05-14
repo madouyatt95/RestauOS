@@ -22,9 +22,16 @@ export default function BottomNav() {
       ];
       break;
     case 'Caissier':
+      navItems = [
+        { path: '/caisse', icon: ShoppingBag, label: 'Encaissement' },
+        { path: '/fidelite', icon: Users, label: 'Fidélité' },
+        { path: '/personnel', icon: Calendar, label: 'Planning' },
+        { path: '/plus', icon: MoreHorizontal, label: 'Plus' },
+      ];
+      break;
     case 'Serveur':
       navItems = [
-        { path: '/caisse', icon: ShoppingBag, label: 'Caisse' },
+        { path: '/commandes', icon: ShoppingBag, label: 'Salle' },
         { path: '/fidelite', icon: Users, label: 'Fidélité' },
         { path: '/personnel', icon: Calendar, label: 'Planning' },
         { path: '/plus', icon: MoreHorizontal, label: 'Plus' },
@@ -34,12 +41,14 @@ export default function BottomNav() {
       navItems = [
         { path: '/cuisine', icon: ChefHat, label: 'Cuisine' },
         { path: '/stocks', icon: Package, label: 'Stocks' },
+        { path: '/personnel', icon: Calendar, label: 'Planning' },
         { path: '/plus', icon: MoreHorizontal, label: 'Plus' },
       ];
       break;
     case 'Livreur':
       navItems = [
         { path: '/livraisons', icon: Truck, label: 'Livraisons' },
+        { path: '/personnel', icon: Calendar, label: 'Planning' },
         { path: '/plus', icon: MoreHorizontal, label: 'Plus' },
       ];
       break;
