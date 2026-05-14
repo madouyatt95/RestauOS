@@ -11,13 +11,27 @@ export interface Shift {
   hours: string; // e.g., "11:00 - 15:00"
 }
 
+export interface SwapRequest {
+  id: string;
+  fromEmployeeId: string;
+  toEmployeeId: string;
+  shiftId: string;
+  date: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
 interface PlanningState {
   shifts: Shift[];
+  swapRequests: SwapRequest[];
   addShift: (shift: Omit<Shift, 'id'>) => void;
   removeShift: (id: string) => void;
   updateShift: (id: string, type: ShiftType, hours: string) => void;
   getShiftsByDate: (date: string) => Shift[];
   getShiftsByEmployee: (employeeId: string) => Shift[];
+  addSwapRequest: (req: Omit<SwapRequest, 'id' | 'status' | 'createdAt'>) => void;
+  updateSwapStatus: (id: string, status: 'approved' | 'rejected') => void;
 }
 
 export const usePlanningStore = create<PlanningState>()(
@@ -76,6 +90,29 @@ export const usePlanningStore = create<PlanningState>()(
       })),
       getShiftsByDate: (date) => get().shifts.filter(s => s.date === date),
       getShiftsByEmployee: (employeeId) => get().shifts.filter(s => s.employeeId === employeeId),
+
+      swapRequests: [
+        { id: 'sw1', fromEmployeeId: 'e2', toEmployeeId: 'e6', shiftId: 's08', date: new Date().toISOString().split('T')[0], reason: 'RDV médical jeudi soir', status: 'pending' as const, createdAt: new Date().toISOString() },
+      ],
+      addSwapRequest: (req) => set((state) => ({
+        swapRequests: [...state.swapRequests, { ...req, id: `sw${Date.now()}`, status: 'pending', createdAt: new Date().toISOString() }]
+      })),
+      updateSwapStatus: (id, status) => set((state) => {
+        const req = state.swapRequests.find(r => r.id === id);
+        if (status === 'approved' && req) {
+          // Swap the employeeId on the shift
+          const shift = state.shifts.find(s => s.id === req.shiftId);
+          if (shift) {
+            return {
+              swapRequests: state.swapRequests.map(r => r.id === id ? { ...r, status } : r),
+              shifts: state.shifts.map(s => s.id === req.shiftId ? { ...s, employeeId: req.toEmployeeId } : s),
+            };
+          }
+        }
+        return {
+          swapRequests: state.swapRequests.map(r => r.id === id ? { ...r, status } : r),
+        };
+      }),
     }),
     { name: 'restauos-planning' }
   )
