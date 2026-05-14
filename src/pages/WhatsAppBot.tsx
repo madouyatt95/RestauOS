@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useOrderStore, PRODUCTS } from '../stores/orderStore';
 import { useDeliveryStore } from '../stores/deliveryStore';
 import { useNotificationStore } from '../stores/notificationStore';
+import { useGalsenRegions } from '../hooks/useGalsenAPI';
 import { ArrowLeft, Send, Bot, Phone } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -25,6 +26,7 @@ export default function WhatsAppBot() {
   const navigate = useNavigate();
   const { addDelivery } = useDeliveryStore();
   const { addNotification } = useNotificationStore();
+  const { searchLocations } = useGalsenRegions();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [messages, setMessages] = useState<Message[]>([
@@ -36,6 +38,7 @@ export default function WhatsAppBot() {
   const [clientAddress, setClientAddress] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [clientPayment, setClientPayment] = useState<'especes' | 'wave'>('especes');
+  const [addressSuggestions, setAddressSuggestions] = useState<{ name: string; type: string; region: string }[]>([]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -132,8 +135,33 @@ export default function WhatsAppBot() {
       }
 
       case 'address': {
+        // Check if user selected a suggestion number
+        const suggestionMatch = msg.match(/^(\d+)$/);
+        if (suggestionMatch && addressSuggestions.length > 0) {
+          const idx = parseInt(suggestionMatch[1]) - 1;
+          if (idx >= 0 && idx < addressSuggestions.length) {
+            const chosen = addressSuggestions[idx];
+            setClientAddress(`${chosen.name}, ${chosen.region}`);
+            setAddressSuggestions([]);
+            botReply(`\u2705 Adresse confirm\u00e9e : *${chosen.name}, ${chosen.region}*\n\nEnvoyez-moi maintenant votre *num\u00e9ro de t\u00e9l\u00e9phone*.`);
+            setBotState('phone');
+            return;
+          }
+        }
+
+        // Try to find location suggestions
+        const results = searchLocations(msg, 5);
+        if (results.length > 0) {
+          setAddressSuggestions(results);
+          const suggText = results.map((r, i) => `${i + 1}. ${r.name} _(${r.region} - ${r.type})_`).join('\n');
+          botReply(`\ud83d\udccd *Localit\u00e9s trouv\u00e9es :*\n\n${suggText}\n\n_R\u00e9pondez avec le num\u00e9ro ou pr\u00e9cisez votre adresse compl\u00e8te._`);
+          return;
+        }
+
+        // No match found, use as-is
         setClientAddress(msg);
-        botReply("📱 Merci ! Envoyez-moi maintenant votre *numéro de téléphone*.");
+        setAddressSuggestions([]);
+        botReply("\ud83d\udcf1 Merci ! Envoyez-moi maintenant votre *num\u00e9ro de t\u00e9l\u00e9phone*.");
         setBotState('phone');
         break;
       }
