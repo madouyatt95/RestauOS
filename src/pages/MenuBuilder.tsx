@@ -54,7 +54,23 @@ export default function MenuBuilder() {
             {editingId === item.id ? (
               <div className="flex-1 space-y-2">
                 <input type="text" value={item.name} onChange={e => handleUpdate(item.id, 'name', e.target.value)} className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm" placeholder="Nom du plat" />
-                <input type="text" value={item.image || ''} onChange={e => handleUpdate(item.id, 'image', e.target.value)} className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-[10px]" placeholder="URL de l'image (optionnel)" />
+                <div className="relative">
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          handleUpdate(item.id, 'image', reader.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }} 
+                    className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-[10px] file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-orange file:text-white hover:file:bg-orange/80 cursor-pointer" 
+                  />
+                </div>
                 <div className="flex gap-2">
                   <input type="number" value={item.price} onChange={e => handleUpdate(item.id, 'price', Number(e.target.value))} className="w-1/2 bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm" placeholder="Prix" />
                   <select value={item.category} onChange={e => handleUpdate(item.id, 'category', e.target.value)} className="w-1/2 bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm">

@@ -63,8 +63,18 @@ export default function Personnel() {
   const weekDates = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
   const todayStr = new Date().toISOString().split('T')[0];
 
-  const availableRoles = useMemo(() => ['Tous', ...Array.from(new Set(employees.map(e => e.role)))], [employees]);
-  const filteredEmployees = useMemo(() => employees.filter(e => roleFilter === 'Tous' || e.role === roleFilter), [employees, roleFilter]);
+  const ROLE_GROUPS: Record<string, string[]> = {
+    'Salle': ['Serveur', 'Serveuse', 'Hôtesse', 'Barman'],
+    'Cuisine': ['Chef Cuisine', 'Second Cuisine', 'Commis', 'Plongeur', 'Plongeuse', 'Cuisinier'],
+    'Livraison': ['Livreur', 'Livreur Indépendant'],
+    'Management': ['Caissier', 'Gérant', 'Admin']
+  };
+
+  const availableRoles = ['Tous', 'Salle', 'Cuisine', 'Livraison', 'Management'];
+  const filteredEmployees = useMemo(() => employees.filter(e => {
+    if (roleFilter === 'Tous') return true;
+    return ROLE_GROUPS[roleFilter]?.includes(e.role);
+  }), [employees, roleFilter]);
 
   const getShifts = (empId: string, date: string) => {
     return shifts.filter(s => s.employeeId === empId && s.date === date);
