@@ -106,15 +106,18 @@ export default function Personnel() {
       )}
 
       {activeTab === 'calendrier' && (
-        <div className="glass-card-lg p-4 bg-white rounded-2xl overflow-hidden">
+        <div className="glass-card-lg p-4 rounded-2xl overflow-hidden">
           <style>{`
-            .fc { font-family: 'Inter', sans-serif; }
-            .fc-toolbar-title { font-size: 1.1rem !important; font-weight: 900 !important; color: #111827 !important; text-transform: capitalize; }
+            .fc { font-family: 'Inter', sans-serif; color: white; }
+            .fc-toolbar-title { font-size: 1.1rem !important; font-weight: 900 !important; color: white !important; text-transform: capitalize; }
             .fc-button-primary { background: var(--color-orange) !important; border: none !important; font-weight: bold !important; text-transform: capitalize; border-radius: 8px !important; }
             .fc-button-primary:not(:disabled):active, .fc-button-primary:not(:disabled).fc-button-active { background: #E67A00 !important; }
-            .fc-daygrid-day-number { color: #4B5563 !important; font-weight: 600; text-decoration: none; }
-            .fc-col-header-cell-cushion { color: #111827 !important; font-weight: 800; padding: 8px !important; text-transform: uppercase; font-size: 0.75rem; }
-            .fc-theme-standard td, .fc-theme-standard th { border-color: #E5E7EB; }
+            .fc-daygrid-day-number { color: #A1A1AA !important; font-weight: 600; text-decoration: none; }
+            .fc-col-header-cell-cushion { color: #A1A1AA !important; font-weight: 800; padding: 8px !important; text-transform: uppercase; font-size: 0.75rem; }
+            .fc-theme-standard td, .fc-theme-standard th { border-color: rgba(255,255,255,0.1) !important; }
+            .fc-list-day-cushion { background: rgba(255,255,255,0.05) !important; }
+            .fc-list-event:hover td { background: rgba(255,255,255,0.02) !important; }
+            .fc-list-event-title, .fc-list-event-time { color: white !important; }
             .fc-event { border-radius: 4px; border: none; padding: 2px 4px; font-size: 0.7rem; font-weight: bold; cursor: pointer; }
             .fc-h-event .fc-event-main { color: white; }
           `}</style>
