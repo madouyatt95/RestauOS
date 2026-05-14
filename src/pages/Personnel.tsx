@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useStaffStore, type Employee } from '../stores/staffStore';
 import { useAuthStore } from '../stores/authStore';
 import { usePlanningStore, type ShiftType } from '../stores/planningStore';
-import { Phone, ChevronLeft, ChevronRight, Plus, X, Sun, Moon, Clock, Users, RefreshCw, Check, AlertCircle } from 'lucide-react';
+import { Phone, ChevronLeft, ChevronRight, Plus, X, Sun, Moon, Clock, Users, RefreshCw, Check, AlertCircle, UserPlus, Trash2 } from 'lucide-react';
 
 const statusConfig = {
   present: { label: 'Présent', color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
@@ -35,7 +35,7 @@ function getWeekDates(weekOffset: number): { label: string; date: string; isToda
 }
 
 export default function Personnel() {
-  const { employees, updateStatus } = useStaffStore();
+  const { employees, updateStatus, addEmployee, removeEmployee } = useStaffStore();
   const { shifts, addShift, removeShift, swapRequests, addSwapRequest, colleagueRespond, managerRespond } = usePlanningStore();
   const { user } = useAuthStore();
   
@@ -48,6 +48,11 @@ export default function Personnel() {
   const [swapSelectedShift, setSwapSelectedShift] = useState<string | null>(null);
   const [swapTargetEmp, setSwapTargetEmp] = useState<string | null>(null);
   const [swapReason, setSwapReason] = useState('');
+  const [showAddEmployee, setShowAddEmployee] = useState(false);
+  const [newEmpName, setNewEmpName] = useState('');
+  const [newEmpRole, setNewEmpRole] = useState('Serveur');
+  const [newEmpPhone, setNewEmpPhone] = useState('');
+  const [newEmpAvatar, setNewEmpAvatar] = useState('🧑‍🍽️');
 
   const isManager = ['Admin', 'Gérant'].includes(user?.role || '');
 
@@ -91,8 +96,14 @@ export default function Personnel() {
       <div className="flex items-center justify-between mb-6 px-4">
         <div>
           <h1 className="text-white font-black text-2xl">Personnel</h1>
-          <p className="text-text-secondary text-xs uppercase tracking-widest font-bold">Planning & Équipe</p>
+          <p className="text-text-secondary text-xs uppercase tracking-widest font-bold">{employees.length} salariés</p>
         </div>
+        {isManager && (
+          <button onClick={() => { setShowAddEmployee(true); setNewEmpName(''); setNewEmpPhone(''); setNewEmpRole('Serveur'); setNewEmpAvatar('🧑‍🍽️'); }}
+            className="w-10 h-10 rounded-xl bg-orange flex items-center justify-center text-white active:scale-90 transition-transform shadow-lg shadow-orange/20">
+            <UserPlus size={18} />
+          </button>
+        )}
       </div>
 
       {/* Tabs */}
@@ -560,6 +571,87 @@ export default function Personnel() {
                 <a href={`tel:${selectedEmp.phone}`} className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold flex items-center justify-center gap-3">
                   <Phone size={18} /> Appeler {selectedEmp.name.split(' ')[0]}
                 </a>
+                {isManager && (
+                  <button onClick={() => { if (confirm(`Retirer ${selectedEmp.name} de l'équipe ?`)) { removeEmployee(selectedEmp.id); setSelectedEmp(null); } }}
+                    className="w-full py-3 rounded-2xl bg-red/5 border border-red/20 text-red font-bold text-xs flex items-center justify-center gap-3">
+                    <Trash2 size={16} /> Retirer de l'équipe
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── ADD EMPLOYEE MODAL ─── */}
+      <AnimatePresence>
+        {showAddEmployee && isManager && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setShowAddEmployee(false)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <h3 className="text-white font-black text-xl mb-6 text-center">Nouveau Salarié</h3>
+              
+              <div className="space-y-5">
+                {/* Avatar picker */}
+                <div>
+                  <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-3 block">Avatar</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {['👨‍🍳', '👩‍🍳', '🧑‍🍳', '👩‍🍽️', '🧑‍🍽️', '🧑‍💼', '💁‍♀️', '🍸', '🛵', '👩', '🧑'].map(av => (
+                      <button key={av} onClick={() => setNewEmpAvatar(av)}
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl transition-all ${newEmpAvatar === av ? 'bg-orange/20 ring-2 ring-orange' : 'bg-white/5'}`}>
+                        {av}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Name */}
+                <div>
+                  <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Nom complet</label>
+                  <input type="text" value={newEmpName} onChange={e => setNewEmpName(e.target.value)}
+                    placeholder="Ex: Ousmane Thiam"
+                    className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-orange/50" />
+                </div>
+
+                {/* Role */}
+                <div>
+                  <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Poste</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {['Chef Cuisine', 'Second Cuisine', 'Commis', 'Serveur', 'Serveuse', 'Hôtesse', 'Caissier', 'Barman', 'Plongeur', 'Livreur'].map(r => (
+                      <button key={r} onClick={() => setNewEmpRole(r)}
+                        className={`py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${newEmpRole === r ? 'bg-orange text-white' : 'bg-white/5 text-text-tertiary'}`}>
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Téléphone</label>
+                  <input type="tel" value={newEmpPhone} onChange={e => setNewEmpPhone(e.target.value)}
+                    placeholder="77 000 00 00"
+                    className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-orange/50" />
+                </div>
+
+                {/* Submit */}
+                <button
+                  onClick={() => {
+                    if (!newEmpName.trim()) return;
+                    addEmployee({
+                      name: newEmpName.trim(),
+                      role: newEmpRole,
+                      phone: newEmpPhone || '00 000 00 00',
+                      avatar: newEmpAvatar,
+                      schedule: 'À planifier',
+                      status: 'repos',
+                    });
+                    setShowAddEmployee(false);
+                  }}
+                  disabled={!newEmpName.trim()}
+                  className="w-full py-4 rounded-2xl bg-orange text-white font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-transform disabled:opacity-30 shadow-lg shadow-orange/20">
+                  <UserPlus size={18} /> Ajouter à l'équipe
+                </button>
               </div>
             </motion.div>
           </motion.div>
