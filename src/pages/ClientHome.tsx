@@ -3,13 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../stores/authStore';
 import { useOrderStore, PRODUCTS } from '../stores/orderStore';
 import { useDeliveryStore } from '../stores/deliveryStore';
-import { QrCode, Star, ShoppingBag, Plus, Minus, MapPin, Check, Truck, Clock } from 'lucide-react';
+import { QrCode, ShoppingBag, Plus, Minus, MapPin, Check, Truck, Clock } from 'lucide-react';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
 export default function ClientHome() {
   const { user } = useAuthStore();
-  const { cart, addToCart, updateQuantity, clearCart, checkout, orders } = useOrderStore();
+  const { cart, addToCart, updateQuantity, checkout, orders } = useOrderStore();
   const { deliveries } = useDeliveryStore();
   const [showCart, setShowCart] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
