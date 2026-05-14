@@ -116,9 +116,13 @@ export default function Personnel() {
             .fc-daygrid-day-top { flex-direction: row !important; }
             .fc-col-header-cell-cushion { color: #A1A1AA !important; font-weight: 800; padding: 8px !important; text-transform: uppercase; font-size: 0.75rem; }
             .fc-theme-standard td, .fc-theme-standard th { border-color: rgba(255,255,255,0.1) !important; }
+            .fc-list { border-color: rgba(255,255,255,0.1) !important; }
             .fc-list-day-cushion { background: rgba(255,255,255,0.05) !important; }
-            .fc-list-event:hover td { background: rgba(255,255,255,0.02) !important; }
+            .fc-list-day-text, .fc-list-day-side-text { color: white !important; font-weight: bold; }
+            .fc-list-event:hover td { background: rgba(255,255,255,0.05) !important; }
             .fc-list-event-title, .fc-list-event-time { color: white !important; }
+            .fc-list-empty { background: transparent !important; color: #A1A1AA !important; }
+            .fc-list-empty-cushion { color: #A1A1AA !important; }
             .fc-event { border-radius: 4px; border: none; padding: 2px 4px; font-size: 0.7rem; font-weight: bold; cursor: pointer; }
             .fc-h-event .fc-event-main { color: white; }
             .fc-timegrid-slot-label-cushion { color: #A1A1AA !important; font-size: 0.75rem; }
@@ -140,13 +144,13 @@ export default function Personnel() {
             selectable={isManager}
             nowIndicator={true}
             events={[
-              { title: 'Awa F. (08h-16h)', date: new Date().toISOString().split('T')[0], color: '#3B82F6' },
-              { title: 'Ibrahima B. (16h-23h)', date: new Date().toISOString().split('T')[0], color: '#F59E0B' },
-              { title: 'Ousmane C. (09h-17h)', date: new Date().toISOString().split('T')[0], color: '#10B981' },
-              { title: 'Fatou N. (08h-16h)', date: new Date(Date.now() + 86400000).toISOString().split('T')[0], color: '#EC4899' },
-              { title: 'Cheikh T. (16h-23h)', date: new Date(Date.now() + 86400000).toISOString().split('T')[0], color: '#8B5CF6' },
+              { title: 'Awa F.', start: new Date().toISOString().split('T')[0] + 'T08:00:00', end: new Date().toISOString().split('T')[0] + 'T16:00:00', color: '#3B82F6' },
+              { title: 'Ibrahima B.', start: new Date().toISOString().split('T')[0] + 'T16:00:00', end: new Date().toISOString().split('T')[0] + 'T23:00:00', color: '#F59E0B' },
+              { title: 'Ousmane C.', start: new Date().toISOString().split('T')[0] + 'T09:00:00', end: new Date().toISOString().split('T')[0] + 'T17:00:00', color: '#10B981' },
+              { title: 'Fatou N.', start: new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T08:00:00', end: new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T16:00:00', color: '#EC4899' },
+              { title: 'Cheikh T.', start: new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T16:00:00', end: new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T23:00:00', color: '#8B5CF6' },
               { title: 'Moussa D. (Repos)', date: new Date(Date.now() + 86400000).toISOString().split('T')[0], color: '#6B7280' },
-              { title: 'Awa F. (08h-16h)', date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0], color: '#3B82F6' },
+              { title: 'Awa F.', start: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0] + 'T08:00:00', end: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0] + 'T16:00:00', color: '#3B82F6' },
               { title: 'Ibrahima B. (Repos)', date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0], color: '#6B7280' },
             ]}
           />
