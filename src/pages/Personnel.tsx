@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useStaffStore, type Employee } from '../stores/staffStore';
 import { useAuthStore } from '../stores/authStore';
 import { usePlanningStore } from '../stores/planningStore';
-import { Phone, Clock, RefreshCw, Check, Calendar as CalendarIcon, List } from 'lucide-react';
+import { Phone, RefreshCw, Check, Calendar as CalendarIcon, List } from 'lucide-react';
 
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -23,22 +23,17 @@ export default function Personnel() {
   const { shifts, addShift, removeShift } = usePlanningStore();
   const { user } = useAuthStore();
   
-  const [activeTab, setActiveTab] = useState<'presences' | 'calendrier' | 'remplacements'>('presences');
+  // Set Planning as default tab for everyone
+  const [activeTab, setActiveTab] = useState<'calendrier' | 'presences' | 'remplacements'>('calendrier');
   const [calendarView, setCalendarView] = useState<'list' | 'grid'>('list');
   const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
   const [showAddShift, setShowAddShift] = useState(false);
   const [newShift, setNewShift] = useState({ empId: '', date: '', type: 'midi' as any });
-  const [filterMyShifts, setFilterMyShifts] = useState(false);
 
   const isManager = ['Admin', 'Gérant'].includes(user?.role || '');
 
   const calendarEvents = useMemo(() => {
-    let s = shifts;
-    if (filterMyShifts && user) {
-      const emp = employees.find(e => e.name === user.name);
-      if (emp) s = s.filter(x => x.employeeId === emp.id);
-    }
-    return s.map(s => {
+    return shifts.map(s => {
       const emp = employees.find(e => e.id === s.employeeId);
       return {
         id: s.id,
@@ -49,7 +44,7 @@ export default function Personnel() {
         extendedProps: { employeeId: s.employeeId }
       };
     });
-  }, [shifts, employees, filterMyShifts, user]);
+  }, [shifts, employees]);
 
   const handleDateClick = (info: any) => {
     if (!isManager) return;
@@ -80,33 +75,64 @@ export default function Personnel() {
 
       <div className="flex items-center justify-between mb-6 px-4">
         <div>
-          <h1 className="text-white font-black text-2xl">Personnel</h1>
-          <p className="text-text-secondary text-xs uppercase tracking-widest font-bold">Équipe & Planning</p>
+          <h1 className="text-white font-black text-2xl">Planning</h1>
+          <p className="text-text-secondary text-xs uppercase tracking-widest font-bold">Rotation de l'équipe</p>
         </div>
-        {!isManager && (
-          <button onClick={() => setFilterMyShifts(!filterMyShifts)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filterMyShifts ? 'bg-orange text-white' : 'bg-white/10 text-white'}`}>
-            {filterMyShifts ? 'Voir tout' : 'Mon Planning'}
-          </button>
-        )}
       </div>
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6 px-4">
         {[
-          { id: 'presences', label: 'Présences', icon: Check },
           { id: 'calendrier', label: 'Planning', icon: CalendarIcon },
+          { id: 'presences', label: 'Présences', icon: Check },
           { id: 'remplacements', label: 'Échanges', icon: RefreshCw },
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex-1 py-3 rounded-2xl flex flex-col items-center gap-1.5 transition-all border ${activeTab === tab.id ? 'bg-white/10 border-white/20 text-white' : 'bg-transparent border-transparent text-text-tertiary'}`}
+            className={`flex-1 py-3 rounded-2xl flex flex-col items-center gap-1.5 transition-all border ${activeTab === tab.id ? 'bg-white/10 border-white/20 text-white shadow-xl shadow-white/5' : 'bg-transparent border-transparent text-text-tertiary'}`}
           >
             <tab.icon size={18} />
             <span className="text-[10px] font-black uppercase tracking-wider">{tab.label}</span>
           </button>
         ))}
       </div>
+
+      {activeTab === 'calendrier' && (
+        <div className="px-2">
+          <div className="flex gap-2 mb-4 px-2">
+            <button onClick={() => setCalendarView('list')} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 ${calendarView === 'list' ? 'bg-orange text-white' : 'bg-white/5 text-text-tertiary'}`}>
+              <List size={14} /> Vue Hebdo
+            </button>
+            <button onClick={() => setCalendarView('grid')} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 ${calendarView === 'grid' ? 'bg-orange text-white' : 'bg-white/5 text-text-tertiary'}`}>
+              <CalendarIcon size={14} /> Vue Mois
+            </button>
+          </div>
+          <div className="glass-card p-4 shadow-2xl border-white/5">
+            <FullCalendar
+              plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
+              initialView={calendarView === 'list' ? 'listWeek' : 'dayGridMonth'}
+              locale="fr"
+              headerToolbar={{
+                left: 'prev,next',
+                center: 'title',
+                right: ''
+              }}
+              height="auto"
+              events={calendarEvents}
+              dateClick={handleDateClick}
+              eventClick={handleEventClick}
+              editable={false}
+              key={calendarView} 
+            />
+          </div>
+          {isManager && (
+            <p className="text-[10px] text-text-tertiary italic text-center mt-6">
+              * Mode Gérant : Cliquez sur un jour pour assigner un service.
+            </p>
+          )}
+        </div>
+      )}
 
       {activeTab === 'presences' && (
         <div className="px-4 space-y-3">
@@ -125,50 +151,10 @@ export default function Personnel() {
                   <span className="text-[9px] font-black px-3 py-1 rounded-full" style={{ color: sc.color, background: sc.bg }}>
                     {sc.label}
                   </span>
-                  <div className="flex items-center justify-end gap-1 mt-1 text-text-tertiary">
-                    <Clock size={10} />
-                    <span className="text-[9px] font-bold">{emp.schedule}</span>
-                  </div>
                 </div>
               </motion.div>
             );
           })}
-        </div>
-      )}
-
-      {activeTab === 'calendrier' && (
-        <div className="px-2">
-          <div className="flex gap-2 mb-4 px-2">
-            <button onClick={() => setCalendarView('list')} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 ${calendarView === 'list' ? 'bg-white/10 text-white' : 'text-text-tertiary'}`}>
-              <List size={14} /> Liste
-            </button>
-            <button onClick={() => setCalendarView('grid')} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 ${calendarView === 'grid' ? 'bg-white/10 text-white' : 'text-text-tertiary'}`}>
-              <CalendarIcon size={14} /> Calendrier
-            </button>
-          </div>
-          <div className="glass-card p-4">
-            <FullCalendar
-              plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
-              initialView={calendarView === 'list' ? 'listWeek' : 'dayGridMonth'}
-              locale="fr"
-              headerToolbar={{
-                left: 'prev,next',
-                center: 'title',
-                right: ''
-              }}
-              height="auto"
-              events={calendarEvents}
-              dateClick={handleDateClick}
-              eventClick={handleEventClick}
-              editable={false}
-              key={calendarView} // Force re-render on view change
-            />
-          </div>
-          {isManager && (
-            <p className="text-[10px] text-text-tertiary italic text-center mt-4">
-              * Cliquez sur une date pour ajouter un service.
-            </p>
-          )}
         </div>
       )}
 
@@ -178,32 +164,34 @@ export default function Personnel() {
         </div>
       )}
 
-      {/* Add Shift Modal */}
+      {/* Add Shift Modal (Manager) */}
       <AnimatePresence>
         {showAddShift && isManager && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setShowAddShift(false)}>
             <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
               <div className="modal-handle" />
               <h3 className="text-white font-black text-xl mb-6 text-center">Ajouter au Planning</h3>
+              
               <div className="space-y-6">
                 <div>
                   <label className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-3 block">1. Choisir l'employé</label>
                   <div className="grid grid-cols-3 gap-2">
                     {employees.map(emp => (
-                      <button key={emp.id} onClick={() => setNewShift({ ...newShift, empId: emp.id })} className={`p-3 rounded-xl border transition-all text-center ${newShift.empId === emp.id ? 'bg-orange/20 border-orange text-orange' : 'bg-white/5 border-transparent text-white'}`}>
+                      <button key={emp.id} onClick={() => setNewShift({ ...newShift, empId: emp.id })} className={`p-3 rounded-xl border transition-all text-center ${newShift.empId === emp.id ? 'bg-orange/20 border-orange text-orange shadow-lg' : 'bg-white/5 border-transparent text-white'}`}>
                         <span className="text-xl block mb-1">{emp.avatar}</span>
                         <span className="text-[8px] font-bold uppercase truncate block">{emp.name.split(' ')[0]}</span>
                       </button>
                     ))}
                   </div>
                 </div>
+
                 <div>
                   <label className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-3 block">2. Type de Service</label>
                   <div className="grid grid-cols-2 gap-3">
                     {[
                       { id: 'midi', label: 'Service Midi', hours: '11:00 - 16:00' },
                       { id: 'soir', label: 'Service Soir', hours: '18:00 - 23:00' },
-                      { id: 'journee', label: 'Journée', hours: '10:00 - 22:00' },
+                      { id: 'journee', label: 'Coupure', hours: '10:00 - 22:00' },
                     ].map(st => (
                       <button key={st.id} onClick={() => {
                         if (!newShift.empId) return alert("Sélectionnez un employé");
@@ -214,7 +202,7 @@ export default function Personnel() {
                           hours: st.hours
                         });
                         setShowAddShift(false);
-                      }} className="p-4 rounded-2xl bg-white/5 border border-white/10 text-left active:scale-95 transition-all">
+                      }} className="p-4 rounded-2xl bg-white/5 border border-white/10 text-left active:scale-95 transition-all hover:border-orange/50">
                         <span className="text-white font-black text-xs uppercase block">{st.label}</span>
                         <span className="text-text-tertiary text-[10px]">{st.hours}</span>
                       </button>
@@ -239,7 +227,6 @@ export default function Personnel() {
                 <p className="text-orange font-bold text-xs uppercase tracking-widest">{selectedEmp.role}</p>
               </div>
               <div className="space-y-4">
-                <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-4">Statut actuel</p>
                 <div className="grid grid-cols-2 gap-3">
                   {Object.entries(statusConfig).map(([key, cfg]) => (
                     <button key={key} onClick={() => { updateStatus(selectedEmp.id, key as any); setSelectedEmp({...selectedEmp, status: key as any}); }}
@@ -250,7 +237,7 @@ export default function Personnel() {
                   ))}
                 </div>
                 <button className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold flex items-center justify-center gap-3">
-                  <Phone size={18} /> Contacter {selectedEmp.name.split(' ')[0]}
+                  <Phone size={18} /> Contacter
                 </button>
               </div>
             </motion.div>

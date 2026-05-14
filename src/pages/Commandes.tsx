@@ -237,6 +237,12 @@ export default function Commandes() {
           {floorTables.map(t => {
             const isSelected = showTableOptions === t.id;
             const isEditing = editingTable?.id === t.id;
+            
+            // Dynamic sizing based on capacity
+            const scale = t.capacity <= 2 ? 0.85 : t.capacity <= 4 ? 1 : t.capacity <= 6 ? 1.2 : 1.4;
+            const baseWidth = t.shape === 'rectangle' ? 80 : 56;
+            const baseHeight = t.shape === 'rectangle' ? 48 : 56;
+
             return (
               <motion.div
                 key={t.id}
@@ -259,22 +265,26 @@ export default function Commandes() {
                   <motion.div 
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className={`relative flex items-center justify-center transition-all duration-300 ${
-                    t.shape === 'round' ? 'rounded-full aspect-square w-14' : 
-                    t.shape === 'rectangle' ? 'rounded-xl w-20 h-12' : 'rounded-xl w-14 h-14'
-                  } border-2 ${
+                    className={`relative flex items-center justify-center transition-all duration-300 border-2 ${
+                      t.shape === 'round' ? 'rounded-full aspect-square' : 'rounded-xl'
+                    } ${
                     t.status === 'libre' ? 'bg-[#1a1c22] border-green/40 text-green shadow-[0_0_15px_rgba(34,197,94,0.05)]' :
                     t.status === 'occupee' ? 'bg-[#1a1c22] border-red/50 text-red shadow-[0_0_20px_rgba(239,68,68,0.2)]' :
                     'bg-[#1a1c22] border-blue/50 text-blue shadow-[0_0_20px_rgba(59,130,246,0.2)]'
-                  } ${isSelected || isEditing ? 'border-white ring-4 ring-white/10' : ''}`}>
+                  } ${isSelected || isEditing ? 'border-white ring-4 ring-white/10' : ''}`}
+                  style={{ 
+                    width: `${baseWidth * scale}px`, 
+                    height: `${baseHeight * scale}px` 
+                  }}>
                     <div className="flex flex-col items-center">
-                      <span className="text-lg font-black">{t.number}</span>
+                      <span className="text-lg font-black" style={{ fontSize: `${18 * scale}px` }}>{t.number}</span>
                     </div>
                   </motion.div>
                 </div>
               </motion.div>
             );
           })}
+
         </div>
 
         {/* Legend & Stats */}
