@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOrderStore, PRODUCTS } from '../stores/orderStore';
 import { useStockStore } from '../stores/stockStore';
-import { Search, Plus, Minus, ShoppingCart, Check, CreditCard, Smartphone, Banknote, Wallet, Bell, Mic, Wifi } from 'lucide-react';
+import { Search, Plus, Minus, ShoppingCart, Check, CreditCard, Smartphone, Banknote, Wallet, Wifi, Flame } from 'lucide-react';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 const categories = ['Tout', 'Plats', 'Boissons', 'Desserts'] as const;
@@ -21,26 +21,8 @@ export default function Caisse() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [splitCount, setSplitCount] = useState(1);
   const [showUpsell, setShowUpsell] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [voiceText, setVoiceText] = useState('');
   const [showSoftPOS, setShowSoftPOS] = useState(false);
-
-  const handleVoiceOrder = () => {
-    setIsListening(true);
-    setVoiceText('Écoute en cours...');
-    
-    setTimeout(() => {
-      setVoiceText('Deux Thiéboudienne poisson, un sans piment, et trois Bissap...');
-    }, 1500);
-
-    setTimeout(() => {
-      const thieb = PRODUCTS.find(p => p.name.includes('Thiéboudienne'));
-      const bissap = PRODUCTS.find(p => p.name.includes('Bissap'));
-      if (thieb) { addToCart(thieb); addToCart(thieb); }
-      if (bissap) { addToCart(bissap); addToCart(bissap); addToCart(bissap); }
-      setIsListening(false);
-    }, 3500);
-  };
+  const [showPingChef, setShowPingChef] = useState(false);
 
   const handleAddToCart = (p: typeof PRODUCTS[0]) => {
     addToCart(p);
@@ -90,8 +72,9 @@ export default function Caisse() {
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-black text-white">Caisse</h1>
         <div className="flex gap-2">
-          <button className="w-9 h-9 glass-card flex items-center justify-center rounded-full">
-            <Bell size={16} className="text-text-secondary" />
+          <button onClick={() => { setShowPingChef(true); setTimeout(() => setShowPingChef(false), 3000); }}
+            className="w-9 h-9 glass-card flex items-center justify-center rounded-full active:bg-red/20 transition-colors">
+            <Flame size={16} className="text-red" />
           </button>
           <button className="w-9 h-9 rounded-full bg-orange flex items-center justify-center relative" onClick={() => setShowPayment(true)}>
             <ShoppingCart size={16} className="text-white" />
@@ -166,28 +149,6 @@ export default function Caisse() {
           );
         })}
       </div>
-
-      {/* Voice AI FAB */}
-      <button onClick={handleVoiceOrder}
-        className="fixed bottom-24 right-4 w-14 h-14 rounded-full bg-gradient-to-r from-violet to-fuchsia-600 shadow-[0_4px_20px_rgba(139,92,246,0.5)] flex items-center justify-center active:scale-95 transition-transform z-[9997]">
-        <Mic size={24} className="text-white" />
-      </button>
-
-      {/* Voice AI Modal */}
-      <AnimatePresence>
-        {isListening && (
-          <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }}
-            className="fixed bottom-0 left-0 right-0 z-[10003] glass-card-lg p-6 border-t border-violet/30 flex flex-col items-center">
-            <div className="w-16 h-16 rounded-full bg-violet/20 flex items-center justify-center mb-4">
-              <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1.5 }}>
-                <Mic size={32} className="text-violet" />
-              </motion.div>
-            </div>
-            <p className="text-white font-bold text-center text-lg">{voiceText}</p>
-            <p className="text-text-tertiary text-xs mt-2 uppercase tracking-widest font-black text-center">IA Vocale RestauOS</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Cart Bar */}
       {cartCount > 0 && (
@@ -338,6 +299,22 @@ export default function Caisse() {
             }} className="px-3 py-1.5 rounded-lg bg-violet text-white text-xs font-bold">
               Ajouter
             </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Ping Chef Toast */}
+      <AnimatePresence>
+        {showPingChef && (
+          <motion.div initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -50 }}
+            className="fixed top-20 left-4 right-4 z-[10002] glass-card p-4 border border-red/50 bg-red/10 flex items-center gap-3 shadow-[0_4px_20px_rgba(239,68,68,0.4)]">
+            <div className="w-10 h-10 rounded-full bg-red/20 flex items-center justify-center animate-pulse">
+              <Flame size={20} className="text-red" />
+            </div>
+            <div className="flex-1">
+              <p className="text-red font-black text-sm uppercase tracking-wide">Alerte envoyée</p>
+              <p className="text-white text-xs font-semibold">La cuisine vient d'être notifiée de l'urgence !</p>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
