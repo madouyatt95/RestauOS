@@ -106,29 +106,51 @@ export default function Personnel() {
       )}
 
       {activeTab === 'calendrier' && (
-        <div className="glass-card-lg p-4 rounded-2xl overflow-hidden">
+        <div className="glass-card-lg p-2 sm:p-4 rounded-2xl overflow-hidden">
           <style>{`
-            .fc { font-family: 'Inter', sans-serif; color: white; }
-            .fc-toolbar-title { font-size: 1.1rem !important; font-weight: 900 !important; color: white !important; text-transform: capitalize; }
-            .fc-button-primary { background: var(--color-orange) !important; border: none !important; font-weight: bold !important; text-transform: capitalize; border-radius: 8px !important; }
+            .fc { font-family: 'Inter', sans-serif; color: white; background: transparent !important; }
+            .fc-toolbar-title { font-size: 0.95rem !important; font-weight: 900 !important; color: white !important; text-transform: capitalize; }
+            .fc-toolbar { flex-wrap: wrap; gap: 6px; }
+            .fc-button-primary { background: var(--color-orange) !important; border: none !important; font-weight: bold !important; text-transform: capitalize; border-radius: 8px !important; font-size: 0.7rem !important; padding: 4px 8px !important; }
             .fc-button-primary:not(:disabled):active, .fc-button-primary:not(:disabled).fc-button-active { background: #E67A00 !important; }
-            .fc-daygrid-day-number { color: white !important; font-weight: 600; text-decoration: none; padding: 4px; }
+
+            /* === DAY GRID (MONTH) === */
+            .fc-daygrid-day-number { color: white !important; font-weight: 600; text-decoration: none !important; padding: 4px !important; }
             .fc-daygrid-day-top { flex-direction: row !important; }
-            .fc-col-header-cell-cushion { color: #A1A1AA !important; font-weight: 800; padding: 8px !important; text-transform: uppercase; font-size: 0.75rem; }
+            .fc-daygrid-day-frame { min-height: 60px !important; }
+            .fc-daygrid-event { white-space: normal !important; overflow: visible !important; }
+            .fc-daygrid-event .fc-event-title { font-size: 0.6rem !important; white-space: normal !important; overflow: visible !important; text-overflow: unset !important; }
+            .fc-daygrid-dot-event .fc-event-title { font-weight: 700 !important; color: white !important; }
+            .fc-daygrid-dot-event:hover { background: rgba(255,255,255,0.1) !important; }
+            .fc-daygrid-dot-event { padding: 1px 2px !important; }
+            .fc-daygrid-day.fc-day-today { background: rgba(255,138,0,0.08) !important; }
+            .fc-col-header-cell-cushion { color: #A1A1AA !important; font-weight: 800; padding: 8px !important; text-transform: uppercase; font-size: 0.65rem; text-decoration: none !important; }
+
+            /* === BORDERS === */
             .fc-theme-standard td, .fc-theme-standard th { border-color: rgba(255,255,255,0.1) !important; }
-            .fc-list { border-color: rgba(255,255,255,0.1) !important; }
-            .fc-list-day-cushion { background: rgba(255,255,255,0.05) !important; }
-            .fc-list-day-text, .fc-list-day-side-text { color: white !important; font-weight: bold; }
-            .fc-list-event:hover td { background: rgba(255,255,255,0.05) !important; }
-            .fc-list-event-title, .fc-list-event-time { color: white !important; }
-            .fc-list-empty { background: transparent !important; color: #A1A1AA !important; }
-            .fc-list-empty-cushion { color: #A1A1AA !important; }
-            .fc-event { border-radius: 4px; border: none; padding: 2px 4px; font-size: 0.7rem; font-weight: bold; cursor: pointer; }
-            .fc-h-event .fc-event-main { color: white; }
-            .fc-timegrid-slot-label-cushion { color: #A1A1AA !important; font-size: 0.75rem; }
-            .fc-timegrid-axis-cushion { color: #A1A1AA !important; }
-            .fc-timegrid-now-indicator-line { border-color: var(--color-red) !important; }
             .fc-scrollgrid { border-color: rgba(255,255,255,0.1) !important; }
+            .fc-scrollgrid-sync-table { border-color: rgba(255,255,255,0.1) !important; }
+
+            /* === LIST VIEW === */
+            .fc-list { border-color: rgba(255,255,255,0.1) !important; background: transparent !important; }
+            .fc-list-table { background: transparent !important; }
+            .fc-list-day-cushion { background: rgba(255,138,0,0.12) !important; }
+            .fc-list-day-text, .fc-list-day-side-text { color: var(--color-orange) !important; font-weight: 800 !important; text-decoration: none !important; }
+            .fc-list-event td { background: transparent !important; border-color: rgba(255,255,255,0.05) !important; }
+            .fc-list-event:hover td { background: rgba(255,255,255,0.05) !important; }
+            .fc-list-event-title { color: white !important; font-weight: 600 !important; }
+            .fc-list-event-time { color: #A1A1AA !important; }
+            .fc-list-event-dot { border-color: currentColor !important; }
+            .fc-list-empty { background: transparent !important; }
+            .fc-list-empty-cushion { color: #A1A1AA !important; }
+
+            /* === TIME GRID (DAY) === */
+            .fc-event { border-radius: 6px !important; border: none !important; padding: 2px 4px; font-size: 0.7rem; font-weight: bold; cursor: pointer; }
+            .fc-h-event .fc-event-main { color: white; }
+            .fc-timegrid-slot-label-cushion { color: #A1A1AA !important; font-size: 0.7rem; }
+            .fc-timegrid-axis-cushion { color: #A1A1AA !important; }
+            .fc-timegrid-now-indicator-line { border-color: var(--color-red) !important; border-width: 2px !important; }
+            .fc-timegrid-col.fc-day-today { background: rgba(255,138,0,0.04) !important; }
           `}</style>
           <FullCalendar
             plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
@@ -139,19 +161,27 @@ export default function Personnel() {
               center: 'title',
               right: 'listWeek,dayGridMonth,timeGridDay'
             }}
-            height={500}
+            height="auto"
+            contentHeight={480}
             editable={isManager}
             selectable={isManager}
             nowIndicator={true}
+            dayMaxEventRows={4}
+            eventDisplay="auto"
             events={[
               { title: 'Awa F.', start: new Date().toISOString().split('T')[0] + 'T08:00:00', end: new Date().toISOString().split('T')[0] + 'T16:00:00', color: '#3B82F6' },
               { title: 'Ibrahima B.', start: new Date().toISOString().split('T')[0] + 'T16:00:00', end: new Date().toISOString().split('T')[0] + 'T23:00:00', color: '#F59E0B' },
               { title: 'Ousmane C.', start: new Date().toISOString().split('T')[0] + 'T09:00:00', end: new Date().toISOString().split('T')[0] + 'T17:00:00', color: '#10B981' },
               { title: 'Fatou N.', start: new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T08:00:00', end: new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T16:00:00', color: '#EC4899' },
               { title: 'Cheikh T.', start: new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T16:00:00', end: new Date(Date.now() + 86400000).toISOString().split('T')[0] + 'T23:00:00', color: '#8B5CF6' },
-              { title: 'Moussa D. (Repos)', date: new Date(Date.now() + 86400000).toISOString().split('T')[0], color: '#6B7280' },
+              { title: 'Moussa D. (Repos)', date: new Date(Date.now() + 86400000).toISOString().split('T')[0], color: '#6B7280', allDay: true },
               { title: 'Awa F.', start: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0] + 'T08:00:00', end: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0] + 'T16:00:00', color: '#3B82F6' },
-              { title: 'Ibrahima B. (Repos)', date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0], color: '#6B7280' },
+              { title: 'Ibrahima B. (Repos)', date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0], color: '#6B7280', allDay: true },
+              { title: 'Fatou N.', start: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0] + 'T09:00:00', end: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0] + 'T17:00:00', color: '#EC4899' },
+              { title: 'Cheikh T.', start: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0] + 'T08:00:00', end: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0] + 'T16:00:00', color: '#8B5CF6' },
+              { title: 'Ousmane C.', start: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0] + 'T16:00:00', end: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0] + 'T23:00:00', color: '#10B981' },
+              { title: 'Awa F. (Repos)', date: new Date(Date.now() + 86400000 * 4).toISOString().split('T')[0], color: '#6B7280', allDay: true },
+              { title: 'Ibrahima B.', start: new Date(Date.now() + 86400000 * 4).toISOString().split('T')[0] + 'T08:00:00', end: new Date(Date.now() + 86400000 * 4).toISOString().split('T')[0] + 'T16:00:00', color: '#F59E0B' },
             ]}
           />
         </div>
