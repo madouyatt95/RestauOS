@@ -145,6 +145,8 @@ export const usePlanningStore = create<PlanningState>()(
 
       swapRequests: [
         { id: 'sw1', fromEmployeeId: 'e2', toEmployeeId: 'e6', shiftId: 's08', date: new Date().toISOString().split('T')[0], reason: 'RDV médical jeudi soir', status: 'pending_colleague' as const, createdAt: new Date().toISOString() },
+        { id: 'sw2', fromEmployeeId: 'e3', toEmployeeId: 'e2', shiftId: 's14', date: new Date(Date.now() + 86400000).toISOString().split('T')[0], reason: 'Empêchement familial', status: 'pending_manager' as const, createdAt: new Date().toISOString() },
+        { id: 'sw3', fromEmployeeId: 'e5', toEmployeeId: 'e14', shiftId: 's20', date: new Date(Date.now() + 172800000).toISOString().split('T')[0], reason: 'Besoin de repos', status: 'pending_colleague' as const, createdAt: new Date().toISOString() },
       ],
       addSwapRequest: (req) => set((state) => ({
         swapRequests: [...state.swapRequests, { ...req, id: `sw${Date.now()}`, status: 'pending_colleague', createdAt: new Date().toISOString() }]

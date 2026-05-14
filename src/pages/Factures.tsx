@@ -6,9 +6,23 @@ import { useOrderStore } from '../stores/orderStore';
 export default function Factures() {
   const { orders } = useOrderStore();
   const [filter, setFilter] = useState<'tous' | 'paye' | 'en_attente'>('tous');
+  const [dateFilter, setDateFilter] = useState<'aujourd_hui' | 'cette_semaine' | 'tous'>('tous');
 
-  const filteredOrders = orders.filter(o => filter === 'tous' || o.status === filter);
-  const totalRevenue = orders.filter(o => o.status === 'paye').reduce((s, o) => s + o.total, 0);
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+
+  const filteredOrders = orders.filter(o => {
+    const oDate = new Date(o.date);
+    const matchesStatus = filter === 'tous' || o.status === filter;
+    let matchesDate = true;
+    if (dateFilter === 'aujourd_hui') matchesDate = o.date.startsWith(todayStr);
+    if (dateFilter === 'cette_semaine') matchesDate = oDate >= startOfWeek;
+    return matchesStatus && matchesDate;
+  });
+  
+  const totalRevenue = filteredOrders.filter(o => o.status === 'paye').reduce((s, o) => s + o.total, 0);
 
   return (
     <div className="page-content pt-14 pb-28 bg-[#0a0c10] min-h-screen">
@@ -37,9 +51,17 @@ export default function Factures() {
         </div>
 
         <div className="flex gap-2 mb-4 overflow-x-auto pb-2 custom-scrollbar">
+          {['tous', 'aujourd_hui', 'cette_semaine'].map(df => (
+            <button key={df} onClick={() => setDateFilter(df as any)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${dateFilter === df ? 'bg-orange/10 border-orange text-orange' : 'bg-transparent border-white/10 text-text-tertiary'}`}>
+              {df === 'tous' ? 'Toujours' : df === 'aujourd_hui' ? "Aujourd'hui" : 'Cette Semaine'}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-2 custom-scrollbar">
           {['tous', 'paye', 'en_attente'].map(f => (
             <button key={f} onClick={() => setFilter(f as any)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${filter === f ? 'bg-white text-[#0a0c10]' : 'bg-white/5 text-white'}`}>
-              {f === 'tous' ? 'Toutes' : f === 'paye' ? 'Encaissées' : 'En Attente'}
+              {f === 'tous' ? 'Tous les statuts' : f === 'paye' ? 'Encaissées' : 'En Attente'}
             </button>
           ))}
         </div>

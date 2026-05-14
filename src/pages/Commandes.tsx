@@ -496,7 +496,15 @@ export default function Commandes() {
         <div className="flex items-center gap-4">
           <button onClick={() => setSelectedTableId(null)} className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white border border-white/10"><X size={24} /></button>
           <div>
-            <h1 className="text-white font-black text-2xl tracking-tight">Table {currentTable?.number}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-white font-black text-2xl tracking-tight">Table {currentTable?.number}</h1>
+              <button onClick={() => {
+                if(confirm("Libérer cette table ? Les commandes en cours ne seront pas effacées.")) {
+                  updateTableStatus(currentTable!.id, 'libre');
+                  setSelectedTableId(null);
+                }
+              }} className="px-2 py-1 rounded-lg bg-red/10 text-red text-[9px] font-black uppercase tracking-widest active:scale-95 transition-transform">Libérer</button>
+            </div>
             <p className="text-text-secondary text-xs font-bold uppercase tracking-wider">{currentRes ? `Réservée : ${currentRes.clientName}` : 'Prise de commande'}</p>
           </div>
         </div>

@@ -40,6 +40,7 @@ export default function Personnel() {
   const { user } = useAuthStore();
   
   const [activeTab, setActiveTab] = useState<'planning' | 'presences' | 'echanges'>('planning');
+  const [roleFilter, setRoleFilter] = useState('Tous');
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
   const [addingShift, setAddingShift] = useState<{ empId: string; date: string } | null>(null);
@@ -61,6 +62,9 @@ export default function Personnel() {
   const myShifts = currentEmployee ? shifts.filter(s => s.employeeId === currentEmployee.id) : [];
   const weekDates = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
   const todayStr = new Date().toISOString().split('T')[0];
+
+  const availableRoles = useMemo(() => ['Tous', ...Array.from(new Set(employees.map(e => e.role)))], [employees]);
+  const filteredEmployees = useMemo(() => employees.filter(e => roleFilter === 'Tous' || e.role === roleFilter), [employees, roleFilter]);
 
   const getShifts = (empId: string, date: string) => {
     return shifts.filter(s => s.employeeId === empId && s.date === date);
@@ -148,6 +152,15 @@ export default function Personnel() {
             </button>
           </div>
 
+          <div className="flex gap-2 overflow-x-auto px-4 mb-4 pb-2 custom-scrollbar">
+            {availableRoles.map(role => (
+              <button key={role} onClick={() => setRoleFilter(role)}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${roleFilter === role ? 'bg-orange text-white shadow-lg shadow-orange/20' : 'bg-white/5 text-text-tertiary hover:bg-white/10'}`}>
+                {role}
+              </button>
+            ))}
+          </div>
+
           <div className="overflow-x-auto pb-4">
             <div style={{ minWidth: '700px' }}>
               <div className="flex mb-2">
@@ -161,7 +174,7 @@ export default function Personnel() {
                 ))}
               </div>
 
-              {employees.map(emp => (
+              {filteredEmployees.map(emp => (
                 <div key={emp.id} className="flex items-stretch mb-1.5">
                   <div className="w-28 shrink-0 flex items-center gap-2 pr-2">
                     <span className="text-lg">{emp.avatar}</span>

@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../stores/orderStore';
 import { useTableStore } from '../stores/tableStore';
-import { Check, CreditCard, Smartphone, Banknote, Wallet, Wifi, CloudUpload, ClipboardList, Clock, User } from 'lucide-react';
+import { useAuthStore } from '../stores/authStore';
+import { Check, CreditCard, Smartphone, Banknote, Wallet, Wifi, CloudUpload, ClipboardList, Clock, User, Edit2 } from 'lucide-react';
 import { syncOrderToERP } from '../services/erpConnector';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
 export default function Caisse() {
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
   const { orders, updateOrderStatus } = useOrderStore();
   const { tables, updateTableStatus } = useTableStore();
   
@@ -26,6 +30,8 @@ export default function Caisse() {
   const activeOrder = orders.find(o => o.id === selectedOrder);
 
   const handleCheckout = (payment: 'especes' | 'wave' | 'orange_money' | 'carte') => {
+    if (!confirm('Confirmer cet encaissement ?')) return;
+
     if (payment === 'carte') {
       setShowSoftPOS(true);
       setTimeout(() => {
@@ -169,7 +175,12 @@ export default function Caisse() {
             <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25 }}
               className="modal-sheet" onClick={e => e.stopPropagation()}>
               <div className="modal-handle" />
-              <div className="text-center mb-8">
+              <div className="text-center mb-8 relative">
+                {['Admin', 'Gérant'].includes(user?.role || '') && (
+                  <button onClick={() => { setShowPayment(false); navigate('/commandes'); }} className="absolute -top-4 right-0 p-2 text-text-tertiary hover:text-orange transition-colors">
+                    <Edit2 size={18} />
+                  </button>
+                )}
                 <p className="text-text-secondary text-sm mb-1">Total à encaisser</p>
                 <h2 className="text-white font-black text-4xl">{fmt(activeOrder.total)} <span className="text-sm">FCFA</span></h2>
                 <div className="mt-2 text-text-tertiary text-xs">Table {tables.find(t => t.id === activeOrder.tableId)?.number}</div>
