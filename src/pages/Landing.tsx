@@ -24,8 +24,11 @@ export default function Landing() {
     else if (user.role === 'Chef cuisine') navigate('/cuisine');
     else if (user.role === 'Livreur') navigate('/livraisons');
     else if (user.role === 'Client') navigate('/client');
-    else navigate('/caisse');
+    else if (user.role === 'Serveur') navigate('/commandes');
+    else if (user.role === 'Caissier') navigate('/caisse');
+    else navigate('/dashboard');
   };
+
 
   return (
     <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center px-6 py-12">
