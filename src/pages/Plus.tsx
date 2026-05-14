@@ -13,6 +13,7 @@ const menuItems = [
   { icon: Users, label: 'Utilisateurs', color: '#06B6D4', path: '' },
   { icon: Settings, label: 'Paramètres', color: '#A1A1AA', path: '' },
   { icon: HelpCircle, label: 'Aide & Support', color: '#F59E0B', path: '' },
+  { icon: Users, label: 'Personnel & Plannings', path: '/personnel', roles: ['Admin', 'Gérant', 'Caissier', 'Serveur', 'Chef cuisine'], color: '#EC4899' },
 ];
 
 const quickLinks = [
@@ -74,11 +75,15 @@ export default function Plus() {
           if (!['Admin', 'Gérant'].includes(user?.role || '') && ['Utilisateurs', 'Abonnements', 'Mon restaurant'].includes(item.label)) {
             return null;
           }
+          if (item.roles && !item.roles.includes(user?.role || '')) {
+            return null;
+          }
           return (
           <motion.button key={item.label}
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 + i * 0.04 }}
+            onClick={() => item.path && navigate(item.path)}
             className="w-full flex items-center gap-4 px-5 py-4 active:bg-white/[0.03] transition-colors"
             style={{ borderBottom: i < menuItems.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
