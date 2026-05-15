@@ -161,10 +161,19 @@ export default function Commandes() {
       setAssigningRes(null);
       return;
     }
-    if (t.status === 'libre') {
+    // Check if table has an active order even if its status is technically 'libre'
+    const hasActiveOrder = orders.some(o => o.tableId === t.id && ['en_preparation', 'prete', 'non_payee', 'partiellement_payee'].includes(o.status));
+
+    if (t.status === 'libre' && !hasActiveOrder) {
       setShowTableOptions(t.id);
       return;
     }
+
+    // Auto-correct status if there's an active order but table is marked libre
+    if (t.status === 'libre' && hasActiveOrder) {
+      updateTableStatus(t.id, 'occupee');
+    }
+
     setSelectedTableId(t.id);
   };
 
