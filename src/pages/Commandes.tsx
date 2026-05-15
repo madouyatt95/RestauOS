@@ -538,6 +538,7 @@ export default function Commandes() {
 
   const currentTable = tables.find(t => t.id === selectedTableId);
   const currentRes = reservations.find(r => r.tableId === selectedTableId && r.status === 'confirmed');
+  const activeOrderForTable = orders.find(o => o.tableId === selectedTableId && ['en_preparation', 'prete', 'non_payee', 'partiellement_payee'].includes(o.status));
 
   return (
     <div className="page-content pt-8 pb-32">
@@ -611,6 +612,26 @@ export default function Commandes() {
               </button>
 
               <div className="space-y-5 mb-8 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                {/* Existing Order Items */}
+                {activeOrderForTable && (
+                  <div className="mb-6">
+                    <h4 className="text-text-secondary text-[10px] font-black uppercase tracking-widest mb-3">Déjà commandé</h4>
+                    <div className="space-y-3 p-4 rounded-2xl bg-white/5 border border-white/10">
+                      {activeOrderForTable.items.map(item => (
+                        <div key={item.product.id} className="flex justify-between items-center opacity-70">
+                          <span className="text-white text-sm">{item.quantity}x {item.product.name}</span>
+                          <span className="text-text-tertiary text-xs">Envoyé</span>
+                        </div>
+                      ))}
+                      <div className="pt-3 mt-3 border-t border-white/10 flex justify-between">
+                        <span className="text-text-secondary text-xs">Total actuel</span>
+                        <span className="text-white font-bold">{activeOrderForTable.total.toLocaleString()} F</span>
+                      </div>
+                    </div>
+                    {cart.length > 0 && <h4 className="text-text-secondary text-[10px] font-black uppercase tracking-widest mt-6 mb-3">Nouveaux articles</h4>}
+                  </div>
+                )}
+                
                 {cart.map(item => (
                   <div key={item.product.id} className="flex items-center gap-5">
                     <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-2xl shrink-0 border border-white/10">
