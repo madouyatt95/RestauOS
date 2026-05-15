@@ -624,7 +624,9 @@ export default function Commandes() {
                     <h4 className="text-text-secondary text-[10px] font-black uppercase tracking-widest mb-3">Déjà commandé</h4>
                     <div className="space-y-3 p-4 rounded-2xl bg-white/5 border border-white/10">
                       {activeOrderForTable.items.map(item => {
-                        const isReady = activeOrderForTable.itemsReady?.[item.product.id];
+                        const isReady = activeOrderForTable.status === 'prete' || 
+                                        activeOrderForTable.status === 'servie' || 
+                                        activeOrderForTable.itemsReady?.[item.product.id];
                         return (
                           <div key={item.product.id} className="flex justify-between items-center opacity-80">
                             <span className="text-white text-sm">{item.quantity}x {item.product.name}</span>
