@@ -337,6 +337,10 @@ export default function Commandes() {
             const readyOrder = orders.find(o => o.tableId === t.id && o.status === 'prete');
             const hasReadyOrder = !!readyOrder;
 
+            // Check if it has an order in preparation
+            const prepOrder = orders.find(o => o.tableId === t.id && o.status === 'en_preparation');
+            const hasPrepOrder = !!prepOrder;
+
             return (
               <motion.div
                 key={t.id}
@@ -384,6 +388,8 @@ export default function Commandes() {
                       <span className="font-black text-sm">{t.number}</span>
                       {hasReadyOrder ? (
                         <span className="text-[7px] font-black uppercase text-green">PRÊT</span>
+                      ) : hasPrepOrder ? (
+                        <span className="text-[7px] font-black uppercase text-blue">EN CUISINE</span>
                       ) : (
                         <span className="text-[8px] opacity-60 font-bold">{t.capacity}p</span>
                       )}
@@ -617,12 +623,17 @@ export default function Commandes() {
                   <div className="mb-6">
                     <h4 className="text-text-secondary text-[10px] font-black uppercase tracking-widest mb-3">Déjà commandé</h4>
                     <div className="space-y-3 p-4 rounded-2xl bg-white/5 border border-white/10">
-                      {activeOrderForTable.items.map(item => (
-                        <div key={item.product.id} className="flex justify-between items-center opacity-70">
-                          <span className="text-white text-sm">{item.quantity}x {item.product.name}</span>
-                          <span className="text-text-tertiary text-xs">Envoyé</span>
-                        </div>
-                      ))}
+                      {activeOrderForTable.items.map(item => {
+                        const isReady = activeOrderForTable.itemsReady?.[item.product.id];
+                        return (
+                          <div key={item.product.id} className="flex justify-between items-center opacity-80">
+                            <span className="text-white text-sm">{item.quantity}x {item.product.name}</span>
+                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${isReady ? 'bg-green/20 text-green' : 'bg-blue/20 text-blue'}`}>
+                              {isReady ? 'Prêt' : 'En cuisine'}
+                            </span>
+                          </div>
+                        );
+                      })}
                       <div className="pt-3 mt-3 border-t border-white/10 flex justify-between">
                         <span className="text-text-secondary text-xs">Total actuel</span>
                         <span className="text-white font-bold">{activeOrderForTable.total.toLocaleString()} F</span>
