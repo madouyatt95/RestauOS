@@ -244,12 +244,50 @@ export const useOrderStore = create<OrderState>()(
         const state = get();
         if (state.cart.length === 0) return null;
 
-        const total = state.cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+        const cartTotal = state.cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
         
+        // If there's a table, try to find an existing active order
+        if (tableId) {
+          const activeOrder = state.orders.find(o => o.tableId === tableId && ['en_preparation', 'prete', 'non_payee', 'partiellement_payee'].includes(o.status));
+          
+          if (activeOrder) {
+            const updatedItems = [...activeOrder.items];
+            state.cart.forEach(cartItem => {
+              const existingItemIndex = updatedItems.findIndex(i => i.product.id === cartItem.product.id);
+              if (existingItemIndex >= 0) {
+                updatedItems[existingItemIndex] = {
+                  ...updatedItems[existingItemIndex],
+                  quantity: updatedItems[existingItemIndex].quantity + cartItem.quantity
+                };
+              } else {
+                updatedItems.push(cartItem);
+              }
+            });
+
+            const newTotal = activeOrder.total + cartTotal;
+            // Revert to 'en_preparation' if it was 'prete' and new items were added
+            const newStatus = activeOrder.status === 'prete' ? 'en_preparation' : activeOrder.status;
+
+            const updatedOrder = {
+              ...activeOrder,
+              items: updatedItems,
+              total: newTotal,
+              status: newStatus
+            };
+
+            set(state => ({
+              orders: state.orders.map(o => o.id === activeOrder.id ? updatedOrder : o),
+              cart: [],
+            }));
+
+            return updatedOrder;
+          }
+        }
+
         const newOrder: Order = {
           id: `cmd-${Date.now()}`,
           items: [...state.cart],
-          total,
+          total: cartTotal,
           type: state.orderType,
           payment,
           clientId,
@@ -257,8 +295,8 @@ export const useOrderStore = create<OrderState>()(
           serveurName,
           date: new Date().toISOString(),
           status: tableId ? 'en_preparation' : 'payee',
-          paidAmount: tableId ? 0 : total,
-          payments: tableId ? [] : [{ id: `pay-${Date.now()}`, amount: total, method: payment, date: new Date().toISOString() }],
+          paidAmount: tableId ? 0 : cartTotal,
+          payments: tableId ? [] : [{ id: `pay-${Date.now()}`, amount: cartTotal, method: payment, date: new Date().toISOString() }],
           itemsReady: {},
         };
 
