@@ -5,7 +5,7 @@ import { useAuthStore } from '../stores/authStore';
 export default function BottomNav() {
   const { pathname } = useLocation();
   const { user } = useAuthStore();
-  const hiddenPaths = ['/', '/landing'];
+  const hiddenPaths = ['/', '/landing', '/whatsapp-bot'];
   if (hiddenPaths.includes(pathname)) return null;
 
   let navItems = [];
