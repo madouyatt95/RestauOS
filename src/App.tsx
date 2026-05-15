@@ -83,7 +83,7 @@ function AppContent() {
             <ProtectedRoute allowedRoles={['Admin', 'Gérant']}><Factures /></ProtectedRoute>
           } />
           <Route path="/whatsapp-bot" element={
-            <ProtectedRoute allowedRoles={['Admin', 'Gérant']}><WhatsAppBot /></ProtectedRoute>
+            <ProtectedRoute><WhatsAppBot /></ProtectedRoute>
           } />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
