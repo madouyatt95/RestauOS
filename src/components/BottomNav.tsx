@@ -35,6 +35,7 @@ export default function BottomNav() {
     case 'Serveur':
       navItems = [
         { path: '/commandes', icon: ShoppingBag, label: 'Salle' },
+        { path: '/caisse', icon: Wallet, label: 'Caisse' },
         { path: '/fidelite', icon: Users, label: 'Fidélité' },
         { path: '/personnel', icon: Calendar, label: 'Planning' },
         { path: '/plus', icon: MoreHorizontal, label: 'Plus' },

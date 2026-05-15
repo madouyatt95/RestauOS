@@ -41,7 +41,7 @@ function AppContent() {
             <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Serveur']}><Commandes /></ProtectedRoute>
           } />
           <Route path="/caisse" element={
-            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier']}><Caisse /></ProtectedRoute>
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier', 'Serveur']}><Caisse /></ProtectedRoute>
           } />
           <Route path="/cuisine" element={
             <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Chef cuisine']}><Cuisine /></ProtectedRoute>

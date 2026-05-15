@@ -6,7 +6,8 @@ import { useAuthStore } from '../stores/authStore';
 import { useReservationStore, type Reservation } from '../stores/reservationStore';
 import { useClientStore } from '../stores/clientStore';
 import { useNotificationStore } from '../stores/notificationStore';
-import { Search, ShoppingCart, X, ChefHat, Calendar, UserPlus, Phone, Plus, Minus, Trash2, Layout, Layers, Map as MapIcon, User, QrCode, Gift } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, ShoppingCart, X, ChefHat, Calendar, UserPlus, Phone, Plus, Minus, Trash2, Layout, Layers, Map as MapIcon, User, QrCode, Gift, Wallet } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 
@@ -98,6 +99,7 @@ export default function Commandes() {
   const [showLoyaltySearch, setShowLoyaltySearch] = useState(false);
   const [loyaltySearch, setLoyaltySearch] = useState('');
   
+  const navigate = useNavigate();
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [category, setCategory] = useState('tous');
   const [search, setSearch] = useState('');
@@ -666,9 +668,16 @@ export default function Commandes() {
                 <span className="text-text-secondary font-black uppercase tracking-[0.2em] text-xs">Total à payer</span>
                 <span className="text-white font-black text-3xl">{cartTotal.toLocaleString()} <span className="text-sm opacity-40">F</span></span>
               </div>
-              <button onClick={handleSendToKitchen} disabled={sending} className="w-full py-5 rounded-[2rem] bg-gradient-to-r from-orange to-amber-600 text-white font-black text-lg shadow-xl shadow-orange/20 flex items-center justify-center gap-4 active:scale-95 transition-transform disabled:opacity-50">
-                {sending ? 'Envoi en cours...' : <><ChefHat size={24} /> Envoyer en cuisine</>}
-              </button>
+              
+              {cart.length === 0 && activeOrderForTable ? (
+                <button onClick={() => { setShowCart(false); navigate('/caisse'); }} className="w-full py-5 rounded-[2rem] bg-gradient-to-r from-blue to-cyan-500 text-white font-black text-lg shadow-xl shadow-blue/20 flex items-center justify-center gap-4 active:scale-95 transition-transform">
+                  <Wallet size={24} /> Aller à l'encaissement
+                </button>
+              ) : (
+                <button onClick={handleSendToKitchen} disabled={sending} className="w-full py-5 rounded-[2rem] bg-gradient-to-r from-orange to-amber-600 text-white font-black text-lg shadow-xl shadow-orange/20 flex items-center justify-center gap-4 active:scale-95 transition-transform disabled:opacity-50">
+                  {sending ? 'Envoi en cours...' : <><ChefHat size={24} /> Envoyer en cuisine</>}
+                </button>
+              )}
             </motion.div>
           </motion.div>
         )}
