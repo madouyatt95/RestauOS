@@ -202,7 +202,10 @@ export default function WhatsAppBot() {
               payment: clientPayment,
               date: new Date().toISOString(),
               serveurName: 'WhatsApp Bot',
-              status: 'en_attente' as const,
+              status: 'en_preparation' as const,
+              paidAmount: clientPayment === 'wave' ? cartTotal : 0,
+              payments: clientPayment === 'wave' ? [{ id: `pay-${Date.now()}`, amount: cartTotal, method: 'wave' as const, date: new Date().toISOString() }] : [],
+              itemsReady: {},
             }]
           }));
 

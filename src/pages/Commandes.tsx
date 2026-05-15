@@ -6,7 +6,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useReservationStore, type Reservation } from '../stores/reservationStore';
 import { useClientStore } from '../stores/clientStore';
 import { useNotificationStore } from '../stores/notificationStore';
-import { Search, ShoppingCart, X, ChefHat, Calendar, UserPlus, Phone, Plus, Minus, Trash2, Layout, Layers, Map as MapIcon, User, QrCode } from 'lucide-react';
+import { Search, ShoppingCart, X, ChefHat, Calendar, UserPlus, Phone, Plus, Minus, Trash2, Layout, Layers, Map as MapIcon, User, QrCode, Gift } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 
@@ -89,12 +89,14 @@ const getTableDimensions = (capacity: number): { w: number, h: number } => {
 
 
 export default function Commandes() {
-  const { cart, addToCart, updateQuantity, clearCart, checkout } = useOrderStore();
+  const { cart, addToCart, updateQuantity, clearCart, checkout, orders, setLoyaltyClient } = useOrderStore();
   const { tables, updateTableStatus, updateTablePosition, updateTableCapacity, updateTableFloor } = useTableStore();
   const { reservations, updateStatus, addReservation } = useReservationStore();
   const { clients } = useClientStore();
   const { addNotification } = useNotificationStore();
   const { user } = useAuthStore();
+  const [showLoyaltySearch, setShowLoyaltySearch] = useState(false);
+  const [loyaltySearch, setLoyaltySearch] = useState('');
   
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [category, setCategory] = useState('tous');
@@ -322,6 +324,10 @@ export default function Commandes() {
             const vShape = getVisualShape(t.capacity);
             const dims = getTableDimensions(t.capacity);
 
+            // Check if this table has a ready order
+            const readyOrder = orders.find(o => o.tableId === t.id && o.status === 'prete');
+            const hasReadyOrder = !!readyOrder;
+
             return (
               <motion.div
                 key={t.id}
@@ -341,12 +347,19 @@ export default function Commandes() {
               >
                 <div className="relative" style={{ width: `${dims.w + 24}px`, height: `${dims.h + 24}px` }}>
                   <Chairs count={t.capacity} shape={vShape} />
+                  {/* Ready badge */}
+                  {hasReadyOrder && (
+                    <div className="absolute -top-2 -right-2 z-20 w-6 h-6 rounded-full bg-green text-white text-[8px] font-black flex items-center justify-center animate-bounce shadow-lg shadow-green/40">
+                      ✓
+                    </div>
+                  )}
                   <motion.div 
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     className={`absolute transition-all duration-300 border-2 flex items-center justify-center ${
                       vShape === 'round' ? 'rounded-full' : 'rounded-xl'
                     } ${
+                    hasReadyOrder ? 'bg-[#1a1c22] border-green text-green shadow-[0_0_25px_rgba(34,197,94,0.4)] animate-pulse' :
                     t.status === 'libre' ? 'bg-[#1a1c22] border-green/40 text-green shadow-[0_0_15px_rgba(34,197,94,0.05)]' :
                     t.status === 'occupee' ? 'bg-[#1a1c22] border-red/50 text-red shadow-[0_0_20px_rgba(239,68,68,0.2)]' :
                     'bg-[#1a1c22] border-blue/50 text-blue shadow-[0_0_20px_rgba(59,130,246,0.2)]'
@@ -360,7 +373,11 @@ export default function Commandes() {
                   }}>
                     <div className="flex flex-col items-center">
                       <span className="font-black text-sm">{t.number}</span>
-                      <span className="text-[8px] opacity-60 font-bold">{t.capacity}p</span>
+                      {hasReadyOrder ? (
+                        <span className="text-[7px] font-black uppercase text-green">PRÊT</span>
+                      ) : (
+                        <span className="text-[8px] opacity-60 font-bold">{t.capacity}p</span>
+                      )}
                     </div>
                   </motion.div>
                 </div>
@@ -372,11 +389,12 @@ export default function Commandes() {
 
         {/* Legend & Stats */}
         <div className="px-8 flex justify-between items-center mb-6">
-          <div className="flex gap-6">
+          <div className="flex gap-4 flex-wrap">
             <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green" /><span className="text-[10px] font-bold text-text-secondary uppercase">Libre</span></div>
             <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-red shadow-[0_0_8px_red]" /><span className="text-[10px] font-bold text-text-secondary uppercase">Occupée</span></div>
+            <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green animate-pulse shadow-[0_0_8px_green]" /><span className="text-[10px] font-bold text-text-secondary uppercase">Prêt à servir</span></div>
           </div>
-          <div className="text-text-tertiary text-[10px] font-bold uppercase tracking-widest">{floorTables.length} Tables dans cette salle</div>
+          <div className="text-text-tertiary text-[10px] font-bold uppercase tracking-widest">{floorTables.length} Tables</div>
         </div>
 
         {/* Studio Control Panel */}
@@ -576,6 +594,13 @@ export default function Commandes() {
                 <h3 className="text-white font-black text-2xl">Panier • T{currentTable?.number}</h3>
                 <button onClick={clearCart} className="text-text-tertiary text-xs font-black uppercase tracking-widest hover:text-red transition-colors">Vider</button>
               </div>
+
+              {/* Loyalty association */}
+              <button onClick={() => { setShowLoyaltySearch(true); setLoyaltySearch(''); }}
+                className="w-full py-3 rounded-2xl bg-violet/10 border border-violet/20 text-violet font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 mb-6 active:scale-95 transition-transform">
+                <Gift size={16} /> Associer un compte fidélité
+              </button>
+
               <div className="space-y-5 mb-8 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
                 {cart.map(item => (
                   <div key={item.product.id} className="flex items-center gap-5">
@@ -617,6 +642,45 @@ export default function Commandes() {
               </div>
               <p className="text-[#0a0c10]/60 text-xs mt-6 max-w-[200px] text-center font-bold">Le client peut scanner ce code pour rejoindre la commande.</p>
               <button onClick={() => setShowQR(null)} className="mt-6 w-full py-3 bg-[#0a0c10] text-white rounded-xl font-black text-xs uppercase tracking-widest">Fermer</button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Loyalty Search Modal */}
+      <AnimatePresence>
+        {showLoyaltySearch && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay z-[200]" onClick={() => setShowLoyaltySearch(false)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <h3 className="text-white font-black text-xl mb-2 text-center">Associer un compte fidélité</h3>
+              <p className="text-text-tertiary text-xs text-center mb-6">Recherchez par nom ou téléphone</p>
+              <div className="relative mb-4">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary" size={16} />
+                <input type="text" value={loyaltySearch} onChange={e => setLoyaltySearch(e.target.value)} placeholder="Nom ou téléphone..."
+                  className="w-full pl-12 pr-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-violet/50" />
+              </div>
+              <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+                {clients.filter(c => c.name.toLowerCase().includes(loyaltySearch.toLowerCase()) || c.phone.includes(loyaltySearch)).map(c => (
+                  <button key={c.id} onClick={() => {
+                    // We'll set loyalty on the next order for this table
+                    const tableOrder = orders.find(o => o.tableId === selectedTableId && ['en_preparation', 'prete'].includes(o.status));
+                    if (tableOrder) setLoyaltyClient(tableOrder.id, c.id);
+                    setShowLoyaltySearch(false);
+                    setShowCart(false);
+                  }}
+                    className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-4 active:scale-95 transition-all hover:border-violet/30">
+                    <div className="w-10 h-10 rounded-full bg-violet/20 flex items-center justify-center text-violet font-black text-sm">
+                      {c.name.split(' ').map(n => n[0]).join('')}
+                    </div>
+                    <div className="flex-1 text-left">
+                      <span className="text-white font-bold text-sm">{c.name}</span>
+                      <p className="text-text-tertiary text-[10px]">{c.phone} • {c.points} pts</p>
+                    </div>
+                    <Gift size={16} className="text-violet" />
+                  </button>
+                ))}
+              </div>
             </motion.div>
           </motion.div>
         )}

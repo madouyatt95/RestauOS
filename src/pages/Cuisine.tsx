@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useOrderStore } from '../stores/orderStore';
 import { useDeliveryStore } from '../stores/deliveryStore';
 import { useTableStore } from '../stores/tableStore';
+import { useNotificationStore } from '../stores/notificationStore';
 import { useWasteStore, type WasteEntry } from '../stores/wasteStore';
-import { Check, Clock, ChefHat, Bell, Trash2, AlertTriangle, Plus } from 'lucide-react';
+import { Check, Clock, ChefHat, Bell, Trash2, AlertTriangle, Plus, CheckCircle2, Circle } from 'lucide-react';
 
 const getWaitMinutes = (dateString: string) => Math.floor((Date.now() - new Date(dateString).getTime()) / 60000);
 
@@ -27,9 +28,10 @@ const WASTE_REASONS: Record<WasteEntry['reason'], { label: string; color: string
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
 export default function Cuisine() {
-  const { orders, updateOrderStatus } = useOrderStore();
+  const { orders, updateOrderStatus, toggleItemReady } = useOrderStore();
   const { addDelivery } = useDeliveryStore();
   const { tables } = useTableStore();
+  const { addNotification } = useNotificationStore();
   const { entries: wasteEntries, addEntry: addWaste, getWeekTotal } = useWasteStore();
   const [, setTick] = useState(0);
   const [activeTab, setActiveTab] = useState<'tickets' | 'gaspillage'>('tickets');
@@ -45,12 +47,68 @@ export default function Cuisine() {
     return () => clearInterval(timer);
   }, []);
 
-  const activeOrders = orders.filter(o => o.status === 'en_attente').sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const activeOrders = orders.filter(o => o.status === 'en_preparation').sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const summary: Record<string, number> = {};
   activeOrders.forEach(o => o.items.forEach(it => { summary[it.product.name] = (summary[it.product.name] || 0) + it.quantity; }));
 
   const weekWaste = useMemo(() => getWeekTotal(), [wasteEntries]);
+
+  const handleMarkReady = (order: typeof orders[0]) => {
+    updateOrderStatus(order.id, 'prete');
+    
+    // Send notification to server
+    const tableNum = order.tableId ? tables.find(t => t.id === order.tableId)?.number : null;
+    addNotification({
+      type: 'order',
+      title: '🍽️ Commande prête !',
+      message: tableNum ? `Table T${tableNum} — Commande prête à servir` : `Commande #${order.id.slice(-4)} prête (${order.type === 'emporter' ? 'À emporter' : 'Livraison'})`,
+      targetRole: 'Serveur',
+      orderId: order.id,
+    });
+
+    if (order.type === 'livraison') {
+      addDelivery({
+        orderId: order.id, clientName: order.clientId ? 'Ousmane Thiam' : 'Client Inconnu',
+        clientPhone: '77 000 00 00', address: 'Dakar', amount: order.total,
+        deliveryFee: 1500, paymentMethod: 'especes',
+        paymentStatus: order.paidAmount >= order.total ? 'paye' : 'en_attente',
+        driverId: 'u6', driverName: 'Pape Sow', status: 'preparation',
+        estimatedTime: 25, createdAt: new Date().toISOString()
+      });
+    }
+  };
+
+  const handleToggleItem = (orderId: string, productId: string, order: typeof orders[0]) => {
+    toggleItemReady(orderId, productId);
+    
+    // Check if this toggle will make all items ready
+    const updatedReady = { ...order.itemsReady, [productId]: !order.itemsReady[productId] };
+    const allReady = order.items.every(it => updatedReady[it.product.id]);
+    
+    if (allReady) {
+      // The store already sets status to 'prete', but we need to send notifications
+      const tableNum = order.tableId ? tables.find(t => t.id === order.tableId)?.number : null;
+      addNotification({
+        type: 'order',
+        title: '🍽️ Commande prête !',
+        message: tableNum ? `Table T${tableNum} — Commande prête à servir` : `Commande #${order.id.slice(-4)} prête (${order.type === 'emporter' ? 'À emporter' : 'Livraison'})`,
+        targetRole: 'Serveur',
+        orderId: order.id,
+      });
+
+      if (order.type === 'livraison') {
+        addDelivery({
+          orderId: order.id, clientName: order.clientId ? 'Ousmane Thiam' : 'Client Inconnu',
+          clientPhone: '77 000 00 00', address: 'Dakar', amount: order.total,
+          deliveryFee: 1500, paymentMethod: 'especes',
+          paymentStatus: order.paidAmount >= order.total ? 'paye' : 'en_attente',
+          driverId: 'u6', driverName: 'Pape Sow', status: 'preparation',
+          estimatedTime: 25, createdAt: new Date().toISOString()
+        });
+      }
+    }
+  };
 
   return (
     <div className="page-content pt-14 pb-28 min-h-screen bg-[#070A0F]">
@@ -118,6 +176,9 @@ export default function Cuisine() {
                   const waitMins = getWaitMinutes(order.date);
                   const ts = timerStyle(waitMins);
                   const tableNum = order.tableId ? tables.find(t => t.id === order.tableId)?.number : null;
+                  const readyCount = order.items.filter(it => order.itemsReady[it.product.id]).length;
+                  const totalItems = order.items.length;
+                  const progressPct = totalItems > 0 ? (readyCount / totalItems) * 100 : 0;
 
                   return (
                     <motion.div key={order.id} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
@@ -142,34 +203,66 @@ export default function Cuisine() {
                         </div>
                       </div>
 
-                      <div className="space-y-3 mb-5">
-                        {order.items.map(item => (
-                          <div key={item.product.id} className="flex justify-between items-center">
-                            <div className="flex items-center gap-3 text-white text-sm font-bold">
-                              <span className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-orange font-black text-xs">{item.quantity}</span>
-                              {item.product.name}
-                            </div>
-                          </div>
-                        ))}
+                      {/* Progress bar */}
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-text-tertiary text-[9px] font-black uppercase tracking-widest">Progression</span>
+                          <span className="text-[10px] font-black" style={{ color: readyCount === totalItems ? '#22C55E' : '#F59E0B' }}>
+                            {readyCount}/{totalItems} articles
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                          <motion.div 
+                            className="h-full rounded-full"
+                            style={{ background: readyCount === totalItems ? '#22C55E' : 'linear-gradient(90deg, #F59E0B, #FF8A00)' }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${progressPct}%` }}
+                            transition={{ duration: 0.3 }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Items with individual checkboxes */}
+                      <div className="space-y-2 mb-5">
+                        {order.items.map(item => {
+                          const isReady = order.itemsReady[item.product.id] || false;
+                          return (
+                            <motion.div 
+                              key={item.product.id} 
+                              layout
+                              onClick={() => handleToggleItem(order.id, item.product.id, order)}
+                              className={`flex justify-between items-center p-3 rounded-xl cursor-pointer transition-all active:scale-[0.98] ${
+                                isReady ? 'bg-green/10 border border-green/20' : 'bg-white/5 border border-white/5 hover:border-white/15'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                {isReady ? (
+                                  <CheckCircle2 size={20} className="text-green shrink-0" />
+                                ) : (
+                                  <Circle size={20} className="text-white/30 shrink-0" />
+                                )}
+                                <div className={`flex items-center gap-2 text-sm font-bold transition-all ${isReady ? 'text-green line-through opacity-60' : 'text-white'}`}>
+                                  <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-xs ${
+                                    isReady ? 'bg-green/20 text-green' : 'bg-white/10 text-orange'
+                                  }`}>{item.quantity}</span>
+                                  {item.product.name}
+                                </div>
+                              </div>
+                              {isReady ? (
+                                <span className="text-[9px] font-black text-green uppercase tracking-widest">✔ Prêt</span>
+                              ) : (
+                                <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">⏳ En attente</span>
+                              )}
+                            </motion.div>
+                          );
+                        })}
                       </div>
 
                       <div className="flex gap-2">
                         <button
-                          onClick={() => {
-                            updateOrderStatus(order.id, 'pret');
-                            if (order.type === 'livraison') {
-                              addDelivery({
-                                orderId: order.id, clientName: order.clientId ? 'Ousmane Thiam' : 'Client Inconnu',
-                                clientPhone: '77 000 00 00', address: 'Dakar', amount: order.total,
-                                deliveryFee: 1500, paymentMethod: 'especes',
-                                paymentStatus: order.status === 'paye' ? 'paye' : 'en_attente',
-                                driverId: 'u6', driverName: 'Pape Sow', status: 'preparation',
-                                estimatedTime: 25, createdAt: new Date().toISOString()
-                              });
-                            }
-                          }}
+                          onClick={() => handleMarkReady(order)}
                           className="flex-1 py-4 rounded-xl bg-gradient-to-r from-green to-emerald-600 text-white font-black text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg shadow-green/10">
-                          <Check size={20} /> PRÊT
+                          <Check size={20} /> TOUT PRÊT
                         </button>
                         <button className="w-14 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-orange active:scale-95 transition-transform">
                           <Bell size={18} />

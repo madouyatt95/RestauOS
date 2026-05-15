@@ -63,10 +63,13 @@ export default function ClientOrder() {
       type: tableId ? 'sur_place' : 'emporter',
       items: cart,
       total: cartTotal,
-      status: 'en_attente',
+      status: 'en_preparation',
       payment: 'especes',
       date: new Date().toISOString(),
       serveurName: 'Commande QR',
+      paidAmount: 0,
+      payments: [],
+      itemsReady: {},
     } as any;
     
     useOrderStore.setState(s => ({ orders: [...s.orders, newOrder] }));

@@ -18,6 +18,15 @@ export interface CartItem {
   quantity: number;
 }
 
+export interface Payment {
+  id: string;
+  amount: number;
+  method: 'especes' | 'wave' | 'orange_money' | 'carte';
+  date: string;
+}
+
+export type OrderStatus = 'non_payee' | 'partiellement_payee' | 'payee' | 'en_preparation' | 'prete' | 'servie' | 'en_livraison' | 'terminee';
+
 export interface Order {
   id: string;
   items: CartItem[];
@@ -28,7 +37,11 @@ export interface Order {
   clientId?: string;
   tableId?: string;
   serveurName?: string;
-  status: 'en_attente' | 'pret' | 'servi' | 'paye';
+  status: OrderStatus;
+  paidAmount: number;
+  payments: Payment[];
+  itemsReady: Record<string, boolean>;
+  loyaltyClientId?: string;
 }
 
 export const PRODUCTS: Product[] = [
@@ -78,14 +91,19 @@ const generateOrders = (): Order[] => {
         const p = PRODUCTS[Math.floor(Math.random() * PRODUCTS.length)];
         items.push({ product: p, quantity: Math.floor(Math.random() * 2) + 1 });
       }
+      const total = items.reduce((s, it) => s + it.product.price * it.quantity, 0);
+      const pm = payments[Math.floor(Math.random() * payments.length)];
       orders.push({
         id: `ord-${d}-${i}`,
         items,
-        total: items.reduce((s, it) => s + it.product.price * it.quantity, 0),
+        total,
         type: types[Math.floor(Math.random() * types.length)],
-        payment: payments[Math.floor(Math.random() * payments.length)],
+        payment: pm,
         date: day.toISOString(),
-        status: 'paye'
+        status: 'terminee',
+        paidAmount: total,
+        payments: [{ id: `pay-${d}-${i}`, amount: total, method: pm, date: day.toISOString() }],
+        itemsReady: {},
       });
     }
   }
@@ -100,7 +118,10 @@ const generateOrders = (): Order[] => {
     date: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
     tableId: 't4',
     serveurName: 'Awa F.',
-    status: 'en_attente'
+    status: 'en_preparation',
+    paidAmount: 0,
+    payments: [],
+    itemsReady: {},
   });
 
   orders.push({
@@ -112,7 +133,54 @@ const generateOrders = (): Order[] => {
     date: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
     tableId: 't7',
     serveurName: 'Ibrahima B.',
-    status: 'pret'
+    status: 'prete',
+    paidAmount: 0,
+    payments: [],
+    itemsReady: {},
+  });
+
+  // Demo commande livraison en cours (for client view)
+  orders.push({
+    id: 'cmd-live-3',
+    items: [{ product: PRODUCTS[0], quantity: 1 }, { product: PRODUCTS[9], quantity: 2 }],
+    total: 7000,
+    type: 'livraison',
+    payment: 'wave',
+    date: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+    clientId: 'c1',
+    status: 'en_livraison',
+    paidAmount: 7000,
+    payments: [{ id: 'pay-live-3', amount: 7000, method: 'wave', date: new Date(Date.now() - 1000 * 60 * 30).toISOString() }],
+    itemsReady: {},
+  });
+
+  // Demo historique client passé
+  orders.push({
+    id: 'cmd-hist-1',
+    items: [{ product: PRODUCTS[4], quantity: 1 }, { product: PRODUCTS[6], quantity: 1 }],
+    total: 7500,
+    type: 'livraison',
+    payment: 'wave',
+    date: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
+    clientId: 'c1',
+    status: 'terminee',
+    paidAmount: 7500,
+    payments: [{ id: 'pay-hist-1', amount: 7500, method: 'wave', date: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString() }],
+    itemsReady: {},
+  });
+
+  orders.push({
+    id: 'cmd-hist-2',
+    items: [{ product: PRODUCTS[1], quantity: 2 }, { product: PRODUCTS[11], quantity: 1 }],
+    total: 10000,
+    type: 'livraison',
+    payment: 'orange_money',
+    date: new Date(Date.now() - 1000 * 60 * 60 * 120).toISOString(),
+    clientId: 'c1',
+    status: 'terminee',
+    paidAmount: 10000,
+    payments: [{ id: 'pay-hist-2', amount: 10000, method: 'orange_money', date: new Date(Date.now() - 1000 * 60 * 60 * 120).toISOString() }],
+    itemsReady: {},
   });
 
   return orders;
@@ -128,7 +196,11 @@ interface OrderState {
   clearCart: () => void;
   setOrderType: (type: Order['type']) => void;
   checkout: (payment: Order['payment'], clientId?: string, tableId?: string, serveurName?: string) => Order | null;
-  updateOrderStatus: (orderId: string, status: Order['status']) => void;
+  updateOrderStatus: (orderId: string, status: OrderStatus) => void;
+  addPayment: (orderId: string, amount: number, method: Payment['method']) => void;
+  toggleItemReady: (orderId: string, productId: string) => void;
+  checkAllItemsReady: (orderId: string) => boolean;
+  setLoyaltyClient: (orderId: string, clientId: string) => void;
   getCA: (daysAgo: number) => number;
   getOrderCount: (daysAgo?: number) => number;
   getClientCount: (daysAgo?: number) => number;
@@ -137,6 +209,8 @@ interface OrderState {
   getTypeDistribution: () => { sur_place: number; emporter: number; livraison: number };
   getTopProducts: () => { name: string; image: string; sales: number; revenue: number }[];
 }
+
+const PAID_STATUSES: OrderStatus[] = ['payee', 'terminee', 'servie'];
 
 export const useOrderStore = create<OrderState>()(
   persist(
@@ -182,7 +256,10 @@ export const useOrderStore = create<OrderState>()(
           tableId,
           serveurName,
           date: new Date().toISOString(),
-          status: tableId ? 'en_attente' : 'paye', // Direct payment if no table (takeaway)
+          status: tableId ? 'en_preparation' : 'payee',
+          paidAmount: tableId ? 0 : total,
+          payments: tableId ? [] : [{ id: `pay-${Date.now()}`, amount: total, method: payment, date: new Date().toISOString() }],
+          itemsReady: {},
         };
 
         set(state => ({
@@ -197,6 +274,50 @@ export const useOrderStore = create<OrderState>()(
         orders: state.orders.map(o => o.id === orderId ? { ...o, status } : o)
       })),
 
+      addPayment: (orderId, amount, method) => set(state => ({
+        orders: state.orders.map(o => {
+          if (o.id !== orderId) return o;
+          const newPayment: Payment = {
+            id: `pay-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            amount,
+            method,
+            date: new Date().toISOString(),
+          };
+          const newPaidAmount = o.paidAmount + amount;
+          const newStatus: OrderStatus = newPaidAmount >= o.total ? 'payee' : 'partiellement_payee';
+          return {
+            ...o,
+            payments: [...o.payments, newPayment],
+            paidAmount: newPaidAmount,
+            status: newStatus,
+          };
+        })
+      })),
+
+      toggleItemReady: (orderId, productId) => set(state => ({
+        orders: state.orders.map(o => {
+          if (o.id !== orderId) return o;
+          const newItemsReady = { ...o.itemsReady, [productId]: !o.itemsReady[productId] };
+          // Check if all items are now ready
+          const allReady = o.items.every(it => newItemsReady[it.product.id]);
+          return {
+            ...o,
+            itemsReady: newItemsReady,
+            status: allReady ? 'prete' : o.status,
+          };
+        })
+      })),
+
+      checkAllItemsReady: (orderId) => {
+        const order = get().orders.find(o => o.id === orderId);
+        if (!order) return false;
+        return order.items.every(it => order.itemsReady[it.product.id]);
+      },
+
+      setLoyaltyClient: (orderId, clientId) => set(state => ({
+        orders: state.orders.map(o => o.id === orderId ? { ...o, loyaltyClientId: clientId } : o)
+      })),
+
       getCA: (daysAgo) => {
         const s = get();
         const now = new Date();
@@ -204,7 +325,7 @@ export const useOrderStore = create<OrderState>()(
         target.setDate(target.getDate() - daysAgo);
         const dayStr = target.toISOString().split('T')[0];
         return s.orders
-          .filter(o => o.date.startsWith(dayStr) && o.status === 'paye')
+          .filter(o => o.date.startsWith(dayStr) && PAID_STATUSES.includes(o.status))
           .reduce((sum, o) => sum + o.total, 0);
       },
 
@@ -214,7 +335,7 @@ export const useOrderStore = create<OrderState>()(
         const target = new Date(now);
         target.setDate(target.getDate() - daysAgo);
         const dayStr = target.toISOString().split('T')[0];
-        return s.orders.filter(o => o.date.startsWith(dayStr) && o.status === 'paye').length;
+        return s.orders.filter(o => o.date.startsWith(dayStr) && PAID_STATUSES.includes(o.status)).length;
       },
 
       getClientCount: (daysAgo = 0) => {
@@ -235,7 +356,7 @@ export const useOrderStore = create<OrderState>()(
           d.setDate(d.getDate() - i);
           const dayStr = d.toISOString().split('T')[0];
           const ca = get().orders
-            .filter(o => o.date.startsWith(dayStr) && o.status === 'paye')
+            .filter(o => o.date.startsWith(dayStr) && PAID_STATUSES.includes(o.status))
             .reduce((sum, o) => sum + o.total, 0);
           result.push({ day: days[d.getDay() === 0 ? 6 : d.getDay() - 1], ca });
         }
@@ -243,7 +364,7 @@ export const useOrderStore = create<OrderState>()(
       },
 
       getTypeDistribution: () => {
-        const orders = get().orders.filter(o => o.status === 'paye');
+        const orders = get().orders.filter(o => PAID_STATUSES.includes(o.status));
         const total = orders.length || 1;
         return {
           sur_place: Math.round(orders.filter(o => o.type === 'sur_place').length / total * 100),
@@ -254,7 +375,7 @@ export const useOrderStore = create<OrderState>()(
 
       getTopProducts: () => {
         const counts: Record<string, { name: string; image: string; sales: number; revenue: number }> = {};
-        get().orders.filter(o => o.status === 'paye').forEach(o => {
+        get().orders.filter(o => PAID_STATUSES.includes(o.status)).forEach(o => {
           o.items.forEach(it => {
             if (!counts[it.product.id]) {
               counts[it.product.id] = { name: it.product.name, image: it.product.image, sales: 0, revenue: 0 };
@@ -269,4 +390,3 @@ export const useOrderStore = create<OrderState>()(
     { name: 'restauos-orders' }
   )
 );
-

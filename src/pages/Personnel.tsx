@@ -54,6 +54,7 @@ export default function Personnel() {
   const [newEmpRole, setNewEmpRole] = useState('Serveur');
   const [newEmpPhone, setNewEmpPhone] = useState('');
   const [newEmpAvatar, setNewEmpAvatar] = useState('🧑‍🍽️');
+  const [presenceFilter, setPresenceFilter] = useState('Tous');
 
   const isManager = ['Admin', 'Gérant'].includes(user?.role || '');
 
@@ -256,11 +257,23 @@ export default function Personnel() {
       {/* ─── PRESENCES TAB (connected to Planning) ─── */}
       {activeTab === 'presences' && (
         <div className="px-4 space-y-3">
+          {/* Department Filters */}
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-2 custom-scrollbar">
+            {availableRoles.map(role => (
+              <button key={role} onClick={() => setPresenceFilter(role)}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${presenceFilter === role ? 'bg-orange text-white shadow-lg shadow-orange/20' : 'bg-white/5 text-text-tertiary hover:bg-white/10'}`}>
+                {role}
+              </button>
+            ))}
+          </div>
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-white/60 font-black text-[10px] uppercase tracking-widest">Équipe du jour</h3>
             <span className="text-orange font-black text-xs">{employees.filter(e => e.status === 'present').length} / {employees.length}</span>
           </div>
-          {employees.map(emp => {
+          {employees.filter(e => {
+            if (presenceFilter === 'Tous') return true;
+            return ROLE_GROUPS[presenceFilter]?.includes(e.role);
+          }).map(emp => {
             const sc = statusConfig[emp.status];
             const todayShifts = getTodayShifts(emp.id);
             return (
@@ -376,7 +389,12 @@ export default function Personnel() {
                       </div>
                     )}
 
-                    <p className="text-text-secondary text-[11px] italic mb-4">« {req.reason} »</p>
+                    {/* Confidentiality: only show reason to target employee, requester, and managers */}
+                    {(isManager || (currentEmployee && (req.toEmployeeId === currentEmployee.id || req.fromEmployeeId === currentEmployee.id))) ? (
+                      <p className="text-text-secondary text-[11px] italic mb-4">« {req.reason} »</p>
+                    ) : (
+                      <p className="text-text-tertiary text-[11px] italic mb-4 flex items-center gap-1.5">🔒 Motif confidentiel</p>
+                    )}
 
                     {/* Colleague action */}
                     {canColleagueAct && (

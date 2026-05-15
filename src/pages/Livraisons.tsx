@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDeliveryStore, type Delivery } from '../stores/deliveryStore';
+import { useOrderStore } from '../stores/orderStore';
 import { useAuthStore } from '../stores/authStore';
+import { useNotificationStore } from '../stores/notificationStore';
 import { MapPin, Clock, Truck, Check, ChefHat, Phone, Navigation, Wallet, X, Link2 } from 'lucide-react';
 
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
@@ -24,6 +26,8 @@ const statusConfig = {
 
 export default function Livraisons() {
   const { deliveries, updateStatus, updatePaymentStatus, groupDeliveries } = useDeliveryStore();
+  const { updateOrderStatus } = useOrderStore();
+  const { addNotification } = useNotificationStore();
   const { user } = useAuthStore();
   const [selected, setSelected] = useState<Delivery | null>(null);
   const [showSignature, setShowSignature] = useState(false);
@@ -56,10 +60,50 @@ export default function Livraisons() {
     return { name, owedToDriver, owedToRestaurant };
   });
 
+  const handlePickup = (delivery: Delivery) => {
+    // Update delivery status
+    updateStatus(delivery.id, 'en_route');
+    // Update the linked order status to 'en_livraison'
+    updateOrderStatus(delivery.orderId, 'en_livraison');
+    // Send notifications
+    addNotification({
+      type: 'delivery',
+      title: '🛵 Commande récupérée',
+      message: `${delivery.driverName} a récupéré la commande #${delivery.orderId.slice(-4)} pour ${delivery.clientName}`,
+      targetRole: 'Gérant',
+      orderId: delivery.orderId,
+    });
+    addNotification({
+      type: 'delivery',
+      title: '🛵 Votre commande est en route !',
+      message: `${delivery.driverName} est en chemin vers ${delivery.address}`,
+      targetRole: 'Client',
+      orderId: delivery.orderId,
+    });
+    // Close the modal automatically
+    setSelected(null);
+  };
+
   const handleSignAndComplete = () => {
     if (selected) {
       updateStatus(selected.id, 'livre');
+      updateOrderStatus(selected.orderId, 'terminee');
       if (selected.paymentStatus === 'en_attente') updatePaymentStatus(selected.id, 'paye');
+      // Send notifications
+      addNotification({
+        type: 'delivery',
+        title: '✅ Livraison terminée',
+        message: `Commande #${selected.orderId.slice(-4)} livrée à ${selected.clientName} (${selected.address})`,
+        targetRole: 'Gérant',
+        orderId: selected.orderId,
+      });
+      addNotification({
+        type: 'delivery',
+        title: '✅ Commande livrée !',
+        message: `Votre commande a été livrée avec succès. Bon appétit !`,
+        targetRole: 'Client',
+        orderId: selected.orderId,
+      });
     }
     setShowSignature(false);
     setSelected(null);
@@ -295,7 +339,7 @@ export default function Livraisons() {
               {!isGerant && user?.role === 'Livreur' && (
                 <div className="space-y-3">
                   {selected.status === 'preparation' && (
-                    <button onClick={() => updateStatus(selected.id, 'en_route')} className="w-full py-5 rounded-[2rem] bg-blue text-white font-black text-base shadow-xl shadow-blue/20 active:scale-95 transition-transform">
+                    <button onClick={() => handlePickup(selected)} className="w-full py-5 rounded-[2rem] bg-blue text-white font-black text-base shadow-xl shadow-blue/20 active:scale-95 transition-transform">
                       Récupérer & Commencer la livraison
                     </button>
                   )}

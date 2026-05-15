@@ -3,13 +3,14 @@ import { persist } from 'zustand/middleware';
 
 export interface AppNotification {
   id: string;
-  type: 'order' | 'swap' | 'stock' | 'review' | 'delivery' | 'promo' | 'system';
+  type: 'order' | 'swap' | 'stock' | 'review' | 'delivery' | 'promo' | 'system' | 'loyalty' | 'payment';
   title: string;
   message: string;
   read: boolean;
   date: string;
   targetRole?: string;
   actionUrl?: string;
+  orderId?: string;
 }
 
 interface NotificationState {
