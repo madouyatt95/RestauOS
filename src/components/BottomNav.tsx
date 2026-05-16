@@ -1,10 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Home, ShoppingBag, Package, Users, MoreHorizontal, Truck, ChefHat, Calendar, Wallet } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import { usePlanningStore } from '../stores/planningStore';
 
 export default function BottomNav() {
   const { pathname } = useLocation();
   const { user } = useAuthStore();
+  const { checkIsOffShift } = usePlanningStore();
   const hiddenPaths = ['/', '/landing', '/whatsapp-bot'];
   if (hiddenPaths.includes(pathname)) return null;
 
@@ -65,6 +67,15 @@ export default function BottomNav() {
       break;
     default:
       return null;
+  }
+
+  // Shift-based Filtering
+  const operationalRoles = ['Serveur', 'Chef cuisine', 'Caissier', 'Livreur'];
+  if (user && operationalRoles.includes(user.role) && user.employeeId && !user.shiftOverride) {
+    const isOffShift = checkIsOffShift(user.employeeId);
+    if (isOffShift) {
+      navItems = navItems.filter(item => item.path === '/personnel' || item.path === '/plus');
+    }
   }
 
   return (

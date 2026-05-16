@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { AnimatePresence } from 'framer-motion';
 import BottomNav from './components/BottomNav';
 import ProtectedRoute from './components/ProtectedRoute';
+import NotificationToaster from './components/NotificationToaster';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Caisse from './pages/Caisse';
@@ -88,6 +89,7 @@ function AppContent() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>
+      <NotificationToaster />
       {!isLanding && <BottomNav />}
     </>
   );

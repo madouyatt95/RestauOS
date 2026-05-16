@@ -33,6 +33,7 @@ interface PlanningState {
   addSwapRequest: (req: Omit<SwapRequest, 'id' | 'status' | 'createdAt'>) => void;
   colleagueRespond: (id: string, accept: boolean) => void;
   managerRespond: (id: string, accept: boolean) => void;
+  checkIsOffShift: (employeeId: string) => boolean;
 }
 
 export const usePlanningStore = create<PlanningState>()(
@@ -142,6 +143,37 @@ export const usePlanningStore = create<PlanningState>()(
       })),
       getShiftsByDate: (date) => get().shifts.filter(s => s.date === date),
       getShiftsByEmployee: (employeeId) => get().shifts.filter(s => s.employeeId === employeeId),
+      checkIsOffShift: (employeeId) => {
+        const state = get();
+        const today = new Date();
+        const dateStr = today.toISOString().split('T')[0];
+        
+        const shiftsToday = state.shifts.filter(s => s.employeeId === employeeId && s.date === dateStr);
+        if (shiftsToday.length === 0) return true;
+        
+        const currentMinutes = today.getHours() * 60 + today.getMinutes();
+        const TOLERANCE = 15;
+        
+        for (const shift of shiftsToday) {
+          const [startStr, endStr] = shift.hours.split(' - ');
+          if (!startStr || !endStr) continue;
+          
+          const [sH, sM] = startStr.split(':').map(Number);
+          const [eH, eM] = endStr.split(':').map(Number);
+          
+          const startMinutes = sH * 60 + sM;
+          let endMinutes = eH * 60 + eM;
+          if (endMinutes < startMinutes) endMinutes += 24 * 60;
+          
+          let cm = currentMinutes;
+          if (cm < startMinutes && endMinutes > 24 * 60) cm += 24 * 60;
+
+          if (cm >= startMinutes - TOLERANCE && cm <= endMinutes + TOLERANCE) {
+            return false;
+          }
+        }
+        return true;
+      },
 
       swapRequests: [
         { id: 'sw1', fromEmployeeId: 'e2', toEmployeeId: 'e6', shiftId: 's08', date: new Date().toISOString().split('T')[0], reason: 'RDV médical jeudi soir', status: 'pending_colleague' as const, createdAt: new Date().toISOString() },

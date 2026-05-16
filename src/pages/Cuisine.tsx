@@ -65,6 +65,7 @@ export default function Cuisine() {
       message: tableNum ? `Table T${tableNum} — Commande prête à servir` : `Commande #${order.id.slice(-4)} prête (${order.type === 'emporter' ? 'À emporter' : 'Livraison'})`,
       targetRole: 'Serveur',
       orderId: order.id,
+      actionUrl: order.tableId ? `/commandes?tableId=${order.tableId}` : undefined,
     });
 
     if (order.type === 'livraison') {
@@ -95,6 +96,7 @@ export default function Cuisine() {
         message: tableNum ? `Table T${tableNum} — Commande prête à servir` : `Commande #${order.id.slice(-4)} prête (${order.type === 'emporter' ? 'À emporter' : 'Livraison'})`,
         targetRole: 'Serveur',
         orderId: order.id,
+        actionUrl: order.tableId ? `/commandes?tableId=${order.tableId}` : undefined,
       });
 
       if (order.type === 'livraison') {

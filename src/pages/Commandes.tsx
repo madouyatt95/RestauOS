@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOrderStore, PRODUCTS } from '../stores/orderStore';
 import { useTableStore, type Table } from '../stores/tableStore';
@@ -6,8 +6,8 @@ import { useAuthStore } from '../stores/authStore';
 import { useReservationStore, type Reservation } from '../stores/reservationStore';
 import { useClientStore } from '../stores/clientStore';
 import { useNotificationStore } from '../stores/notificationStore';
-import { useNavigate } from 'react-router-dom';
-import { Search, ShoppingCart, X, ChefHat, Calendar, UserPlus, Phone, Plus, Minus, Trash2, Layout, Layers, Map as MapIcon, User, QrCode, Gift, Wallet } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Search, ShoppingCart, X, ChefHat, Calendar, UserPlus, Phone, Plus, Minus, Trash2, Layout, Layers, Map as MapIcon, User, QrCode, Gift, Wallet, CheckCircle2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 
@@ -90,7 +90,7 @@ const getTableDimensions = (capacity: number): { w: number, h: number } => {
 
 
 export default function Commandes() {
-  const { cart, addToCart, updateQuantity, clearCart, checkout, orders, setLoyaltyClient } = useOrderStore();
+  const { cart, addToCart, updateQuantity, clearCart, checkout, orders, setLoyaltyClient, updateOrderStatus } = useOrderStore();
   const { tables, updateTableStatus, updateTablePosition, updateTableCapacity, updateTableFloor } = useTableStore();
   const { reservations, updateStatus, addReservation } = useReservationStore();
   const { clients } = useClientStore();
@@ -100,6 +100,7 @@ export default function Commandes() {
   const [loyaltySearch, setLoyaltySearch] = useState('');
   
   const navigate = useNavigate();
+  const location = useLocation();
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [category, setCategory] = useState('tous');
   const [search, setSearch] = useState('');
@@ -116,6 +117,18 @@ export default function Commandes() {
   const [designMode, setDesignMode] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tableId = params.get('tableId');
+    if (tableId) {
+      const table = tables.find(t => t.id === tableId);
+      if (table) {
+        setSelectedTableId(tableId);
+        setShowCart(true);
+      }
+    }
+  }, [location.search, tables]);
 
   const zones = useMemo(() => {
     const floorTables = tables.filter(t => t.floor === selectedFloor);
@@ -668,6 +681,12 @@ export default function Commandes() {
                 <span className="text-text-secondary font-black uppercase tracking-[0.2em] text-xs">Total à payer</span>
                 <span className="text-white font-black text-3xl">{cartTotal.toLocaleString()} <span className="text-sm opacity-40">F</span></span>
               </div>
+              
+              {activeOrderForTable?.status === 'prete' && cart.length === 0 && (
+                <button onClick={() => { updateOrderStatus(activeOrderForTable.id, 'servie'); setShowCart(false); }} className="w-full py-5 rounded-[2rem] bg-gradient-to-r from-green to-emerald-500 text-white font-black text-lg shadow-xl shadow-green/20 flex items-center justify-center gap-4 active:scale-95 transition-transform mb-4">
+                  <CheckCircle2 size={24} /> Marquer comme Servie
+                </button>
+              )}
               
               {cart.length === 0 && activeOrderForTable ? (
                 <button onClick={() => { setShowCart(false); navigate('/caisse'); }} className="w-full py-5 rounded-[2rem] bg-gradient-to-r from-blue to-cyan-500 text-white font-black text-lg shadow-xl shadow-blue/20 flex items-center justify-center gap-4 active:scale-95 transition-transform">
