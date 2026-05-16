@@ -60,14 +60,6 @@ export default function Landing() {
     setShowOnboarding(false);
   };
 
-  // Shift status: hardcoded for demo — Awa=on, Fatou=off
-  const getShiftBadge = (user: typeof DEMO_USERS[0]) => {
-    if (user.role !== 'Serveur') return null;
-    if (user.employeeId === 'e2') return <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-green/10 text-green border border-green/20">🟢 En service</span>;
-    if (user.employeeId === 'e6') return <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-red/10 text-red border border-red/20">🔴 Hors shift</span>;
-    return null;
-  };
-
   // ==================== ONBOARDING ====================
   if (showOnboarding) {
     const slide = ONBOARDING_SLIDES[slideIdx];
@@ -268,7 +260,6 @@ export default function Landing() {
                     <div className="text-center">
                       <div className="text-white text-xs font-bold">{user.name}</div>
                       <div className="text-text-tertiary text-[10px] mt-0.5">{user.role}</div>
-                      {getShiftBadge(user) && <div className="mt-1">{getShiftBadge(user)}</div>}
                     </div>
                   </button>
                 ))}

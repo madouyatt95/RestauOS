@@ -49,12 +49,14 @@ export const usePlanningStore = create<PlanningState>()(
           return dt.toISOString().split('T')[0];
         };
         return [
-          // Chef Cuisine - Mamadou
-          { id: 's01', employeeId: 'e1', date: d(0), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
-          { id: 's02', employeeId: 'e1', date: d(1), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
-          { id: 's03', employeeId: 'e1', date: d(2), type: 'journee' as ShiftType, hours: '10:00 - 22:00' },
-          { id: 's04', employeeId: 'e1', date: d(3), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
-          { id: 's05', employeeId: 'e1', date: d(5), type: 'journee' as ShiftType, hours: '10:00 - 22:00' },
+          // Chef Cuisine - Mamadou (DEMO 24/7)
+          { id: 's01', employeeId: 'e1', date: d(0), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's02', employeeId: 'e1', date: d(1), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's03', employeeId: 'e1', date: d(2), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's04', employeeId: 'e1', date: d(3), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's05', employeeId: 'e1', date: d(4), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's05b', employeeId: 'e1', date: d(5), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's05c', employeeId: 'e1', date: d(6), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
           // Second Cuisine - Oumar
           { id: 's26', employeeId: 'e7', date: d(0), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
           { id: 's27', employeeId: 'e7', date: d(1), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
@@ -69,19 +71,15 @@ export const usePlanningStore = create<PlanningState>()(
           { id: 's35', employeeId: 'e8', date: d(4), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
           { id: 's36', employeeId: 'e8', date: d(5), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
           { id: 's37', employeeId: 'e8', date: d(5), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
-          // Awa - Serveuse (EN SERVICE — journée complète pour la démo)
-          { id: 's06', employeeId: 'e2', date: d(0), type: 'journee' as ShiftType, hours: '08:00 - 23:00' },
-          { id: 's07', employeeId: 'e2', date: d(1), type: 'journee' as ShiftType, hours: '08:00 - 23:00' },
-          { id: 's08', employeeId: 'e2', date: d(2), type: 'journee' as ShiftType, hours: '08:00 - 23:00' },
-          { id: 's09', employeeId: 'e2', date: d(3), type: 'journee' as ShiftType, hours: '08:00 - 23:00' },
-          { id: 's10', employeeId: 'e2', date: d(4), type: 'journee' as ShiftType, hours: '08:00 - 23:00' },
-          { id: 's06b', employeeId: 'e2', date: d(5), type: 'journee' as ShiftType, hours: '08:00 - 23:00' },
-          { id: 's06c', employeeId: 'e2', date: d(6), type: 'journee' as ShiftType, hours: '08:00 - 23:00' },
-          // Fatou Sarr - Serveuse (HORS SHIFT — soir uniquement, hors service en journée)
-          { id: 's21', employeeId: 'e6', date: d(0), type: 'soir' as ShiftType, hours: '20:00 - 23:30' },
-          { id: 's22', employeeId: 'e6', date: d(1), type: 'soir' as ShiftType, hours: '20:00 - 23:30' },
-          { id: 's23', employeeId: 'e6', date: d(3), type: 'soir' as ShiftType, hours: '20:00 - 23:30' },
-          { id: 's24', employeeId: 'e6', date: d(5), type: 'soir' as ShiftType, hours: '20:00 - 23:30' },
+          // Awa - Serveuse (TOUJOURS EN SERVICE 24/7 pour la démo)
+          { id: 's06', employeeId: 'e2', date: d(0), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's07', employeeId: 'e2', date: d(1), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's08', employeeId: 'e2', date: d(2), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's09', employeeId: 'e2', date: d(3), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's10', employeeId: 'e2', date: d(4), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's06b', employeeId: 'e2', date: d(5), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's06c', employeeId: 'e2', date: d(6), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          // Fatou Sarr - Serveuse (TOUJOURS HORS SHIFT — aucun shift assigné)
           // Abdou - Serveur (midi + soir samedi)
           { id: 's38', employeeId: 'e9', date: d(0), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
           { id: 's39', employeeId: 'e9', date: d(1), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
@@ -100,12 +98,14 @@ export const usePlanningStore = create<PlanningState>()(
           { id: 's50', employeeId: 'e11', date: d(4), type: 'journee' as ShiftType, hours: '10:00 - 22:00' },
           { id: 's51', employeeId: 'e11', date: d(5), type: 'journee' as ShiftType, hours: '10:00 - 22:00' },
           { id: 's52', employeeId: 'e11', date: d(6), type: 'journee' as ShiftType, hours: '10:00 - 22:00' },
-          // Ibrahima - Caissier midi
-          { id: 's11', employeeId: 'e3', date: d(0), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
-          { id: 's12', employeeId: 'e3', date: d(1), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
-          { id: 's13', employeeId: 'e3', date: d(2), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
-          { id: 's14', employeeId: 'e3', date: d(4), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
-          { id: 's15', employeeId: 'e3', date: d(5), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
+          // Ibrahima - Caissier (DEMO 24/7)
+          { id: 's11', employeeId: 'e3', date: d(0), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's12', employeeId: 'e3', date: d(1), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's13', employeeId: 'e3', date: d(2), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's14', employeeId: 'e3', date: d(3), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's15', employeeId: 'e3', date: d(4), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's15b', employeeId: 'e3', date: d(5), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's15c', employeeId: 'e3', date: d(6), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
           // Modou - Barman soir
           { id: 's53', employeeId: 'e12', date: d(0), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
           { id: 's54', employeeId: 'e12', date: d(1), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
@@ -119,12 +119,14 @@ export const usePlanningStore = create<PlanningState>()(
           { id: 's61', employeeId: 'e13', date: d(3), type: 'journee' as ShiftType, hours: '10:00 - 22:00' },
           { id: 's62', employeeId: 'e13', date: d(5), type: 'journee' as ShiftType, hours: '10:00 - 22:00' },
           { id: 's63', employeeId: 'e13', date: d(6), type: 'journee' as ShiftType, hours: '10:00 - 22:00' },
-          // Pape - Livreur soir
-          { id: 's16', employeeId: 'e5', date: d(0), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
-          { id: 's17', employeeId: 'e5', date: d(2), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
-          { id: 's18', employeeId: 'e5', date: d(3), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
-          { id: 's19', employeeId: 'e5', date: d(5), type: 'journee' as ShiftType, hours: '10:00 - 22:00' },
-          { id: 's20', employeeId: 'e5', date: d(6), type: 'soir' as ShiftType, hours: '18:00 - 23:00' },
+          // Pape - Livreur (DEMO 24/7)
+          { id: 's16', employeeId: 'e5', date: d(0), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's17', employeeId: 'e5', date: d(1), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's18', employeeId: 'e5', date: d(2), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's19', employeeId: 'e5', date: d(3), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's20', employeeId: 'e5', date: d(4), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's20b', employeeId: 'e5', date: d(5), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
+          { id: 's20c', employeeId: 'e5', date: d(6), type: 'journee' as ShiftType, hours: '00:00 - 23:59' },
           // Lamine - Livreur midi
           { id: 's64', employeeId: 'e14', date: d(0), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
           { id: 's65', employeeId: 'e14', date: d(1), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
