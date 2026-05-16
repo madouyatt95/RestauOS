@@ -177,7 +177,7 @@ export default function Commandes() {
       return;
     }
     // Check if table has an active order even if its status is technically 'libre'
-    const hasActiveOrder = orders.some(o => o.tableId === t.id && ['en_preparation', 'prete', 'non_payee', 'partiellement_payee'].includes(o.status));
+    const hasActiveOrder = orders.some(o => o.tableId === t.id && ['en_preparation', 'prete', 'servie', 'non_payee', 'partiellement_payee'].includes(o.status));
 
     if (t.status === 'libre' && !hasActiveOrder) {
       setShowTableOptions(t.id);
@@ -567,7 +567,7 @@ export default function Commandes() {
 
   const currentTable = tables.find(t => t.id === selectedTableId);
   const currentRes = reservations.find(r => r.tableId === selectedTableId && r.status === 'confirmed');
-  const activeOrderForTable = orders.find(o => o.tableId === selectedTableId && ['en_preparation', 'prete', 'non_payee', 'partiellement_payee'].includes(o.status));
+  const activeOrderForTable = orders.find(o => o.tableId === selectedTableId && ['en_preparation', 'prete', 'servie', 'non_payee', 'partiellement_payee'].includes(o.status));
 
   return (
     <div className="page-content pt-8 pb-32">
@@ -664,10 +664,28 @@ export default function Commandes() {
                 );
               })()}
 
+              {/* Loyalty client banner */}
+              {activeOrderForTable?.loyaltyClientId && (() => {
+                const lc = clients.find(c => c.id === activeOrderForTable.loyaltyClientId);
+                if (!lc) return null;
+                return (
+                  <div className="mb-4 p-4 rounded-2xl bg-violet/10 border border-violet/30 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-violet/20 flex items-center justify-center text-violet font-black text-sm">
+                      {lc.name.split(' ').map(n => n[0]).join('')}
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-white text-xs font-bold">{lc.name}</div>
+                      <div className="text-text-tertiary text-[10px]">{lc.points.toLocaleString()} pts • {lc.tier} • {lc.visits} visites</div>
+                    </div>
+                    <Gift size={16} className="text-violet" />
+                  </div>
+                );
+              })()}
+
               {/* Loyalty association */}
               <button onClick={() => { setShowLoyaltySearch(true); setLoyaltySearch(''); }}
                 className="w-full py-3 rounded-2xl bg-violet/10 border border-violet/20 text-violet font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 mb-6 active:scale-95 transition-transform">
-                <Gift size={16} /> Associer un compte fidélité
+                <Gift size={16} /> {activeOrderForTable?.loyaltyClientId ? 'Changer le compte fidélité' : 'Associer un compte fidélité'}
               </button>
 
               <div className="space-y-5 mb-8 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
@@ -773,10 +791,9 @@ export default function Commandes() {
                 {clients.filter(c => c.name.toLowerCase().includes(loyaltySearch.toLowerCase()) || c.phone.includes(loyaltySearch)).map(c => (
                   <button key={c.id} onClick={() => {
                     // We'll set loyalty on the next order for this table
-                    const tableOrder = orders.find(o => o.tableId === selectedTableId && ['en_preparation', 'prete'].includes(o.status));
+                    const tableOrder = orders.find(o => o.tableId === selectedTableId && ['en_preparation', 'prete', 'servie', 'non_payee', 'partiellement_payee'].includes(o.status));
                     if (tableOrder) setLoyaltyClient(tableOrder.id, c.id);
                     setShowLoyaltySearch(false);
-                    setShowCart(false);
                   }}
                     className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-4 active:scale-95 transition-all hover:border-violet/30">
                     <div className="w-10 h-10 rounded-full bg-violet/20 flex items-center justify-center text-violet font-black text-sm">
