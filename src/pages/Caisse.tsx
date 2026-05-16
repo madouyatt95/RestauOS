@@ -33,7 +33,7 @@ export default function Caisse() {
   const [showOTP, setShowOTP] = useState(false);
   const [otpCode, setOtpCode] = useState('');
 
-  const pendingOrders = orders.filter(o => ['en_preparation', 'prete', 'non_payee', 'partiellement_payee'].includes(o.status));
+  const pendingOrders = orders.filter(o => ['en_preparation', 'prete', 'servie', 'non_payee', 'partiellement_payee'].includes(o.status));
   const activeOrder = orders.find(o => o.id === selectedOrder);
   const loyaltyClient = activeOrder?.loyaltyClientId ? clients.find(c => c.id === activeOrder.loyaltyClientId) : null;
 
