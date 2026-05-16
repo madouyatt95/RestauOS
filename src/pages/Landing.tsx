@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore, DEMO_USERS } from '../stores/authStore';
-import { usePlanningStore } from '../stores/planningStore';
+
 import { ShoppingBag, Package, Users, BarChart3, Heart, Truck, ChefHat, X, ScanLine } from 'lucide-react';
 
 const modules = [
@@ -26,7 +26,7 @@ const ONBOARDING_SLIDES = [
 export default function Landing() {
   const navigate = useNavigate();
   const { login } = useAuthStore();
-  const { checkIsOffShift } = usePlanningStore();
+
   const [showLogin, setShowLogin] = useState(false);
   const [showQRInput, setShowQRInput] = useState(false);
   const [qrInput, setQRInput] = useState('');
@@ -60,14 +60,12 @@ export default function Landing() {
     setShowOnboarding(false);
   };
 
-  // Shift status for demo badges
+  // Shift status: hardcoded for demo — Awa=on, Fatou=off
   const getShiftBadge = (user: typeof DEMO_USERS[0]) => {
-    if (!user.employeeId) return null;
     if (user.role !== 'Serveur') return null;
-    const isOff = checkIsOffShift(user.employeeId);
-    return isOff 
-      ? <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-red/10 text-red border border-red/20">🔴 Hors shift</span>
-      : <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-green/10 text-green border border-green/20">🟢 En service</span>;
+    if (user.employeeId === 'e2') return <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-green/10 text-green border border-green/20">🟢 En service</span>;
+    if (user.employeeId === 'e6') return <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-red/10 text-red border border-red/20">🔴 Hors shift</span>;
+    return null;
   };
 
   // ==================== ONBOARDING ====================
@@ -76,38 +74,69 @@ export default function Landing() {
     const isLast = slideIdx === ONBOARDING_SLIDES.length - 1;
 
     return (
-      <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center px-6 relative overflow-hidden">
+      <div className="min-h-screen bg-[#070A0F] flex flex-col items-center justify-between px-6 py-10 relative overflow-hidden">
         {/* Background glow */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-[400px] h-[400px] rounded-full opacity-20 blur-[100px]" style={{ background: slide.color }} />
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full opacity-15 blur-[120px]" style={{ background: slide.color }} />
         </div>
 
+        {/* Skip button */}
+        <div className="w-full flex justify-end relative z-20">
+          <button onClick={finishOnboarding} className="text-text-tertiary text-xs font-bold uppercase tracking-widest px-3 py-1">
+            Passer
+          </button>
+        </div>
+
+        {/* Phone mockup with demo image */}
         <AnimatePresence mode="wait">
           <motion.div
             key={slideIdx}
-            initial={{ opacity: 0, x: 80 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -80 }}
-            transition={{ duration: 0.35 }}
-            className="text-center max-w-sm mx-auto relative z-10"
+            initial={{ opacity: 0, y: 40, scale: 0.92 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -30, scale: 0.95 }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+            className="relative z-10 w-full max-w-[280px]"
           >
-            <div className="text-7xl mb-8">{slide.emoji}</div>
-            <h2 className="text-white font-black text-2xl mb-3 tracking-tight">{slide.title}</h2>
-            <p className="text-text-secondary text-sm leading-relaxed">{slide.subtitle}</p>
+            {/* Phone frame */}
+            <div className="rounded-[2rem] border-2 border-white/10 bg-black/40 p-2 shadow-[0_20px_80px_rgba(0,0,0,0.6)]">
+              {/* Notch */}
+              <div className="mx-auto w-24 h-5 bg-black rounded-b-2xl mb-1" />
+              {/* Screen */}
+              <motion.div
+                animate={{ y: [0, -6, 0] }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                className="rounded-[1.5rem] overflow-hidden"
+              >
+                <img src={slide.image} alt={slide.title} className="w-full aspect-[9/16] object-cover" />
+              </motion.div>
+            </div>
           </motion.div>
         </AnimatePresence>
 
-        {/* Dots */}
-        <div className="flex gap-2 mt-12 relative z-10">
-          {ONBOARDING_SLIDES.map((_, i) => (
-            <button key={i} onClick={() => setSlideIdx(i)}
-              className={`transition-all duration-300 rounded-full ${i === slideIdx ? 'w-8 h-2' : 'w-2 h-2'}`}
-              style={{ background: i === slideIdx ? slide.color : 'rgba(255,255,255,0.2)' }} />
-          ))}
-        </div>
+        {/* Text + controls */}
+        <div className="relative z-10 w-full max-w-sm text-center space-y-5">
+          <AnimatePresence mode="wait">
+            <motion.div key={`text-${slideIdx}`}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3, delay: 0.1 }}
+            >
+              <h2 className="text-white font-black text-xl mb-2 tracking-tight">{slide.title}</h2>
+              <p className="text-text-secondary text-sm leading-relaxed">{slide.subtitle}</p>
+            </motion.div>
+          </AnimatePresence>
 
-        {/* Buttons */}
-        <div className="mt-10 w-full max-w-sm relative z-10 space-y-3">
+          {/* Dots */}
+          <div className="flex gap-2 justify-center">
+            {ONBOARDING_SLIDES.map((_, i) => (
+              <button key={i} onClick={() => setSlideIdx(i)}
+                className={`transition-all duration-300 rounded-full ${i === slideIdx ? 'w-8 h-2' : 'w-2 h-2'}`}
+                style={{ background: i === slideIdx ? slide.color : 'rgba(255,255,255,0.15)' }} />
+            ))}
+          </div>
+
+          {/* Button */}
           {isLast ? (
             <motion.button whileTap={{ scale: 0.97 }} onClick={finishOnboarding}
               className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange to-amber-600 text-white font-bold text-lg shadow-[0_8px_32px_rgba(255,138,0,0.35)]">
@@ -119,9 +148,6 @@ export default function Landing() {
               Suivant →
             </motion.button>
           )}
-          <button onClick={finishOnboarding} className="w-full py-3 text-text-tertiary text-sm font-semibold">
-            Passer
-          </button>
         </div>
       </div>
     );
