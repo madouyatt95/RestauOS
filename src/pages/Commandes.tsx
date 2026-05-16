@@ -536,25 +536,86 @@ export default function Commandes() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setShowResList(false)}>
               <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
                 <div className="modal-handle" />
-                <h3 className="text-white font-black text-xl mb-6">Réservations attendues</h3>
-                <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                <h3 className="text-white font-black text-xl mb-1">Réservations du jour</h3>
+                <p className="text-text-tertiary text-xs mb-5">{todayRes.length} réservation{todayRes.length > 1 ? 's' : ''} • {todayRes.filter(r => r.status === 'pending').length} en attente</p>
+                <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                   {todayRes.length === 0 ? (
                     <div className="py-16 text-center text-text-tertiary italic">Aucune réservation pour le moment</div>
                   ) : (
-                    todayRes.map((res: Reservation) => (
-                      <div key={res.id} className="glass-card p-5 flex justify-between items-center border-white/5 hover:border-blue/30 transition-colors">
-                        <div>
-                          <h4 className="text-white font-black text-base">{res.clientName}</h4>
-                          <div className="flex gap-4 mt-1 text-[10px] text-text-tertiary font-bold uppercase tracking-widest">
-                            <span>{res.time}</span>
-                            <span>{res.guests} Personnes</span>
+                    todayRes.map((res: Reservation) => {
+                      const statusCfg: Record<string, { label: string; color: string; bg: string }> = {
+                        pending: { label: 'En attente', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
+                        confirmed: { label: 'Confirmée', color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
+                        waitlist: { label: 'Liste d\'attente', color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' },
+                        cancelled: { label: 'Annulée', color: '#EF4444', bg: 'rgba(239,68,68,0.12)' },
+                        noshow: { label: 'No-show', color: '#6B7280', bg: 'rgba(107,114,128,0.12)' },
+                      };
+                      const sc = statusCfg[res.status] || statusCfg.pending;
+                      const occasionLabels: Record<string, string> = { anniversaire: '🎂 Anniversaire', affaires: '💼 Affaires', romantique: '❤️ Romantique', famille: '👨‍👩‍👧‍👦 Famille' };
+                      return (
+                        <div key={res.id} className={`glass-card p-4 border ${res.status === 'cancelled' ? 'border-red/10 opacity-50' : 'border-white/5'}`}>
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <h4 className="text-white font-black text-sm">{res.clientName}</h4>
+                              <p className="text-text-tertiary text-[10px] font-mono mt-0.5">{res.clientPhone}</p>
+                            </div>
+                            <span className="text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider" style={{ color: sc.color, background: sc.bg }}>
+                              {sc.label}
+                            </span>
                           </div>
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            <span className="text-[10px] font-bold text-text-secondary bg-white/5 px-2 py-0.5 rounded-md">🕐 {res.time}</span>
+                            <span className="text-[10px] font-bold text-text-secondary bg-white/5 px-2 py-0.5 rounded-md">👥 {res.guests} pers.</span>
+                            {res.occasion && <span className="text-[10px] font-bold text-text-secondary bg-white/5 px-2 py-0.5 rounded-md">{occasionLabels[res.occasion] || res.occasion}</span>}
+                            {res.tableId && <span className="text-[10px] font-bold text-green bg-green/10 px-2 py-0.5 rounded-md">Table {tables.find(t => t.id === res.tableId)?.number}</span>}
+                          </div>
+                          {res.notes && <p className="text-text-tertiary text-[10px] italic mb-2">📝 {res.notes}</p>}
+                          {res.cancelReason && <p className="text-red/60 text-[10px] italic mb-2">Motif : {res.cancelReason}</p>}
+
+                          {/* Actions */}
+                          {res.status === 'pending' && (
+                            <div className="flex gap-2 mt-3">
+                              <button onClick={() => { updateStatus(res.id, 'confirmed'); }}
+                                className="flex-1 py-2.5 rounded-xl bg-green/10 text-green font-black text-[10px] uppercase tracking-widest active:scale-95 transition-transform border border-green/20">
+                                ✓ Confirmer
+                              </button>
+                              <button onClick={() => { setAssigningRes(res); setShowResList(false); }}
+                                className="flex-1 py-2.5 rounded-xl bg-blue/10 text-blue font-black text-[10px] uppercase tracking-widest active:scale-95 transition-transform border border-blue/20">
+                                📍 Attribuer table
+                              </button>
+                              <button onClick={() => { updateStatus(res.id, 'cancelled'); }}
+                                className="py-2.5 px-3 rounded-xl bg-red/10 text-red font-black text-[10px] uppercase tracking-widest active:scale-95 transition-transform border border-red/20">
+                                ✕
+                              </button>
+                            </div>
+                          )}
+                          {res.status === 'waitlist' && (
+                            <div className="flex gap-2 mt-3">
+                              <button onClick={() => { updateStatus(res.id, 'confirmed'); }}
+                                className="flex-1 py-2.5 rounded-xl bg-green/10 text-green font-black text-[10px] uppercase tracking-widest active:scale-95 transition-transform border border-green/20">
+                                ✓ Confirmer (table libre)
+                              </button>
+                              <button onClick={() => { updateStatus(res.id, 'cancelled'); }}
+                                className="py-2.5 px-3 rounded-xl bg-red/10 text-red text-[10px] font-black active:scale-95 transition-transform border border-red/20">
+                                ✕
+                              </button>
+                            </div>
+                          )}
+                          {res.status === 'confirmed' && !res.tableId && (
+                            <button onClick={() => { setAssigningRes(res); setShowResList(false); }}
+                              className="w-full py-2.5 mt-3 rounded-xl bg-blue/10 text-blue font-black text-[10px] uppercase tracking-widest active:scale-95 transition-transform border border-blue/20">
+                              📍 Attribuer une table
+                            </button>
+                          )}
+                          {res.status === 'confirmed' && (
+                            <button onClick={() => { updateStatus(res.id, 'noshow'); }}
+                              className="w-full py-2 mt-2 rounded-xl bg-white/5 text-text-tertiary font-bold text-[9px] uppercase tracking-widest active:scale-95 transition-transform">
+                              Marquer No-show
+                            </button>
+                          )}
                         </div>
-                        {res.status === 'pending' && (
-                          <button onClick={() => { setAssigningRes(res); setShowResList(false); }} className="px-5 py-2.5 rounded-xl bg-blue text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue/20">Attribuer</button>
-                        )}
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </motion.div>
