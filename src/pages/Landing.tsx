@@ -14,13 +14,14 @@ const modules = [
   { icon: Truck, label: 'Livraisons', color: '#06B6D4' },
 ];
 
-// Onboarding slides with demo images
+// Onboarding slides with real app screenshots
 const ONBOARDING_SLIDES = [
-  { image: '/images/onboarding/gestion.png', title: 'Gestion complète', subtitle: 'Pilotez tout votre restaurant depuis une seule application : tables, commandes, stocks, équipe.', color: '#FF8A00' },
-  { image: '/images/onboarding/commandes.png', title: 'Plan de salle interactif', subtitle: 'Gérez vos tables en temps réel, prenez les commandes d\'un simple tap et suivez les statuts en direct.', color: '#22C55E' },
-  { image: '/images/onboarding/cuisine.png', title: 'Cuisine & Livraison', subtitle: 'Écran cuisine (KDS) avec tickets en temps réel, suivi des livraisons GPS et gestion des courses.', color: '#3B82F6' },
-  { image: '/images/onboarding/fidelite.png', title: 'Fidélité & VIP', subtitle: 'Programme de points automatique, détection VIP, historique client complet et préférences.', color: '#EF4444' },
-  { image: '/images/onboarding/dashboard.png', title: 'Dashboard & Rapports', subtitle: 'Rapports intelligents, chiffre d\'affaires en temps réel, prévisions IA et alertes automatiques.', color: '#8B5CF6' },
+  { image: '/images/onboarding/salle.png', title: 'Plan de salle interactif', subtitle: 'Visualisez toutes vos tables en temps réel. Libre, occupée ou prête à servir — tout en un coup d\'œil.', color: '#22C55E' },
+  { image: '/images/onboarding/cuisine.png', title: 'Cuisine connectée', subtitle: 'Tickets en temps réel, suivi de progression par plat et validation en un clic. La coordination parfaite.', color: '#FF8A00' },
+  { image: '/images/onboarding/caisse.png', title: 'Encaissement rapide', subtitle: 'Division d\'addition, paiements multiples : Espèces, Wave, Orange Money ou carte. Simple et sécurisé.', color: '#F59E0B' },
+  { image: '/images/onboarding/livraisons.png', title: 'Livraisons optimisées', subtitle: 'Carte Dakar en direct, suivi GPS, statuts en temps réel et encaissement à la livraison.', color: '#3B82F6' },
+  { image: '/images/onboarding/personnel.png', title: 'Gestion du personnel', subtitle: 'Planning intelligent, présences en temps réel, échanges de shifts et vue par département.', color: '#8B5CF6' },
+  { image: '/images/onboarding/dashboard.png', title: 'Pilotage & Performance', subtitle: 'Chiffre d\'affaires, panier moyen, répartition des ventes et satisfaction client — tout centralisé.', color: '#7C3AED' },
 ];
 
 export default function Landing() {
