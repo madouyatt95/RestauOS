@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 
 export interface AppNotification {
   id: string;
-  type: 'order' | 'swap' | 'stock' | 'review' | 'delivery' | 'promo' | 'system' | 'loyalty' | 'payment';
+  type: 'order' | 'swap' | 'stock' | 'review' | 'delivery' | 'promo' | 'system' | 'loyalty' | 'payment' | 'broadcast';
   title: string;
   message: string;
   read: boolean;

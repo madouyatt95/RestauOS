@@ -15,6 +15,7 @@ export const DEMO_USERS: UserProfile[] = [
   { id: 'u2', name: 'Admin Systèmes', role: 'Admin' },
   { id: 'u3', name: 'Ibrahima Ba', role: 'Caissier', employeeId: 'e3' },
   { id: 'u4', name: 'Awa Fall', role: 'Serveur', employeeId: 'e2' },
+  { id: 'u7', name: 'Fatou Sarr', role: 'Serveur', employeeId: 'e6' },
   { id: 'u5', name: 'Mamadou Diop', role: 'Chef cuisine', employeeId: 'e1' },
   { id: 'u6', name: 'Pape Sow', role: 'Livreur', employeeId: 'e5' },
   { id: 'c1', name: 'Ousmane Thiam', role: 'Client' },

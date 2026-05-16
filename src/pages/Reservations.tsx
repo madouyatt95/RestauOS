@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useReservationStore } from '../stores/reservationStore';
 import { useAuthStore } from '../stores/authStore';
-import { Calendar as CalIcon, Clock, Users, MessageSquare, Check, X, Bell } from 'lucide-react';
+import { Calendar as CalIcon, Clock, Users, MessageSquare, Check, X, Bell, Trash2 } from 'lucide-react';
 
 const DATES = [
   { day: 'Auj.', date: new Date().toISOString().split('T')[0] },
@@ -14,13 +14,15 @@ const OCCASIONS = ['Classique', 'Anniversaire', 'Affaires', 'Romantique', 'Famil
 
 export default function Reservations() {
   const { user } = useAuthStore();
-  const { reservations, addReservation } = useReservationStore();
+  const { reservations, addReservation, cancelReservation } = useReservationStore();
   const [step, setStep] = useState(1);
   const [date, setDate] = useState(DATES[0].date);
   const [time, setTime] = useState('');
   const [guests, setGuests] = useState(2);
   const [occasion, setOccasion] = useState('Classique');
   const [notes, setNotes] = useState('');
+  const [cancelTarget, setCancelTarget] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   const myReservations = reservations.filter(r => r.clientName === user?.name).sort((a, b) => new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime());
 
@@ -46,19 +48,28 @@ export default function Reservations() {
               <h2 className="text-white font-bold text-lg mb-3">Vos réservations</h2>
               <div className="space-y-3">
                 {myReservations.map(r => (
-                  <div key={r.id} className="glass-card p-4 border border-white/5">
+                  <div key={r.id} className={`glass-card p-4 border ${r.status === 'cancelled' ? 'border-red/20 opacity-50' : 'border-white/5'}`}>
                     <div className="flex justify-between items-start mb-2">
                       <span className="text-white font-bold">{new Date(r.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
                       <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider ${
-                        r.status === 'confirmed' ? 'bg-green/20 text-green' : r.status === 'waitlist' ? 'bg-orange/20 text-orange' : 'bg-blue/20 text-blue'
+                        r.status === 'confirmed' ? 'bg-green/20 text-green' : r.status === 'waitlist' ? 'bg-orange/20 text-orange' : r.status === 'cancelled' ? 'bg-red/20 text-red' : 'bg-blue/20 text-blue'
                       }`}>
-                        {r.status === 'waitlist' ? 'Liste d\'attente' : r.status === 'confirmed' ? 'Confirmée' : 'En attente'}
+                        {r.status === 'waitlist' ? "Liste d'attente" : r.status === 'confirmed' ? 'Confirmée' : r.status === 'cancelled' ? 'Annulée' : 'En attente'}
                       </span>
                     </div>
                     <div className="flex gap-4 text-text-secondary text-xs">
                       <span className="flex items-center gap-1"><Clock size={12} /> {r.time}</span>
                       <span className="flex items-center gap-1"><Users size={12} /> {r.guests} pers.</span>
                     </div>
+                    {r.status === 'cancelled' && r.cancelReason && (
+                      <p className="text-red/60 text-[10px] mt-2 italic">Motif : {r.cancelReason}</p>
+                    )}
+                    {r.status !== 'cancelled' && (
+                      <button onClick={() => { setCancelTarget(r.id); setCancelReason(''); }}
+                        className="mt-3 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red/10 text-red text-[10px] font-black uppercase tracking-widest active:scale-95 transition-transform">
+                        <Trash2 size={10} /> Annuler
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -152,6 +163,41 @@ export default function Reservations() {
           <button onClick={() => setStep(1)} className="px-6 py-3 rounded-xl bg-orange/20 text-orange font-bold text-sm">Compris</button>
         </motion.div>
       )}
+
+      {/* Cancel Reservation Modal */}
+      <AnimatePresence>
+        {cancelTarget && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setCancelTarget(null)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25 }}
+              className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto rounded-full bg-red/10 flex items-center justify-center text-red mb-4">
+                  <Trash2 size={28} />
+                </div>
+                <h3 className="text-white font-black text-xl">Annuler la réservation ?</h3>
+                <p className="text-text-secondary text-sm mt-2">Cette action est irréversible.</p>
+              </div>
+              <textarea
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+                placeholder="Motif d'annulation (facultatif)"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white text-sm h-20 resize-none focus:border-red/50 transition-colors mb-6"
+              />
+              <div className="flex gap-3">
+                <button onClick={() => setCancelTarget(null)}
+                  className="flex-1 py-3.5 rounded-2xl bg-white/5 text-text-secondary font-bold text-sm">
+                  Retour
+                </button>
+                <button onClick={() => { cancelReservation(cancelTarget, cancelReason); setCancelTarget(null); }}
+                  className="flex-1 py-3.5 rounded-2xl bg-red text-white font-black text-sm shadow-lg shadow-red/20 active:scale-95 transition-transform">
+                  Confirmer l'annulation
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

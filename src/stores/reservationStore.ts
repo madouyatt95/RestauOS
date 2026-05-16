@@ -12,6 +12,7 @@ export interface Reservation {
   notes: string;
   occasion?: 'anniversaire' | 'affaires' | 'romantique' | 'famille' | 'autre';
   tableId?: string;
+  cancelReason?: string;
   createdAt: string;
 }
 
@@ -20,6 +21,7 @@ interface ReservationState {
   addReservation: (r: Omit<Reservation, 'id' | 'createdAt'>) => void;
   updateStatus: (id: string, status: Reservation['status'], tableId?: string) => void;
   removeReservation: (id: string) => void;
+  cancelReservation: (id: string, reason?: string) => void;
 }
 
 const today = new Date().toISOString().split('T')[0];
@@ -39,6 +41,9 @@ export const useReservationStore = create<ReservationState>()(
       addReservation: (r) => set((s) => ({ reservations: [...s.reservations, { ...r, id: `res${Date.now()}`, createdAt: new Date().toISOString() }] })),
       updateStatus: (id, status, tableId) => set((s) => ({ reservations: s.reservations.map(r => r.id === id ? { ...r, status, ...(tableId ? { tableId } : {}) } : r) })),
       removeReservation: (id) => set((s) => ({ reservations: s.reservations.filter(r => r.id !== id) })),
+      cancelReservation: (id, reason) => set((s) => ({
+        reservations: s.reservations.map(r => r.id === id ? { ...r, status: 'cancelled' as const, cancelReason: reason || '' } : r)
+      })),
     }),
     { name: 'restauos-reservations' }
   )

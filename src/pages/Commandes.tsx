@@ -410,6 +410,14 @@ export default function Commandes() {
                       )}
                     </div>
                   </motion.div>
+                  {/* VIP Badge */}
+                  {(() => {
+                    const tableRes = reservations.find(r => r.tableId === t.id && r.status === 'confirmed');
+                    if (!tableRes) return null;
+                    const vipC = clients.find(c => c.name.toLowerCase() === tableRes.clientName.toLowerCase() && (c.tier === 'gold' || c.tier === 'platinum'));
+                    if (!vipC) return null;
+                    return <div className="absolute -top-1 -left-1 z-20 w-6 h-6 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center shadow-lg shadow-amber-500/40" title={`VIP ${vipC.tier}`}>👑</div>;
+                  })()}
                 </div>
               </motion.div>
             );
@@ -603,17 +611,28 @@ export default function Commandes() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 px-4">
-        {filteredProducts.map(product => (
-          <motion.div key={product.id} whileTap={{ scale: 0.96 }} onClick={() => addToCart(product)} className="glass-card overflow-hidden flex flex-col group active:border-orange/30">
-            <div className="h-32 bg-white/5 flex items-center justify-center text-4xl group-hover:scale-110 transition-transform duration-500 overflow-hidden">
-              {product.image.startsWith('/') ? <img src={product.image} className="w-full h-full object-cover" /> : product.image}
-            </div>
-            <div className="p-4 flex-1 flex flex-col">
-              <h3 className="text-white font-black text-sm mb-1 leading-tight">{product.name}</h3>
-              <p className="text-orange font-black text-sm mt-auto">{product.price.toLocaleString()} F</p>
-            </div>
-          </motion.div>
-        ))}
+        {filteredProducts.map(product => {
+          const cartItem = cart.find(c => c.product.id === product.id);
+          const qty = cartItem?.quantity || 0;
+          return (
+            <motion.div key={product.id} whileTap={{ scale: 0.96 }} className="glass-card overflow-hidden flex flex-col group active:border-orange/30 relative">
+              {qty > 0 && (
+                <div className="absolute top-2 right-2 z-10 flex items-center gap-1 bg-orange rounded-full px-1 py-0.5 shadow-lg shadow-orange/30">
+                  <button onClick={(e) => { e.stopPropagation(); updateQuantity(product.id, qty - 1); }} className="w-6 h-6 rounded-full bg-white/20 text-white text-xs font-black flex items-center justify-center active:scale-90"><Minus size={12} /></button>
+                  <span className="text-white font-black text-xs min-w-[20px] text-center">{qty}</span>
+                  <button onClick={(e) => { e.stopPropagation(); addToCart(product); }} className="w-6 h-6 rounded-full bg-white/20 text-white text-xs font-black flex items-center justify-center active:scale-90"><Plus size={12} /></button>
+                </div>
+              )}
+              <div onClick={() => addToCart(product)} className="h-32 bg-white/5 flex items-center justify-center text-4xl group-hover:scale-110 transition-transform duration-500 overflow-hidden">
+                {product.image.startsWith('/') ? <img src={product.image} className="w-full h-full object-cover" /> : product.image}
+              </div>
+              <div className="p-4 flex-1 flex flex-col" onClick={() => addToCart(product)}>
+                <h3 className="text-white font-black text-sm mb-1 leading-tight">{product.name}</h3>
+                <p className="text-orange font-black text-sm mt-auto">{product.price.toLocaleString()} F</p>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
 
       <AnimatePresence>
@@ -625,6 +644,25 @@ export default function Commandes() {
                 <h3 className="text-white font-black text-2xl">Panier • T{currentTable?.number}</h3>
                 <button onClick={clearCart} className="text-text-tertiary text-xs font-black uppercase tracking-widest hover:text-red transition-colors">Vider</button>
               </div>
+
+              {/* VIP Info Banner */}
+              {(() => {
+                const tableRes = reservations.find(r => r.tableId === selectedTableId && r.status === 'confirmed');
+                if (!tableRes) return null;
+                const vipC = clients.find(c => c.name.toLowerCase() === tableRes.clientName.toLowerCase() && (c.tier === 'gold' || c.tier === 'platinum'));
+                if (!vipC) return null;
+                return (
+                  <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 to-amber-600/5 border border-amber-500/30">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-lg">👑</span>
+                      <span className="text-amber-400 font-black text-sm uppercase tracking-wider">Client VIP — {vipC.tier}</span>
+                    </div>
+                    <div className="text-white text-xs font-bold">{vipC.name}</div>
+                    <div className="text-text-tertiary text-[10px] mt-1">{vipC.visits} visites • {vipC.points.toLocaleString()} pts • {vipC.totalSpent.toLocaleString()} F dépensés</div>
+                    {vipC.preferences && <div className="text-amber-300/80 text-[10px] mt-2 italic">💡 {vipC.preferences}</div>}
+                  </div>
+                );
+              })()}
 
               {/* Loyalty association */}
               <button onClick={() => { setShowLoyaltySearch(true); setLoyaltySearch(''); }}

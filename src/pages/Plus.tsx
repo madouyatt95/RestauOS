@@ -3,11 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../stores/authStore';
 import { usePromoStore } from '../stores/promoStore';
 import { useNotificationStore } from '../stores/notificationStore';
+import { useBroadcastStore, TARGET_LABELS, type BroadcastMessage } from '../stores/broadcastStore';
 import { useThemeStore } from '../stores/themeStore';
 import {
   User, Building2, CreditCard, Users, Settings, HelpCircle, LogOut,
   ChevronRight, BarChart3, Heart, Truck, QrCode, X, Database,
-  Bell, Tag, Sun, Moon, Palette, Check, AlertCircle, ShoppingBag, Star, Trash2, Edit2
+  Bell, Tag, Sun, Moon, Palette, Check, AlertCircle, ShoppingBag, Star, Trash2, Edit2, Megaphone, Send
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useState } from 'react';
@@ -25,6 +26,7 @@ const NOTIF_ICONS: Record<string, { icon: any; color: string }> = {
   delivery: { icon: Truck, color: '#22C55E' },
   promo: { icon: Tag, color: '#8B5CF6' },
   system: { icon: Settings, color: '#6B7280' },
+  broadcast: { icon: Megaphone, color: '#EC4899' },
 };
 
 export default function Plus() {
@@ -35,8 +37,14 @@ export default function Plus() {
   const [selectedPromoProducts, setSelectedPromoProducts] = useState<string[]>([]);
   const { notifications, markRead, markAllRead, getUnreadCount } = useNotificationStore();
   const { mode, accent, toggleMode, setAccent } = useThemeStore();
+  const { messages: broadcasts, sendBroadcast } = useBroadcastStore();
+  const { addNotification } = useNotificationStore();
   const [showQRModal, setShowQRModal] = useState(false);
   const [showERPModal, setShowERPModal] = useState(false);
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [bcMessage, setBcMessage] = useState('');
+  const [bcTarget, setBcTarget] = useState<BroadcastMessage['target']>('all');
+  const [bcPriority, setBcPriority] = useState<BroadcastMessage['priority']>('normal');
   const [activeSection, setActiveSection] = useState<'menu' | 'notifs' | 'promos' | 'theme'>('menu');
 
   const isManager = ['Admin', 'Gérant'].includes(user?.role || '');
@@ -90,10 +98,11 @@ export default function Plus() {
                 { icon: Heart, label: 'Fidélité', path: '/fidelite', color: '#EF4444' },
                 { icon: Truck, label: 'Livraisons', path: '/livraisons', color: '#3B82F6' },
                 { icon: ShoppingBag, label: 'Menu', path: '/menu-builder', color: '#8B5CF6' },
+                { icon: Megaphone, label: 'Broadcast', action: 'broadcast', color: '#EC4899' },
                 { icon: Database, label: 'Paramètres', path: '/settings', color: '#F59E0B' },
               ].map((link, i) => (
                 <motion.button key={link.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.05 }}
-                  onClick={() => navigate(link.path)}
+                  onClick={() => link.action === 'broadcast' ? setShowBroadcastModal(true) : navigate(link.path!)}
                   className="glass-card p-4 flex flex-col items-center gap-2 active:border-orange/30 transition-colors">
                   <link.icon size={22} style={{ color: link.color }} />
                   <span className="text-white text-xs font-semibold">{link.label}</span>
@@ -328,6 +337,94 @@ export default function Plus() {
                 setEditingPromoId(null);
               }} className="w-full py-4 rounded-2xl bg-orange text-white font-black text-sm uppercase tracking-widest shadow-lg shadow-orange/20 active:scale-95 transition-transform">
                 Sauvegarder
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Broadcast Compose Modal */}
+      <AnimatePresence>
+        {showBroadcastModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay z-[100]" onClick={() => setShowBroadcastModal(false)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25 }} className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-pink-500/10 flex items-center justify-center text-pink-400">
+                  <Megaphone size={24} />
+                </div>
+                <div>
+                  <h3 className="text-white font-black text-xl">Broadcast</h3>
+                  <p className="text-text-secondary text-xs">Envoyer un message à l'équipe</p>
+                </div>
+              </div>
+
+              <textarea
+                value={bcMessage}
+                onChange={e => setBcMessage(e.target.value)}
+                placeholder="Ex: Rupture de bissap, VIP table 8..."
+                className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white text-sm h-24 resize-none focus:border-pink-400/50 transition-colors mb-4"
+              />
+
+              <div className="mb-4">
+                <p className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2">Ciblage</p>
+                <div className="flex gap-2 flex-wrap">
+                  {(['all', 'salle', 'cuisine', 'livraison', 'management'] as const).map(t => (
+                    <button key={t} onClick={() => setBcTarget(t)}
+                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${bcTarget === t ? 'bg-pink-500/20 text-pink-400 border border-pink-500/40' : 'bg-white/5 text-text-tertiary border border-transparent'}`}>
+                      {TARGET_LABELS[t]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2">Priorité</p>
+                <div className="flex gap-2">
+                  <button onClick={() => setBcPriority('normal')}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${bcPriority === 'normal' ? 'bg-white/10 text-white' : 'bg-white/5 text-text-tertiary'}`}>
+                    Normal
+                  </button>
+                  <button onClick={() => setBcPriority('urgent')}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${bcPriority === 'urgent' ? 'bg-red/20 text-red border border-red/30' : 'bg-white/5 text-text-tertiary'}`}>
+                    🚨 Urgent
+                  </button>
+                </div>
+              </div>
+
+              {/* Recent broadcasts */}
+              {broadcasts.length > 0 && (
+                <div className="mb-6">
+                  <p className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2">Messages récents</p>
+                  <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
+                    {broadcasts.slice(0, 3).map(b => (
+                      <div key={b.id} className="p-3 rounded-xl bg-white/5 border border-white/5">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${b.priority === 'urgent' ? 'bg-red/20 text-red' : 'bg-pink-500/20 text-pink-400'}`}>{TARGET_LABELS[b.target]}</span>
+                          <span className="text-text-tertiary text-[9px]">{new Date(b.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <p className="text-white text-xs">{b.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => {
+                  if (!bcMessage.trim()) return;
+                  sendBroadcast({ from: user?.name || 'Gérant', message: bcMessage.trim(), target: bcTarget, priority: bcPriority });
+                  addNotification({
+                    type: 'broadcast',
+                    title: bcPriority === 'urgent' ? '🚨 Broadcast URGENT' : '📢 Broadcast',
+                    message: bcMessage.trim(),
+                    targetRole: bcTarget === 'salle' ? 'Serveur' : bcTarget === 'cuisine' ? 'Chef cuisine' : bcTarget === 'livraison' ? 'Livreur' : undefined,
+                  });
+                  setBcMessage('');
+                  setShowBroadcastModal(false);
+                }}
+                disabled={!bcMessage.trim()}
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-pink-500 to-pink-600 text-white font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-pink-500/20 disabled:opacity-40 active:scale-95 transition-transform">
+                <Send size={16} /> Envoyer
               </button>
             </motion.div>
           </motion.div>

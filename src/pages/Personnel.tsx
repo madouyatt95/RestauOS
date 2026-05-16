@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useStaffStore, type Employee } from '../stores/staffStore';
 import { useAuthStore } from '../stores/authStore';
 import { usePlanningStore, type ShiftType } from '../stores/planningStore';
-import { Phone, ChevronLeft, ChevronRight, Plus, X, Sun, Moon, Clock, Users, RefreshCw, Check, AlertCircle, UserPlus, Trash2 } from 'lucide-react';
+import { Phone, ChevronLeft, ChevronRight, Plus, X, Sun, Moon, Clock, Users, RefreshCw, Check, AlertCircle, UserPlus, Trash2, QrCode } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 const statusConfig = {
   present: { label: 'Présent', color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
@@ -55,6 +56,7 @@ export default function Personnel() {
   const [newEmpPhone, setNewEmpPhone] = useState('');
   const [newEmpAvatar, setNewEmpAvatar] = useState('🧑‍🍽️');
   const [presenceFilter, setPresenceFilter] = useState('Tous');
+  const [showQREmp, setShowQREmp] = useState<Employee | null>(null);
 
   const isManager = ['Admin', 'Gérant'].includes(user?.role || '');
 
@@ -300,7 +302,10 @@ export default function Personnel() {
                     <span className="text-[9px] font-bold text-text-tertiary mt-1 block">Pas de service aujourd'hui</span>
                   )}
                 </div>
-                <div className="text-right shrink-0">
+                <div className="text-right shrink-0 flex items-center gap-2">
+                  <button onClick={(ev) => { ev.stopPropagation(); setShowQREmp(emp); }} className="w-8 h-8 rounded-lg bg-blue/10 text-blue flex items-center justify-center active:scale-90 transition-transform">
+                    <QrCode size={14} />
+                  </button>
                   <span className="text-[9px] font-black px-3 py-1 rounded-full" style={{ color: sc.color, background: sc.bg }}>
                     {sc.label}
                   </span>
@@ -702,6 +707,27 @@ export default function Personnel() {
                   <UserPlus size={18} /> {newEmpRole === 'Livreur Indépendant' ? 'Ajouter & Générer Lien' : 'Ajouter à l\'équipe'}
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Employee QR Code Modal */}
+      <AnimatePresence>
+        {showQREmp && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay z-[100]" onClick={() => setShowQREmp(null)}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="glass-card-lg p-6 m-4 relative max-w-sm w-full flex flex-col items-center text-center" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setShowQREmp(null)} className="absolute top-4 right-4 text-text-tertiary"><X size={20} /></button>
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-white/10 to-transparent flex items-center justify-center text-3xl border border-white/5 mb-4">
+                {showQREmp.avatar}
+              </div>
+              <h3 className="text-white font-black text-xl mb-0.5">{showQREmp.name}</h3>
+              <p className="text-text-secondary text-sm mb-1">{showQREmp.role}</p>
+              <p className="text-text-tertiary text-[10px] font-mono mb-6">ID: {showQREmp.id}</p>
+              <div className="bg-white p-4 rounded-2xl mb-6 shadow-[0_0_40px_rgba(255,255,255,0.1)]">
+                <QRCodeSVG value={showQREmp.id} size={180} level="H" />
+              </div>
+              <p className="text-text-tertiary text-[10px]">Scannez ce QR code pour une connexion rapide</p>
             </motion.div>
           </motion.div>
         )}
