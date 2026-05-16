@@ -14,13 +14,13 @@ const modules = [
   { icon: Truck, label: 'Livraisons', color: '#06B6D4' },
 ];
 
-// Onboarding slides
+// Onboarding slides with demo images
 const ONBOARDING_SLIDES = [
-  { emoji: '🏠', title: 'Gestion complète', subtitle: 'Pilotez tout votre restaurant depuis une seule application.', color: '#FF8A00' },
-  { emoji: '🛒', title: 'Commandes & Encaissements', subtitle: 'Prise de commande rapide, encaissement multi-paiement, tickets automatiques.', color: '#22C55E' },
-  { emoji: '🍳', title: 'Cuisine & Livraison', subtitle: 'KDS en temps réel, suivi des livraisons GPS, gestion des courses.', color: '#3B82F6' },
-  { emoji: '❤️', title: 'Fidélité & CRM', subtitle: 'Programme de points, VIP automatique, historique client complet.', color: '#EF4444' },
-  { emoji: '📊', title: 'Dashboard & IA', subtitle: 'Rapports intelligents, prévisions IA, alertes automatiques.', color: '#8B5CF6' },
+  { image: '/images/onboarding/gestion.png', title: 'Gestion complète', subtitle: 'Pilotez tout votre restaurant depuis une seule application : tables, commandes, stocks, équipe.', color: '#FF8A00' },
+  { image: '/images/onboarding/commandes.png', title: 'Plan de salle interactif', subtitle: 'Gérez vos tables en temps réel, prenez les commandes d\'un simple tap et suivez les statuts en direct.', color: '#22C55E' },
+  { image: '/images/onboarding/cuisine.png', title: 'Cuisine & Livraison', subtitle: 'Écran cuisine (KDS) avec tickets en temps réel, suivi des livraisons GPS et gestion des courses.', color: '#3B82F6' },
+  { image: '/images/onboarding/fidelite.png', title: 'Fidélité & VIP', subtitle: 'Programme de points automatique, détection VIP, historique client complet et préférences.', color: '#EF4444' },
+  { image: '/images/onboarding/dashboard.png', title: 'Dashboard & Rapports', subtitle: 'Rapports intelligents, chiffre d\'affaires en temps réel, prévisions IA et alertes automatiques.', color: '#8B5CF6' },
 ];
 
 export default function Landing() {
