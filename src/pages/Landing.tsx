@@ -80,28 +80,18 @@ export default function Landing() {
           </button>
         </div>
 
-        {/* Phone mockup with demo image */}
+        {/* Demo image */}
         <AnimatePresence mode="wait">
           <motion.div
             key={slideIdx}
-            initial={{ opacity: 0, y: 40, scale: 0.92 }}
+            initial={{ opacity: 0, y: 40, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -30, scale: 0.95 }}
             transition={{ duration: 0.4, ease: 'easeOut' }}
-            className="relative z-10 w-full max-w-[280px]"
+            className="relative z-10 w-full max-w-sm px-2"
           >
-            {/* Phone frame */}
-            <div className="rounded-[2rem] border-2 border-white/10 bg-black/40 p-2 shadow-[0_20px_80px_rgba(0,0,0,0.6)]">
-              {/* Notch */}
-              <div className="mx-auto w-24 h-5 bg-black rounded-b-2xl mb-1" />
-              {/* Screen */}
-              <motion.div
-                animate={{ y: [0, -6, 0] }}
-                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                className="rounded-[1.5rem] overflow-hidden"
-              >
-                <img src={slide.image} alt={slide.title} className="w-full aspect-[9/16] object-cover" />
-              </motion.div>
+            <div className="rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.5)] border border-white/10">
+              <img src={slide.image} alt={slide.title} className="w-full object-contain" />
             </div>
           </motion.div>
         </AnimatePresence>
