@@ -21,21 +21,30 @@ export interface CartItem {
 export interface Payment {
   id: string;
   amount: number;
-  method: 'especes' | 'wave' | 'orange_money' | 'carte';
+  method: 'especes' | 'wave' | 'orange_money' | 'carte' | 'room_charge';
   date: string;
 }
 
-export type OrderStatus = 'non_payee' | 'partiellement_payee' | 'payee' | 'en_preparation' | 'prete' | 'servie' | 'en_livraison' | 'terminee';
+export type OrderStatus = 'non_payee' | 'partiellement_payee' | 'payee' | 'en_preparation' | 'prete' | 'servie' | 'en_livraison' | 'terminee' | 'annulee';
 
 export interface Order {
   id: string;
   items: CartItem[];
   total: number;
   type: 'sur_place' | 'emporter' | 'livraison';
-  payment: 'especes' | 'wave' | 'orange_money' | 'carte';
+  payment: Payment['method'];
   date: string;
   clientId?: string;
   tableId?: string;
+  posId?: string;
+  roomId?: string;
+  roomNumber?: string;
+  hospiLines?: { productId: string; quantity: number }[];
+  discountAmount?: number;
+  discountReason?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
+  cancelledBy?: string;
   serveurName?: string;
   status: OrderStatus;
   paidAmount: number;
@@ -196,7 +205,10 @@ interface OrderState {
   clearCart: () => void;
   setOrderType: (type: Order['type']) => void;
   checkout: (payment: Order['payment'], clientId?: string, tableId?: string, serveurName?: string) => Order | null;
+  updateOrderHospiContext: (orderId: string, context: Pick<Order, 'posId' | 'roomId' | 'roomNumber' | 'hospiLines'>) => void;
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
+  applyDiscount: (orderId: string, amount: number, reason: string) => void;
+  cancelOrder: (orderId: string, reason: string, cancelledBy: string) => void;
   addPayment: (orderId: string, amount: number, method: Payment['method']) => void;
   toggleItemReady: (orderId: string, productId: string) => void;
   checkAllItemsReady: (orderId: string) => boolean;
@@ -310,6 +322,33 @@ export const useOrderStore = create<OrderState>()(
 
       updateOrderStatus: (orderId, status) => set(state => ({
         orders: state.orders.map(o => o.id === orderId ? { ...o, status } : o)
+      })),
+
+      updateOrderHospiContext: (orderId, context) => set(state => ({
+        orders: state.orders.map(o => o.id === orderId ? { ...o, ...context } : o)
+      })),
+
+      applyDiscount: (orderId, amount, reason) => set(state => ({
+        orders: state.orders.map(o => {
+          if (o.id !== orderId) return o;
+          const safeAmount = Math.max(0, Math.min(amount, Math.max(0, o.total - o.paidAmount)));
+          return {
+            ...o,
+            total: Math.max(0, o.total - safeAmount),
+            discountAmount: (o.discountAmount || 0) + safeAmount,
+            discountReason: reason,
+          };
+        })
+      })),
+
+      cancelOrder: (orderId, reason, cancelledBy) => set(state => ({
+        orders: state.orders.map(o => o.id === orderId ? {
+          ...o,
+          status: 'annulee',
+          cancellationReason: reason,
+          cancelledBy,
+          cancelledAt: new Date().toISOString(),
+        } : o)
       })),
 
       addPayment: (orderId, amount, method) => set(state => ({

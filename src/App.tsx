@@ -23,6 +23,7 @@ import Onboarding from './pages/Onboarding';
 import MenuBuilder from './pages/MenuBuilder';
 import Factures from './pages/Factures';
 import WhatsAppBot from './pages/WhatsAppBot';
+import HospiSettings from './pages/HospiSettings';
 import { useThemeStore } from './stores/themeStore';
 import { useEffect } from 'react';
 import './index.css';
@@ -85,6 +86,9 @@ function AppContent() {
           } />
           <Route path="/whatsapp-bot" element={
             <ProtectedRoute><WhatsAppBot /></ProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant']}><HospiSettings /></ProtectedRoute>
           } />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

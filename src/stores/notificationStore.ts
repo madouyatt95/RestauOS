@@ -34,7 +34,7 @@ export const useNotificationStore = create<NotificationState>()(
         { id: 'n6', type: 'promo', title: 'Happy Hour actif', message: '-30% sur les boissons jusqu\'à 19h', read: true, date: new Date(Date.now() - 10800000).toISOString() },
       ],
       addNotification: (n) => set((s) => ({
-        notifications: [{ ...n, id: `n${Date.now()}`, read: false, date: new Date().toISOString() }, ...s.notifications]
+        notifications: [{ ...n, id: `n-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, read: false, date: new Date().toISOString() }, ...s.notifications]
       })),
       markRead: (id) => set((s) => ({ notifications: s.notifications.map(n => n.id === id ? { ...n, read: true } : n) })),
       markAllRead: () => set((s) => ({ notifications: s.notifications.map(n => ({ ...n, read: true })) })),

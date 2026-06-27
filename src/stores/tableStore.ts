@@ -20,6 +20,8 @@ export interface Table {
 
 interface TableState {
   tables: Table[];
+  addTable: (table: Table) => void;
+  removeTable: (id: string) => void;
   updateTableStatus: (id: string, status: TableStatus, orderId?: string) => void;
   updateTablePosition: (id: string, x: number, y: number) => void;
   updateTableCapacity: (id: string, capacity: number) => void;
@@ -78,6 +80,14 @@ export const useTableStore = create<TableState>()(
   persist(
     (set, get) => ({
       tables: INITIAL_TABLES,
+
+      addTable: (table) => set((state) => ({
+        tables: [...state.tables, table]
+      })),
+
+      removeTable: (id) => set((state) => ({
+        tables: state.tables.filter(t => t.id !== id)
+      })),
       
       updateTableStatus: (id, status, orderId) => set((state) => ({
         tables: state.tables.map((t) => 

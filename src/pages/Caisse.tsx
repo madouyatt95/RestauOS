@@ -6,18 +6,34 @@ import { useTableStore } from '../stores/tableStore';
 import { useAuthStore } from '../stores/authStore';
 import { useClientStore } from '../stores/clientStore';
 import { useNotificationStore } from '../stores/notificationStore';
-import { Check, CreditCard, Smartphone, Banknote, Wallet, Wifi, CloudUpload, ClipboardList, Clock, User, Edit2, Gift, Shield } from 'lucide-react';
+import { useHospiStore, type CashSession } from '../stores/hospiStore';
+import { useBusinessRulesStore } from '../stores/businessRulesStore';
+import { Check, CreditCard, Smartphone, Banknote, Wallet, Wifi, CloudUpload, ClipboardList, Clock, User, Edit2, Gift, Shield, BedDouble, ReceiptText, LockKeyhole, UnlockKeyhole, Download, Percent, Ban } from 'lucide-react';
 import { syncOrderToERP } from '../services/erpConnector';
+import { buildCashSessionTicket, summarizeCashSession } from '../services/cashSession';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
 export default function Caisse() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { orders, addPayment } = useOrderStore();
+  const { orders, addPayment, updateOrderHospiContext, applyDiscount, cancelOrder } = useOrderStore();
+  const {
+    activePOSId,
+    posList,
+    warehouses,
+    getOccupiedRoomsWithOpenFolios,
+    chargeOrderToRoom,
+    getRegisterForPOS,
+    getOpenCashSession,
+    openCashSession,
+    closeCashSession,
+    cashSessions,
+  } = useHospiStore();
   const { tables, updateTableStatus } = useTableStore();
   const { clients, usePoints } = useClientStore();
   const { addNotification } = useNotificationStore();
+  const { canPerform, requiresManagerApproval, recordAudit } = useBusinessRulesStore();
   
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [showPayment, setShowPayment] = useState(false);
@@ -32,10 +48,29 @@ export default function Caisse() {
   const [loyaltyPoints, setLoyaltyPoints] = useState('');
   const [showOTP, setShowOTP] = useState(false);
   const [otpCode, setOtpCode] = useState('');
+  const [showRoomCharge, setShowRoomCharge] = useState(false);
+  const [showOpenSession, setShowOpenSession] = useState(false);
+  const [showCloseSession, setShowCloseSession] = useState(false);
+  const [openingFloat, setOpeningFloat] = useState('50000');
+  const [closingCashCount, setClosingCashCount] = useState('');
+  const [showDiscount, setShowDiscount] = useState(false);
+  const [showCancelOrder, setShowCancelOrder] = useState(false);
+  const [discountAmount, setDiscountAmount] = useState('');
+  const [discountReason, setDiscountReason] = useState('');
+  const [cancelReason, setCancelReason] = useState('');
 
   const pendingOrders = orders.filter(o => ['en_preparation', 'prete', 'servie', 'non_payee', 'partiellement_payee'].includes(o.status));
   const activeOrder = orders.find(o => o.id === selectedOrder);
   const loyaltyClient = activeOrder?.loyaltyClientId ? clients.find(c => c.id === activeOrder.loyaltyClientId) : null;
+  const occupiedRooms = getOccupiedRoomsWithOpenFolios();
+  const activePOS = posList.find(pos => pos.id === (activeOrder?.posId || activePOSId));
+  const activeWarehouse = activePOS ? warehouses.find(warehouse => warehouse.id === activePOS.default_warehouse_id) : undefined;
+  const activeRegister = getRegisterForPOS(activePOS?.id);
+  const openSession = getOpenCashSession(activePOS?.id);
+  const cashSummary = summarizeCashSession(openSession, orders);
+  const closedSessions = cashSessions
+    .filter(session => session.pos_id === activePOS?.id && session.status === 'closed')
+    .sort((a, b) => new Date(b.closed_at || b.opened_at).getTime() - new Date(a.closed_at || a.opened_at).getTime());
 
   const getRemainingAmount = () => {
     if (!activeOrder) return 0;
@@ -55,10 +90,15 @@ export default function Caisse() {
     return remaining;
   };
 
-  const handleCheckout = (method: 'especes' | 'wave' | 'orange_money' | 'carte') => {
+  const handleCheckout = (method: 'especes' | 'wave' | 'orange_money' | 'carte' | 'room_charge') => {
     if (!activeOrder) return;
     const amount = getPayAmount();
     if (amount <= 0) return;
+
+    if (method === 'room_charge') {
+      setShowRoomCharge(true);
+      return;
+    }
 
     if (method === 'carte') {
       setShowSoftPOS(true);
@@ -68,7 +108,7 @@ export default function Caisse() {
     finalizePayment(amount, method);
   };
 
-  const finalizePayment = async (amount: number, method: 'especes' | 'wave' | 'orange_money' | 'carte') => {
+  const finalizePayment = async (amount: number, method: 'especes' | 'wave' | 'orange_money' | 'carte' | 'room_charge') => {
     if (!activeOrder) return;
 
     addPayment(activeOrder.id, amount, method);
@@ -104,6 +144,167 @@ export default function Caisse() {
       setShowSuccess(false);
       if (isFullyPaid) setSelectedOrder(null);
     }, 2000);
+  };
+
+  const handleOpenSession = () => {
+    if (!activePOS || !user) return;
+    const amount = Number(openingFloat) || 0;
+    const session = openCashSession(activePOS.id, user.name, amount);
+    if (!session) return;
+    addNotification({
+      type: 'payment',
+      title: 'Ouverture caisse',
+      message: `${activePOS.name} ouverte avec fond ${fmt(amount)} F`,
+      targetRole: 'Gérant',
+    });
+    setShowOpenSession(false);
+  };
+
+  const handleCloseSession = () => {
+    if (!openSession || !user) return;
+    const counted = Number(closingCashCount);
+    if (Number.isNaN(counted)) return;
+    const closed = closeCashSession(openSession.id, user.name, counted, cashSummary.expectedCash);
+    if (!closed) return;
+    addNotification({
+      type: 'payment',
+      title: 'Clôture Z',
+      message: `${activePOS?.name || 'POS'} clôturée. Écart caisse : ${fmt(closed.difference || 0)} F`,
+      targetRole: 'Gérant',
+    });
+    setShowCloseSession(false);
+    setClosingCashCount('');
+  };
+
+  const handleExportSession = (session: CashSession) => {
+    const summary = summarizeCashSession(session, orders);
+    const register = getRegisterForPOS(session.pos_id);
+    const pos = posList.find(item => item.id === session.pos_id);
+    const ticket = buildCashSessionTicket({
+      session,
+      summary,
+      posName: pos?.name || 'POS',
+      registerName: register?.name || 'Caisse',
+    });
+    const blob = new Blob([ticket], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ticket-z-${session.id}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleApplyDiscount = () => {
+    if (!activeOrder || !user) return;
+    const amount = Number(discountAmount);
+    if (!amount || amount <= 0 || !discountReason.trim()) return;
+    const needsApproval = requiresManagerApproval(user, 'discount', amount);
+    if (!canPerform(user, 'discount', amount) && needsApproval) {
+      addNotification({
+        type: 'system',
+        title: 'Validation manager requise',
+        message: `${user.name} demande une remise de ${fmt(amount)} F sur ticket #${activeOrder.id.slice(-4)}`,
+        targetRole: 'Gérant',
+        orderId: activeOrder.id,
+      });
+      return;
+    }
+    applyDiscount(activeOrder.id, amount, discountReason.trim());
+    recordAudit({
+      action: 'discount',
+      actorId: user.id,
+      actorName: user.name,
+      actorRole: user.role,
+      targetType: 'order',
+      targetId: activeOrder.id,
+      amount,
+      reason: discountReason.trim(),
+      managerApprovalRequired: needsApproval,
+    });
+    addNotification({
+      type: 'payment',
+      title: 'Remise appliquée',
+      message: `${fmt(amount)} F sur ticket #${activeOrder.id.slice(-4)} - ${discountReason.trim()}`,
+      targetRole: 'Gérant',
+      orderId: activeOrder.id,
+    });
+    setDiscountAmount('');
+    setDiscountReason('');
+    setShowDiscount(false);
+  };
+
+  const handleCancelOrder = () => {
+    if (!activeOrder || !user || !cancelReason.trim()) return;
+    const needsApproval = requiresManagerApproval(user, 'cancel_order');
+    if (!canPerform(user, 'cancel_order')) {
+      addNotification({
+        type: 'system',
+        title: 'Validation manager requise',
+        message: `${user.name} demande l’annulation du ticket #${activeOrder.id.slice(-4)}`,
+        targetRole: 'Gérant',
+        orderId: activeOrder.id,
+      });
+      return;
+    }
+    cancelOrder(activeOrder.id, cancelReason.trim(), user.name);
+    if (activeOrder.tableId) updateTableStatus(activeOrder.tableId, 'libre');
+    recordAudit({
+      action: 'cancel_order',
+      actorId: user.id,
+      actorName: user.name,
+      actorRole: user.role,
+      targetType: 'order',
+      targetId: activeOrder.id,
+      amount: activeOrder.total,
+      reason: cancelReason.trim(),
+      managerApprovalRequired: needsApproval,
+    });
+    addNotification({
+      type: 'system',
+      title: 'Ticket annulé',
+      message: `Ticket #${activeOrder.id.slice(-4)} annulé par ${user.name}`,
+      targetRole: 'Gérant',
+      orderId: activeOrder.id,
+    });
+    setCancelReason('');
+    setShowCancelOrder(false);
+    setShowPayment(false);
+    setSelectedOrder(null);
+  };
+
+  const handleRoomCharge = (roomId: string) => {
+    if (!activeOrder) return;
+    const amount = getPayAmount();
+    const roomContext = occupiedRooms.find(item => item.room.id === roomId);
+    if (!roomContext) return;
+
+    const line = chargeOrderToRoom(
+      roomId,
+      activeOrder.id,
+      `Consommation ${activePOS?.name || 'POS'} - ticket #${activeOrder.id.slice(-4)}`,
+      amount
+    );
+    if (!line) return;
+
+    addPayment(activeOrder.id, amount, 'room_charge');
+    updateOrderHospiContext(activeOrder.id, {
+      posId: activeOrder.posId,
+      roomId,
+      roomNumber: roomContext.room.room_number,
+      hospiLines: activeOrder.hospiLines,
+    });
+    addNotification({
+      type: 'payment',
+      title: 'Imputation chambre',
+      message: `Ticket #${activeOrder.id.slice(-4)} imputé à la chambre ${roomContext.room.room_number} (${fmt(amount)} F)`,
+      targetRole: 'Gérant',
+      orderId: activeOrder.id,
+    });
+    if (activeOrder.tableId) updateTableStatus(activeOrder.tableId, 'libre');
+    setShowRoomCharge(false);
+    setShowPayment(false);
+    setSelectedOrder(null);
   };
 
   const handleUseLoyaltyPoints = () => {
@@ -153,6 +354,80 @@ export default function Caisse() {
             {pendingOrders.length}
           </span>
         </div>
+      </div>
+
+      <div className="glass-card-lg p-5 mb-5 border-blue/10">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${openSession ? 'bg-green/10 text-green' : 'bg-orange/10 text-orange'}`}>
+              {openSession ? <UnlockKeyhole size={22} /> : <LockKeyhole size={22} />}
+            </div>
+            <div>
+              <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Session caisse</p>
+              <h2 className="text-white font-black text-sm">{activeRegister?.name || 'Caisse principale'}</h2>
+              <p className="text-text-secondary text-xs">{activePOS?.name || 'POS actif'}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => openSession ? setShowCloseSession(true) : setShowOpenSession(true)}
+            className={`px-4 py-2.5 rounded-xl text-white text-xs font-black ${openSession ? 'bg-red' : 'bg-green'}`}
+          >
+            {openSession ? 'Clôture Z' : 'Ouvrir'}
+          </button>
+        </div>
+
+        {openSession ? (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-white/5 p-3">
+              <p className="text-text-tertiary text-[9px] font-black uppercase">Rapport X</p>
+              <p className="text-white font-black text-lg">{fmt(cashSummary.grossSales)} F</p>
+            </div>
+            <div className="rounded-2xl bg-white/5 p-3">
+              <p className="text-text-tertiary text-[9px] font-black uppercase">Espèces attendues</p>
+              <p className="text-green font-black text-lg">{fmt(cashSummary.expectedCash)} F</p>
+            </div>
+            <div className="rounded-2xl bg-white/5 p-3">
+              <p className="text-text-tertiary text-[9px] font-black uppercase">Chambre</p>
+              <p className="text-cyan-300 font-black text-lg">{fmt(cashSummary.roomChargeTotal)} F</p>
+            </div>
+            <div className="rounded-2xl bg-white/5 p-3">
+              <p className="text-text-tertiary text-[9px] font-black uppercase">Tickets</p>
+              <p className="text-white font-black text-lg">{cashSummary.orderCount}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-orange/10 border border-orange/20 p-4">
+            <p className="text-orange font-black text-xs uppercase tracking-widest">Caisse non ouverte</p>
+            <p className="text-text-secondary text-xs mt-1">Ouvre une session avant de commencer les encaissements du POS.</p>
+          </div>
+        )}
+
+        {closedSessions.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-white/5">
+            <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-3">Dernières clôtures Z</p>
+            <div className="space-y-2">
+              {closedSessions.slice(0, 3).map(session => (
+                <div key={session.id} className="rounded-2xl bg-white/5 p-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-white font-bold text-xs">
+                      {session.closed_at ? new Date(session.closed_at).toLocaleDateString('fr-FR') : 'Session clôturée'}
+                    </p>
+                    <p className={`text-[10px] font-bold ${(session.difference || 0) === 0 ? 'text-green' : 'text-orange'}`}>
+                      Écart {fmt(session.difference || 0)} F
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleExportSession(session)}
+                    className="w-9 h-9 rounded-xl bg-white/5 text-text-secondary flex items-center justify-center active:scale-95 transition-transform"
+                    title="Exporter le ticket Z"
+                  >
+                    <Download size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {pendingOrders.length === 0 ? (
@@ -224,7 +499,7 @@ export default function Caisse() {
                         <p className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-1">Paiements effectués</p>
                         {o.payments.map(p => (
                           <div key={p.id} className="flex justify-between text-[10px]">
-                            <span className="text-green">{p.method === 'wave' ? 'Wave' : p.method === 'orange_money' ? 'OM' : p.method === 'carte' ? 'Carte' : 'Espèces'}</span>
+                            <span className="text-green">{p.method === 'wave' ? 'Wave' : p.method === 'orange_money' ? 'OM' : p.method === 'carte' ? 'Carte' : p.method === 'room_charge' ? 'Chambre' : 'Espèces'}</span>
                             <span className="text-green font-bold">-{fmt(p.amount)} F</span>
                           </div>
                         ))}
@@ -257,6 +532,12 @@ export default function Caisse() {
                   <p className="text-orange text-xs mt-1 font-bold">Déjà payé : {fmt(activeOrder.paidAmount)} F sur {fmt(activeOrder.total)} F</p>
                 )}
                 <div className="mt-2 text-text-tertiary text-xs">Table {tables.find(t => t.id === activeOrder.tableId)?.number}</div>
+                {activePOS && (
+                  <div className="mt-3 inline-flex flex-col items-center gap-1 rounded-2xl bg-blue/10 border border-blue/20 px-4 py-2">
+                    <span className="text-blue text-[10px] font-black uppercase tracking-widest">{activePOS.name}</span>
+                    {activeWarehouse && <span className="text-text-tertiary text-[10px]">Stock : {activeWarehouse.name}</span>}
+                  </div>
+                )}
               </div>
 
               {/* Loyalty section */}
@@ -331,20 +612,228 @@ export default function Caisse() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                <button
+                  onClick={() => setShowDiscount(true)}
+                  className="glass-card p-3 flex items-center justify-center gap-2 text-blue font-black text-[10px] uppercase tracking-widest"
+                >
+                  <Percent size={15} /> Remise
+                </button>
+                <button
+                  onClick={() => setShowCancelOrder(true)}
+                  className="glass-card p-3 flex items-center justify-center gap-2 text-red font-black text-[10px] uppercase tracking-widest"
+                >
+                  <Ban size={15} /> Annuler
+                </button>
+              </div>
+
               <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-4">Mode de règlement</p>
+              {!openSession && (
+                <div className="mb-4 rounded-2xl bg-orange/10 border border-orange/20 p-4">
+                  <p className="text-orange font-black text-xs uppercase tracking-widest">Session caisse requise</p>
+                  <p className="text-text-secondary text-xs mt-1">Ouvre la caisse du POS avant d’encaisser ce ticket.</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3 mb-4">
                 {[
                   { key: 'especes' as const, label: 'Espèces', icon: Banknote, color: '#22C55E' },
                   { key: 'wave' as const, label: 'Wave', icon: Smartphone, color: '#3B82F6' },
                   { key: 'orange_money' as const, label: 'Orange Money', icon: Wallet, color: '#FF8A00' },
                   { key: 'carte' as const, label: 'SoftPOS / Carte', icon: CreditCard, color: '#8B5CF6' },
+                  { key: 'room_charge' as const, label: 'Imputer chambre', icon: BedDouble, color: '#06B6D4' },
                 ].map(pm => (
-                  <motion.button key={pm.key} whileTap={{ scale: 0.95 }} onClick={() => handleCheckout(pm.key)}
-                    className="glass-card p-4 flex flex-col items-center gap-2 active:border-orange/40 transition-colors">
+                  <motion.button key={pm.key} whileTap={openSession ? { scale: 0.95 } : undefined} onClick={() => openSession && handleCheckout(pm.key)}
+                    disabled={!openSession}
+                    className={`glass-card p-4 flex flex-col items-center gap-2 active:border-orange/40 transition-colors ${!openSession ? 'opacity-40 cursor-not-allowed' : ''}`}>
                     <pm.icon size={28} style={{ color: pm.color }} />
                     <span className="text-white text-xs font-bold">{pm.label}</span>
                   </motion.button>
                 ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Discount Modal */}
+      <AnimatePresence>
+        {showDiscount && activeOrder && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay z-[10002]" onClick={() => setShowDiscount(false)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <h3 className="text-white font-bold text-lg mb-2">Appliquer une remise</h3>
+              <p className="text-text-secondary text-sm mb-5">Ticket #{activeOrder.id.slice(-4)} • Total {fmt(activeOrder.total)} F</p>
+              <label className="text-text-tertiary text-xs font-semibold block mb-1.5">Montant</label>
+              <input
+                type="number"
+                value={discountAmount}
+                onChange={e => setDiscountAmount(e.target.value)}
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none mb-3"
+                placeholder="1000"
+              />
+              <label className="text-text-tertiary text-xs font-semibold block mb-1.5">Motif obligatoire</label>
+              <input
+                type="text"
+                value={discountReason}
+                onChange={e => setDiscountReason(e.target.value)}
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none mb-4"
+                placeholder="Geste commercial, VIP, erreur..."
+              />
+              {requiresManagerApproval(user, 'discount', Number(discountAmount) || 0) && (
+                <p className="text-orange text-xs font-bold mb-4">Cette remise nécessite une validation manager.</p>
+              )}
+              <button onClick={handleApplyDiscount} className="w-full py-3.5 rounded-2xl bg-blue text-white font-bold text-sm">
+                Valider la remise
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Cancel Order Modal */}
+      <AnimatePresence>
+        {showCancelOrder && activeOrder && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay z-[10002]" onClick={() => setShowCancelOrder(false)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <h3 className="text-white font-bold text-lg mb-2">Annuler le ticket</h3>
+              <p className="text-text-secondary text-sm mb-5">Action sensible journalisée. Réservée aux rôles manager.</p>
+              <label className="text-text-tertiary text-xs font-semibold block mb-1.5">Motif obligatoire</label>
+              <input
+                type="text"
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none mb-4"
+                placeholder="Erreur de saisie, client parti..."
+              />
+              {!canPerform(user, 'cancel_order') && (
+                <p className="text-orange text-xs font-bold mb-4">Ton rôle demandera une validation manager.</p>
+              )}
+              <button onClick={handleCancelOrder} className="w-full py-3.5 rounded-2xl bg-red text-white font-bold text-sm">
+                Confirmer l’annulation
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Open Cash Session Modal */}
+      <AnimatePresence>
+        {showOpenSession && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay z-[10002]" onClick={() => setShowOpenSession(false)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <h3 className="text-white font-bold text-lg mb-2">Ouvrir la caisse</h3>
+              <p className="text-text-secondary text-sm mb-5">{activePOS?.name} • {activeRegister?.name}</p>
+              <label className="text-text-tertiary text-xs font-semibold block mb-1.5">Fond de caisse</label>
+              <input
+                type="number"
+                value={openingFloat}
+                onChange={e => setOpeningFloat(e.target.value)}
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none mb-4"
+              />
+              <button onClick={handleOpenSession} className="w-full py-3.5 rounded-2xl bg-green text-white font-bold text-sm">
+                Ouvrir la session
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Close Cash Session Modal */}
+      <AnimatePresence>
+        {showCloseSession && openSession && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay z-[10002]" onClick={() => setShowCloseSession(false)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-11 h-11 rounded-2xl bg-red/10 text-red flex items-center justify-center">
+                  <ReceiptText size={22} />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Clôture Z</h3>
+                  <p className="text-text-secondary text-xs">{activePOS?.name}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                <div className="rounded-2xl bg-white/5 p-3">
+                  <p className="text-text-tertiary text-[9px] font-black uppercase">Espèces</p>
+                  <p className="text-white font-black">{fmt(cashSummary.byMethod.especes)} F</p>
+                </div>
+                <div className="rounded-2xl bg-white/5 p-3">
+                  <p className="text-text-tertiary text-[9px] font-black uppercase">Wave</p>
+                  <p className="text-white font-black">{fmt(cashSummary.byMethod.wave)} F</p>
+                </div>
+                <div className="rounded-2xl bg-white/5 p-3">
+                  <p className="text-text-tertiary text-[9px] font-black uppercase">Carte</p>
+                  <p className="text-white font-black">{fmt(cashSummary.byMethod.carte)} F</p>
+                </div>
+                <div className="rounded-2xl bg-white/5 p-3">
+                  <p className="text-text-tertiary text-[9px] font-black uppercase">Chambre</p>
+                  <p className="text-cyan-300 font-black">{fmt(cashSummary.byMethod.room_charge)} F</p>
+                </div>
+              </div>
+              <div className="rounded-2xl bg-green/10 border border-green/20 p-4 mb-4">
+                <p className="text-green font-black text-xs uppercase tracking-widest">Espèces attendues</p>
+                <p className="text-white font-black text-2xl">{fmt(cashSummary.expectedCash)} F</p>
+                <p className="text-text-tertiary text-[10px]">Fond {fmt(openSession.opening_float)} F + encaissements espèces</p>
+              </div>
+              <label className="text-text-tertiary text-xs font-semibold block mb-1.5">Espèces comptées</label>
+              <input
+                type="number"
+                value={closingCashCount}
+                onChange={e => setClosingCashCount(e.target.value)}
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none mb-4"
+                placeholder={String(cashSummary.expectedCash)}
+              />
+              {closingCashCount && (
+                <p className={`text-sm font-bold mb-4 ${Number(closingCashCount) - cashSummary.expectedCash === 0 ? 'text-green' : 'text-orange'}`}>
+                  Écart : {fmt(Number(closingCashCount) - cashSummary.expectedCash)} F
+                </p>
+              )}
+              <button onClick={handleCloseSession} className="w-full py-3.5 rounded-2xl bg-red text-white font-bold text-sm">
+                Clôturer la session
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Room Charge Modal */}
+      <AnimatePresence>
+        {showRoomCharge && activeOrder && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay z-[10002]" onClick={() => setShowRoomCharge(false)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <h3 className="text-white font-bold text-lg mb-2">Imputer à une chambre</h3>
+              <p className="text-text-secondary text-sm mb-5">
+                Le ticket reste tracé en caisse et sera ajouté au folio ouvert.
+              </p>
+              <div className="space-y-3">
+                {occupiedRooms.map(item => (
+                  <button
+                    key={item.room.id}
+                    onClick={() => handleRoomCharge(item.room.id)}
+                    className="w-full glass-card p-4 flex items-center gap-4 active:border-blue/40 transition-colors"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-blue/10 text-blue flex items-center justify-center">
+                      <BedDouble size={22} />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="text-white font-black text-sm">Chambre {item.room.room_number}</p>
+                      <p className="text-text-secondary text-xs">{item.guest.first_name} {item.guest.last_name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-blue font-black text-sm">{fmt(getPayAmount())} F</p>
+                      <p className="text-text-tertiary text-[10px]">Folio ouvert</p>
+                    </div>
+                  </button>
+                ))}
+                {occupiedRooms.length === 0 && (
+                  <div className="py-10 text-center text-text-tertiary text-sm">
+                    Aucune chambre occupée avec folio ouvert.
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>

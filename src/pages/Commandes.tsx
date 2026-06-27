@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useReservationStore, type Reservation } from '../stores/reservationStore';
 import { useClientStore } from '../stores/clientStore';
 import { useNotificationStore } from '../stores/notificationStore';
+import { useHospiStore } from '../stores/hospiStore';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Search, ShoppingCart, X, ChefHat, Calendar, UserPlus, Phone, Plus, Minus, Trash2, Layout, Layers, Map as MapIcon, User, QrCode, Gift, Wallet, CheckCircle2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -91,7 +92,8 @@ const getTableDimensions = (capacity: number): { w: number, h: number } => {
 
 export default function Commandes() {
   const { cart, addToCart, updateQuantity, clearCart, checkout, orders, setLoyaltyClient, updateOrderStatus } = useOrderStore();
-  const { tables, updateTableStatus, updateTablePosition, updateTableCapacity, updateTableFloor } = useTableStore();
+  const { posList, activePOSId, setActivePOS, getProductsForPOS, recordSale } = useHospiStore();
+  const { tables, addTable, removeTable, updateTableStatus, updateTablePosition, updateTableCapacity, updateTableFloor } = useTableStore();
   const { reservations, updateStatus, addReservation } = useReservationStore();
   const { clients } = useClientStore();
   const { addNotification } = useNotificationStore();
@@ -141,7 +143,20 @@ export default function Commandes() {
 
   const floorTables = tables.filter(t => t.floor === selectedFloor && t.zone === selectedZone);
 
-  const filteredProducts = PRODUCTS.filter(p => 
+  const activePOS = posList.find(pos => pos.id === activePOSId);
+  const hospiProducts = getProductsForPOS(activePOSId);
+  const productsForActivePOS = PRODUCTS.map(product => {
+    const hospiProduct = hospiProducts.find(item => item.product.legacy_product_id === product.id);
+    if (!hospiProduct) return product;
+    return {
+      ...product,
+      name: hospiProduct.product.name,
+      price: hospiProduct.price.sale_price,
+      stock: hospiProduct.stock?.quantity ?? product.stock,
+    };
+  });
+
+  const filteredProducts = productsForActivePOS.filter(p => 
     (category === 'tous' || p.category === category) &&
     (p.name.toLowerCase().includes(search.toLowerCase()))
   );
@@ -235,14 +250,13 @@ export default function Commandes() {
       x: 50,
       y: 50
     };
-    useTableStore.getState().tables.push(newTable);
+    addTable(newTable);
     setEditingTable(newTable);
   };
 
   const handleDeleteTable = (id: string) => {
     if (!confirm("Supprimer cette table ?")) return;
-    const store = useTableStore.getState();
-    store.tables = store.tables.filter(t => t.id !== id);
+    removeTable(id);
     setEditingTable(null);
   };
 
@@ -252,6 +266,19 @@ export default function Commandes() {
     setTimeout(() => {
       const order = checkout('especes', undefined, selectedTableId, user?.name);
       if (order) {
+        const hospiLines = cart.flatMap(item => {
+          const hospiProduct = hospiProducts.find(product => product.product.legacy_product_id === item.product.id);
+          return hospiProduct ? [{ productId: hospiProduct.product.id, quantity: item.quantity }] : [];
+        });
+        if (hospiLines.length > 0) {
+          recordSale(order.id, hospiLines, user?.name, activePOSId);
+          useOrderStore.getState().updateOrderHospiContext(order.id, {
+            posId: activePOSId,
+            hospiLines,
+          });
+        } else {
+          useOrderStore.getState().updateOrderHospiContext(order.id, { posId: activePOSId });
+        }
         updateTableStatus(selectedTableId, 'occupee', order.id);
         const res = reservations.find(r => r.tableId === selectedTableId && r.status === 'confirmed');
         if (res) updateStatus(res.id, 'confirmed'); // Mark as arrived/served, let's keep confirmed or add a new status.
@@ -274,7 +301,7 @@ export default function Commandes() {
           <div>
             <h1 className="text-white font-black text-2xl mb-1">Plan de Salle</h1>
             <p className="text-text-secondary text-xs">
-              {designMode ? '🎨 Studio Mode : Configurez vos zones' : assigningRes ? `Attribuer à ${assigningRes.clientName}` : 'Gérez vos tables en temps réel'}
+              {designMode ? 'Studio Mode : Configurez vos zones' : assigningRes ? `Attribuer à ${assigningRes.clientName}` : activePOS?.name || 'Gérez vos tables en temps réel'}
             </p>
           </div>
           <div className="flex gap-2">
@@ -663,6 +690,17 @@ export default function Commandes() {
         <div className="relative">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-text-tertiary" size={20} />
           <input type="text" placeholder="Rechercher un plat..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-14 pr-6 text-white focus:border-orange/50 transition-colors" />
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+          {posList.filter(pos => pos.is_active).map(pos => (
+            <button
+              key={pos.id}
+              onClick={() => setActivePOS(pos.id)}
+              className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${activePOSId === pos.id ? 'bg-blue text-white shadow-lg shadow-blue/20' : 'bg-white/5 text-text-secondary border border-white/5'}`}
+            >
+              {pos.name}
+            </button>
+          ))}
         </div>
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
           {['tous', 'plats', 'boissons', 'desserts'].map(cat => (

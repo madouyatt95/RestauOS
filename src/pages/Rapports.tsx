@@ -3,18 +3,20 @@ import { motion } from 'framer-motion';
 import { useOrderStore } from '../stores/orderStore';
 import { useReviewStore } from '../stores/reviewStore';
 import { useWasteStore } from '../stores/wasteStore';
+import { useHospiStore } from '../stores/hospiStore';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, ShoppingBag, DollarSign, Award, Download, Star, Users, Trash2, Clock, Flame, Sun, Moon } from 'lucide-react';
+import { TrendingUp, ShoppingBag, DollarSign, Award, Download, Star, Users, Trash2, Clock, Flame, Sun, Moon, Building2, BedDouble, Warehouse, Store } from 'lucide-react';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 const DONUT_COLORS = ['#FF8A00', '#8B5CF6', '#3B82F6'];
 const HEAT_COLORS = ['#1a1a2e', '#2d1f4e', '#4c1d95', '#7c3aed', '#a78bfa', '#FF8A00', '#ef4444'];
 
 export default function Rapports() {
-  const { getCAByDay, getOrderCount, getTypeDistribution, getTopProducts } = useOrderStore();
+  const { orders, getCAByDay, getOrderCount, getTypeDistribution, getTopProducts } = useOrderStore();
+  const { sites, posList, warehouses, products, stockLevels, stockMovements, folios, folioLines, rooms, guests, stays } = useHospiStore();
   const { reviews, getAverage } = useReviewStore();
   const { getWeekTotal } = useWasteStore();
-  const [activeTab, setActiveTab] = useState<'ca' | 'analytics' | 'avis'>('ca');
+  const [activeTab, setActiveTab] = useState<'ca' | 'hospi' | 'analytics' | 'avis'>('ca');
 
   const caByDay = getCAByDay();
   const weekCA = caByDay.reduce((s, d) => s + d.ca, 0);
@@ -45,6 +47,23 @@ export default function Rapports() {
     { name: 'Livraison', value: dist.livraison },
   ];
 
+  const hospiPaidOrders = orders.filter(order => ['payee', 'terminee', 'servie'].includes(order.status));
+  const revenueByPOS = posList.map(pos => {
+    const posOrders = hospiPaidOrders.filter(order => order.posId === pos.id);
+    const revenue = posOrders.reduce((sum, order) => sum + order.total, 0);
+    const roomCharge = posOrders
+      .flatMap(order => order.payments)
+      .filter(payment => payment.method === 'room_charge')
+      .reduce((sum, payment) => sum + payment.amount, 0);
+    return { pos, revenue, count: posOrders.length, roomCharge };
+  });
+  const unassignedRevenue = hospiPaidOrders
+    .filter(order => !order.posId)
+    .reduce((sum, order) => sum + order.total, 0);
+  const totalRoomCharge = folioLines.reduce((sum, line) => sum + line.amount, 0);
+  const openFolioTotal = folios.filter(folio => folio.status === 'open').reduce((sum, folio) => sum + folio.total_amount, 0);
+  const lowHospiStocks = stockLevels.filter(level => level.quantity <= level.alert_threshold);
+
   const handleExport = () => {
     const text = `Rapport RestauOS\n\nCA: ${fmt(weekCA)} FCFA\nCommandes: ${totalOrders}\nPanier moyen: ${fmt(panierMoyen)} FCFA\nNote moyenne: ${avgRating.toFixed(1)}/5\n\nTop Produits:\n${topProducts.map((p, i) => `${i + 1}. ${p.name} — ${fmt(p.revenue)} FCFA`).join('\n')}`;
     const blob = new Blob([text], { type: 'text/plain' });
@@ -65,6 +84,7 @@ export default function Rapports() {
       <div className="flex gap-2 mb-5">
         {[
           { id: 'ca', label: 'Chiffres', icon: TrendingUp },
+          { id: 'hospi', label: 'Hospi', icon: Building2 },
           { id: 'analytics', label: 'Analytics', icon: Flame },
           { id: 'avis', label: 'Avis', icon: Star },
         ].map(tab => (
@@ -162,6 +182,145 @@ export default function Rapports() {
                   <span className="text-text-secondary text-xs font-bold">{fmt(p.revenue)} F</span>
                 </div>
               ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ─── HOSPI TAB ─── */}
+      {activeTab === 'hospi' && (
+        <>
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="glass-card-lg p-5 mb-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-11 h-11 rounded-2xl bg-blue/10 text-blue flex items-center justify-center">
+                <Building2 size={22} />
+              </div>
+              <div>
+                <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Site consolidé</p>
+                <h2 className="text-white font-black text-lg">{sites[0]?.name || 'Complexe hôtelier'}</h2>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-white/5 p-4">
+                <p className="text-text-tertiary text-[9px] font-black uppercase">CA POS suivis</p>
+                <p className="text-white font-black text-xl">{fmt(revenueByPOS.reduce((s, item) => s + item.revenue, 0))} F</p>
+              </div>
+              <div className="rounded-2xl bg-white/5 p-4">
+                <p className="text-text-tertiary text-[9px] font-black uppercase">Imputé chambres</p>
+                <p className="text-cyan-300 font-black text-xl">{fmt(totalRoomCharge || openFolioTotal)} F</p>
+              </div>
+              <div className="rounded-2xl bg-white/5 p-4">
+                <p className="text-text-tertiary text-[9px] font-black uppercase">Dépôts</p>
+                <p className="text-white font-black text-xl">{warehouses.length}</p>
+              </div>
+              <div className="rounded-2xl bg-white/5 p-4">
+                <p className="text-text-tertiary text-[9px] font-black uppercase">Alertes stock</p>
+                <p className={lowHospiStocks.length ? 'text-orange font-black text-xl' : 'text-green font-black text-xl'}>{lowHospiStocks.length}</p>
+              </div>
+            </div>
+            {unassignedRevenue > 0 && (
+              <p className="text-text-tertiary text-[10px] mt-3">Anciennes ventes sans POS : {fmt(unassignedRevenue)} F conservées séparément.</p>
+            )}
+          </motion.div>
+
+          <div className="glass-card-lg p-5 mb-5">
+            <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2"><Store size={16} className="text-blue" /> Chiffre d'affaires par POS</h3>
+            <div className="space-y-3">
+              {revenueByPOS.map(({ pos, revenue, count, roomCharge }) => {
+                const warehouse = warehouses.find(item => item.id === pos.default_warehouse_id);
+                return (
+                  <div key={pos.id} className="rounded-2xl bg-white/5 p-4">
+                    <div className="flex justify-between gap-3 mb-2">
+                      <div>
+                        <p className="text-white font-black text-sm">{pos.name}</p>
+                        <p className="text-text-tertiary text-[10px]">{warehouse?.name}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-orange font-black text-sm">{fmt(revenue)} F</p>
+                        <p className="text-text-tertiary text-[10px]">{count} ticket{count > 1 ? 's' : ''}</p>
+                      </div>
+                    </div>
+                    {roomCharge > 0 && <p className="text-cyan-300 text-[10px] font-bold">Dont chambre : {fmt(roomCharge)} F</p>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="glass-card-lg p-5 mb-5">
+            <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2"><Warehouse size={16} className="text-green" /> Stock par dépôt</h3>
+            <div className="space-y-3">
+              {warehouses.map(warehouse => {
+                const levels = stockLevels.filter(level => level.warehouse_id === warehouse.id);
+                return (
+                  <div key={warehouse.id} className="rounded-2xl bg-white/5 p-4">
+                    <p className="text-white font-black text-sm mb-2">{warehouse.name}</p>
+                    {levels.map(level => {
+                      const product = products.find(item => item.id === level.product_id);
+                      const low = level.quantity <= level.alert_threshold;
+                      return (
+                        <div key={level.id} className="flex justify-between text-xs">
+                          <span className="text-text-secondary">{product?.name || level.product_id}</span>
+                          <span className={low ? 'text-orange font-black' : 'text-green font-black'}>{level.quantity} {level.unit}</span>
+                        </div>
+                      );
+                    })}
+                    {levels.length === 0 && <p className="text-text-tertiary text-xs">Aucun stock suivi.</p>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="glass-card-lg p-5 mb-5">
+            <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2"><BedDouble size={16} className="text-cyan-300" /> Folios ouverts</h3>
+            <div className="space-y-3">
+              {folios.filter(folio => folio.status === 'open').map(folio => {
+                const room = rooms.find(item => item.id === folio.room_id);
+                const stay = stays.find(item => item.id === folio.stay_id);
+                const guest = stay ? guests.find(item => item.id === stay.guest_id) : undefined;
+                const lines = folioLines.filter(line => line.folio_id === folio.id);
+                return (
+                  <div key={folio.id} className="rounded-2xl bg-white/5 p-4">
+                    <div className="flex justify-between mb-2">
+                      <div>
+                        <p className="text-white font-black text-sm">Chambre {room?.room_number}</p>
+                        <p className="text-text-secondary text-xs">{guest?.first_name} {guest?.last_name}</p>
+                      </div>
+                      <p className="text-cyan-300 font-black text-sm">{fmt(folio.total_amount)} F</p>
+                    </div>
+                    {lines.length === 0 ? (
+                      <p className="text-text-tertiary text-[10px]">Aucune consommation POS imputée.</p>
+                    ) : lines.slice(0, 3).map(line => (
+                      <div key={line.id} className="flex justify-between text-[10px]">
+                        <span className="text-text-secondary">{line.description}</span>
+                        <span className="text-white font-bold">{fmt(line.amount)} F</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="glass-card-lg p-5">
+            <h3 className="text-white font-bold text-sm mb-4">Derniers mouvements de stock</h3>
+            <div className="space-y-2">
+              {stockMovements.slice(0, 8).map(move => {
+                const product = products.find(item => item.id === move.product_id);
+                const warehouse = warehouses.find(item => item.id === move.warehouse_id);
+                const pos = posList.find(item => item.id === move.pos_id);
+                return (
+                  <div key={move.id} className="flex justify-between rounded-xl bg-white/5 px-3 py-2">
+                    <div>
+                      <p className="text-white font-bold text-xs">{product?.name || move.product_id}</p>
+                      <p className="text-text-tertiary text-[10px]">{pos?.name} • {warehouse?.name}</p>
+                    </div>
+                    <span className="text-red font-black text-xs">-{move.quantity}</span>
+                  </div>
+                );
+              })}
+              {stockMovements.length === 0 && <p className="text-text-tertiary text-xs text-center py-6">Aucune vente Hospi enregistrée pour le moment.</p>}
             </div>
           </div>
         </>
