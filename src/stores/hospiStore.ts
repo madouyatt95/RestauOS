@@ -9,6 +9,8 @@ export type StayStatus = 'booked' | 'checked_in' | 'checked_out' | 'cancelled';
 export type FolioStatus = 'open' | 'closed';
 export type CashSessionStatus = 'open' | 'closed';
 export type PaymentMethod = 'especes' | 'wave' | 'orange_money' | 'carte' | 'room_charge';
+export type CustomerAccountType = 'guest' | 'corporate' | 'vip' | 'walk_in';
+export type CustomerLedgerSource = 'folio' | 'pos_order' | 'manual_charge' | 'payment' | 'adjustment';
 
 export interface Company {
   id: string;
@@ -144,6 +146,32 @@ export interface FolioLine {
   source_id: string;
   description: string;
   amount: number;
+  created_at: string;
+}
+
+export interface CustomerAccount {
+  id: string;
+  company_id: string;
+  display_name: string;
+  type: CustomerAccountType;
+  phone?: string;
+  email?: string;
+  hotel_guest_id?: string;
+  loyalty_client_id?: string;
+  credit_limit: number;
+  balance: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface CustomerLedgerEntry {
+  id: string;
+  account_id: string;
+  source_type: CustomerLedgerSource;
+  source_id: string;
+  description: string;
+  debit: number;
+  credit: number;
   created_at: string;
 }
 
@@ -431,6 +459,47 @@ const folios: Folio[] = [
   },
 ];
 
+const customerAccounts: CustomerAccount[] = [
+  {
+    id: 'account-guest-aminata',
+    company_id: 'comp-sartal-demo',
+    display_name: 'Aminata Ndiaye',
+    type: 'vip',
+    phone: '+221 77 000 00 00',
+    email: 'aminata.ndiaye@example.com',
+    hotel_guest_id: 'guest-test',
+    credit_limit: 250000,
+    balance: 0,
+    is_active: true,
+    created_at: now,
+  },
+  {
+    id: 'account-corporate-teranga',
+    company_id: 'comp-sartal-demo',
+    display_name: 'Teranga Events',
+    type: 'corporate',
+    phone: '+221 33 800 10 10',
+    email: 'finance@teranga-events.sn',
+    credit_limit: 1500000,
+    balance: 185000,
+    is_active: true,
+    created_at: now,
+  },
+];
+
+const customerLedgerEntries: CustomerLedgerEntry[] = [
+  {
+    id: 'ledger-teranga-opening',
+    account_id: 'account-corporate-teranga',
+    source_type: 'manual_charge',
+    source_id: 'opening-balance',
+    description: 'Solde banquet corporate',
+    debit: 185000,
+    credit: 0,
+    created_at: now,
+  },
+];
+
 const cashRegisters: CashRegister[] = [
   { id: 'reg-jardin-main', pos_id: 'pos-restaurant-jardin', name: 'Caisse Restaurant', is_active: true, created_at: now },
   { id: 'reg-bar-main', pos_id: 'pos-bar-machines', name: 'Caisse Bar Casino', is_active: true, created_at: now },
@@ -491,6 +560,8 @@ interface HospiState {
   stays: Stay[];
   folios: Folio[];
   folioLines: FolioLine[];
+  customerAccounts: CustomerAccount[];
+  customerLedgerEntries: CustomerLedgerEntry[];
   cashRegisters: CashRegister[];
   cashSessions: CashSession[];
   recipes: Recipe[];
@@ -518,6 +589,8 @@ interface HospiState {
   openCashSession: (posId: string, openedBy: string, openingFloat: number) => CashSession | null;
   closeCashSession: (sessionId: string, closedBy: string, closingCashCount: number, expectedCash: number) => CashSession | null;
   getOccupiedRoomsWithOpenFolios: () => { room: Room; guest: HotelGuest; stay: Stay; folio: Folio }[];
+  getCustomerAccountBalance: (accountId: string) => number;
+  settleCustomerAccount: (accountId: string, amount: number, method: PaymentMethod, createdBy: string) => CustomerLedgerEntry | null;
   chargeOrderToRoom: (roomId: string, orderId: string, description: string, amount: number) => FolioLine | null;
 }
 
@@ -537,6 +610,8 @@ export const useHospiStore = create<HospiState>()(
       stays,
       folios,
       folioLines: [],
+      customerAccounts,
+      customerLedgerEntries,
       cashRegisters,
       cashSessions: [],
       recipes,
@@ -925,6 +1000,37 @@ export const useHospiStore = create<HospiState>()(
           return [{ room, guest, stay, folio }];
         });
       },
+      getCustomerAccountBalance: (accountId) => {
+        return get().customerLedgerEntries
+          .filter(entry => entry.account_id === accountId)
+          .reduce((sum, entry) => sum + entry.debit - entry.credit, 0);
+      },
+      settleCustomerAccount: (accountId, amount, method, createdBy) => {
+        const state = get();
+        const account = state.customerAccounts.find(item => item.id === accountId && item.is_active);
+        if (!account || amount <= 0) return null;
+
+        const entry: CustomerLedgerEntry = {
+          id: `ledger-payment-${Date.now()}`,
+          account_id: accountId,
+          source_type: 'payment',
+          source_id: `${method}-${Date.now()}`,
+          description: `Règlement client ${method} par ${createdBy}`,
+          debit: 0,
+          credit: amount,
+          created_at: new Date().toISOString(),
+        };
+
+        set({
+          customerLedgerEntries: [entry, ...state.customerLedgerEntries],
+          customerAccounts: state.customerAccounts.map(item => item.id === accountId
+            ? { ...item, balance: Math.max(0, item.balance - amount) }
+            : item
+          ),
+        });
+
+        return entry;
+      },
       chargeOrderToRoom: (roomId, orderId, description, amount) => {
         const state = get();
         const stay = state.stays.find(item => item.room_id === roomId && item.status === 'checked_in');
@@ -940,6 +1046,17 @@ export const useHospiStore = create<HospiState>()(
           amount,
           created_at: new Date().toISOString(),
         };
+        const account = state.customerAccounts.find(item => item.hotel_guest_id === stay.guest_id && item.is_active);
+        const ledgerEntry: CustomerLedgerEntry | null = account ? {
+          id: `ledger-folio-${Date.now()}`,
+          account_id: account.id,
+          source_type: 'folio',
+          source_id: folio.id,
+          description,
+          debit: amount,
+          credit: 0,
+          created_at: line.created_at,
+        } : null;
 
         set({
           folioLines: [line, ...state.folioLines],
@@ -947,6 +1064,11 @@ export const useHospiStore = create<HospiState>()(
             ? { ...item, total_amount: item.total_amount + amount }
             : item
           ),
+          customerLedgerEntries: ledgerEntry ? [ledgerEntry, ...state.customerLedgerEntries] : state.customerLedgerEntries,
+          customerAccounts: account ? state.customerAccounts.map(item => item.id === account.id
+            ? { ...item, balance: item.balance + amount }
+            : item
+          ) : state.customerAccounts,
         });
 
         return line;

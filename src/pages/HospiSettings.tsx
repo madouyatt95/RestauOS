@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat, Truck } from 'lucide-react';
+import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat, Truck, Users, CreditCard } from 'lucide-react';
 import { useHospiStore } from '../stores/hospiStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
 
@@ -26,6 +26,10 @@ export default function HospiSettings() {
     stays,
     folios,
     folioLines,
+    customerAccounts,
+    customerLedgerEntries,
+    getCustomerAccountBalance,
+    settleCustomerAccount,
   } = useHospiStore();
   const { auditLogs } = useBusinessRulesStore();
 
@@ -234,6 +238,71 @@ export default function HospiSettings() {
                     ))}
                     {lines.length === 0 && <p className="text-text-tertiary text-[10px]">Aucune consommation imputée.</p>}
                   </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mb-5">
+        <h3 className="text-white font-black text-sm mb-3 flex items-center gap-2"><Users size={16} className="text-green" /> Comptes clients</h3>
+        <div className="space-y-3">
+          {customerAccounts.map(account => {
+            const guest = account.hotel_guest_id ? guests.find(item => item.id === account.hotel_guest_id) : undefined;
+            const entries = customerLedgerEntries.filter(entry => entry.account_id === account.id);
+            const balance = getCustomerAccountBalance(account.id);
+            const availableCredit = account.credit_limit - balance;
+            return (
+              <div key={account.id} className="glass-card p-4">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <p className="text-white font-black text-sm">{account.display_name}</p>
+                    <p className="text-text-tertiary text-[10px] uppercase tracking-widest">
+                      {account.type} {guest ? `• Chambre liée` : '• Compte direct'}
+                    </p>
+                  </div>
+                  <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${balance > account.credit_limit ? 'bg-red/10 text-red' : 'bg-green/10 text-green'}`}>
+                    {account.is_active ? 'Actif' : 'Bloqué'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  <div className="rounded-xl bg-white/5 p-3">
+                    <p className="text-text-tertiary text-[9px] font-black uppercase">Solde</p>
+                    <p className="text-white font-black text-sm">{fmt(balance)} F</p>
+                  </div>
+                  <div className="rounded-xl bg-white/5 p-3">
+                    <p className="text-text-tertiary text-[9px] font-black uppercase">Limite</p>
+                    <p className="text-white font-black text-sm">{fmt(account.credit_limit)} F</p>
+                  </div>
+                  <div className="rounded-xl bg-white/5 p-3">
+                    <p className="text-text-tertiary text-[9px] font-black uppercase">Disponible</p>
+                    <p className={`font-black text-sm ${availableCredit < 0 ? 'text-red' : 'text-green'}`}>{fmt(availableCredit)} F</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1 mb-3">
+                  {entries.slice(0, 3).map(entry => (
+                    <div key={entry.id} className="flex justify-between text-[10px]">
+                      <span className="text-text-secondary">{entry.description}</span>
+                      <span className={entry.debit > 0 ? 'text-orange font-bold' : 'text-green font-bold'}>
+                        {entry.debit > 0 ? '+' : '-'}{fmt(entry.debit || entry.credit)} F
+                      </span>
+                    </div>
+                  ))}
+                  {entries.length === 0 && <p className="text-text-tertiary text-[10px]">Aucun mouvement client pour le moment.</p>}
+                </div>
+
+                {balance > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => settleCustomerAccount(account.id, balance, 'especes', 'Admin')}
+                    className="w-full h-10 rounded-xl bg-green/10 text-green font-black text-xs flex items-center justify-center gap-2"
+                  >
+                    <CreditCard size={14} />
+                    Encaisser le solde
+                  </button>
                 )}
               </div>
             );
