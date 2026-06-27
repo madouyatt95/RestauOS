@@ -8,7 +8,21 @@ import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package } 
 export default function Stocks() {
   const { items, movements, addMovement, addItem } = useStockStore();
   const { user } = useAuthStore();
-  const { sites, posList, warehouses, products, stockLevels, stockMovements, transferStock, adjustInventory } = useHospiStore();
+  const {
+    sites,
+    posList,
+    warehouses,
+    products,
+    stockLevels,
+    stockMovements,
+    suppliers,
+    purchaseOrders,
+    purchaseOrderLines,
+    supplierReceipts,
+    transferStock,
+    adjustInventory,
+    receivePurchaseOrder
+  } = useHospiStore();
   const [tab, setTab] = useState<'inventaire' | 'entrees' | 'sorties' | 'depots'>('inventaire');
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
@@ -83,6 +97,10 @@ export default function Stocks() {
     setAdjustForm(prev => ({ ...prev, countedQuantity: '' }));
   };
 
+  const handleReceivePurchase = (purchaseOrderId: string) => {
+    receivePurchaseOrder(purchaseOrderId, user?.name || 'Système');
+  };
+
   const getStockBadge = (item: typeof items[0]) => {
     if (item.quantity <= item.minStock * 0.5) return { label: 'Stock faible', color: '#EF4444', bg: 'rgba(239,68,68,0.12)' };
     if (item.quantity <= item.minStock) return { label: 'Stock faible', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' };
@@ -135,6 +153,52 @@ export default function Stocks() {
             <button onClick={() => setShowAdjustment(true)} className="py-3 rounded-2xl bg-orange/10 border border-orange/20 text-orange font-black text-[10px] uppercase tracking-widest">
               Ajustement inventaire
             </button>
+          </div>
+
+          <div className="glass-card-lg p-4">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h3 className="text-white font-black text-sm">Achats fournisseurs</h3>
+                <p className="text-text-secondary text-xs">{suppliers.length} fournisseurs • {supplierReceipts.length} réception(s)</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {purchaseOrders.map(order => {
+                const supplier = suppliers.find(item => item.id === order.supplier_id);
+                const warehouse = warehouses.find(item => item.id === order.warehouse_id);
+                const lines = purchaseOrderLines.filter(line => line.purchase_order_id === order.id);
+                const total = lines.reduce((sum, line) => sum + line.quantity_ordered * line.unit_cost, 0);
+                return (
+                  <div key={order.id} className="rounded-2xl bg-white/5 p-4">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div>
+                        <p className="text-white font-black text-sm">{supplier?.name || 'Fournisseur'}</p>
+                        <p className="text-text-tertiary text-[10px]">{warehouse?.name} • {total.toLocaleString('fr-FR')} F</p>
+                      </div>
+                      <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${order.status === 'received' ? 'bg-green/10 text-green' : 'bg-orange/10 text-orange'}`}>
+                        {order.status}
+                      </span>
+                    </div>
+                    <div className="space-y-1 mb-3">
+                      {lines.map(line => {
+                        const product = products.find(item => item.id === line.product_id);
+                        return (
+                          <div key={line.id} className="flex justify-between text-[10px]">
+                            <span className="text-text-secondary">{product?.name}</span>
+                            <span className="text-white font-bold">{line.quantity_received}/{line.quantity_ordered}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {order.status !== 'received' && (
+                      <button onClick={() => handleReceivePurchase(order.id)} className="w-full py-2.5 rounded-xl bg-green/10 text-green font-black text-[10px] uppercase tracking-widest">
+                        Réceptionner vers dépôt
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {warehouses.map(warehouse => {

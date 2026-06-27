@@ -202,6 +202,47 @@ export interface ProductionBatch {
   created_at: string;
 }
 
+export type PurchaseOrderStatus = 'draft' | 'ordered' | 'partially_received' | 'received' | 'cancelled';
+
+export interface Supplier {
+  id: string;
+  company_id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  address?: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface PurchaseOrderLine {
+  id: string;
+  purchase_order_id: string;
+  product_id: string;
+  quantity_ordered: number;
+  quantity_received: number;
+  unit_cost: number;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  supplier_id: string;
+  warehouse_id: string;
+  status: PurchaseOrderStatus;
+  ordered_by: string;
+  expected_at?: string;
+  created_at: string;
+}
+
+export interface SupplierReceipt {
+  id: string;
+  purchase_order_id: string;
+  warehouse_id: string;
+  received_by: string;
+  total_cost: number;
+  created_at: string;
+}
+
 export interface POSProduct {
   product: HospiProduct;
   price: POSProductPrice;
@@ -397,6 +438,45 @@ const cashRegisters: CashRegister[] = [
   { id: 'reg-room-main', pos_id: 'pos-room-service', name: 'Caisse Room Service', is_active: true, created_at: now },
 ];
 
+const suppliers: Supplier[] = [
+  {
+    id: 'sup-touba-distribution',
+    company_id: 'comp-sartal-demo',
+    name: 'Touba Distribution',
+    phone: '+221 77 123 45 67',
+    email: 'contact@touba-distribution.sn',
+    address: 'Dakar',
+    is_active: true,
+    created_at: now,
+  },
+  {
+    id: 'sup-marche-sandaga',
+    company_id: 'comp-sartal-demo',
+    name: 'Marché Sandaga',
+    phone: '+221 76 222 33 44',
+    address: 'Plateau, Dakar',
+    is_active: true,
+    created_at: now,
+  },
+];
+
+const purchaseOrders: PurchaseOrder[] = [
+  {
+    id: 'po-demo-central',
+    supplier_id: 'sup-touba-distribution',
+    warehouse_id: 'wh-central',
+    status: 'ordered',
+    ordered_by: 'Cheikh Fall',
+    expected_at: new Date(Date.now() + 86400000).toISOString(),
+    created_at: now,
+  },
+];
+
+const purchaseOrderLines: PurchaseOrderLine[] = [
+  { id: 'po-line-coca', purchase_order_id: 'po-demo-central', product_id: 'prod-coca-33', quantity_ordered: 120, quantity_received: 0, unit_cost: 350 },
+  { id: 'po-line-riz', purchase_order_id: 'po-demo-central', product_id: 'ing-riz-brise', quantity_ordered: 50, quantity_received: 0, unit_cost: 600 },
+];
+
 interface HospiState {
   companies: Company[];
   sites: Site[];
@@ -416,6 +496,10 @@ interface HospiState {
   recipes: Recipe[];
   recipeItems: RecipeItem[];
   productionBatches: ProductionBatch[];
+  suppliers: Supplier[];
+  purchaseOrders: PurchaseOrder[];
+  purchaseOrderLines: PurchaseOrderLine[];
+  supplierReceipts: SupplierReceipt[];
   activePOSId: string;
   setActivePOS: (posId: string) => void;
   getActivePOS: () => POS | undefined;
@@ -428,6 +512,7 @@ interface HospiState {
   recordProduction: (productId: string, warehouseId: string, quantity: number, createdBy: string) => ProductionBatch | null;
   transferStock: (productId: string, fromWarehouseId: string, toWarehouseId: string, quantity: number, reason: string, createdBy: string) => StockMovement[];
   adjustInventory: (productId: string, warehouseId: string, countedQuantity: number, reason: string, createdBy: string) => StockMovement | null;
+  receivePurchaseOrder: (purchaseOrderId: string, receivedBy: string) => SupplierReceipt | null;
   getRegisterForPOS: (posId?: string) => CashRegister | undefined;
   getOpenCashSession: (posId?: string) => CashSession | undefined;
   openCashSession: (posId: string, openedBy: string, openingFloat: number) => CashSession | null;
@@ -457,6 +542,10 @@ export const useHospiStore = create<HospiState>()(
       recipes,
       recipeItems,
       productionBatches: [],
+      suppliers,
+      purchaseOrders,
+      purchaseOrderLines,
+      supplierReceipts: [],
       activePOSId: 'pos-restaurant-jardin',
 
       setActivePOS: (posId) => set({ activePOSId: posId }),
@@ -704,6 +793,81 @@ export const useHospiStore = create<HospiState>()(
           stockMovements: [movement, ...state.stockMovements],
         });
         return movement;
+      },
+      receivePurchaseOrder: (purchaseOrderId, receivedBy) => {
+        const state = get();
+        const order = state.purchaseOrders.find(item => item.id === purchaseOrderId);
+        if (!order || order.status === 'received' || order.status === 'cancelled') return null;
+        const warehouse = state.warehouses.find(item => item.id === order.warehouse_id);
+        if (!warehouse) return null;
+        const lines = state.purchaseOrderLines.filter(line => line.purchase_order_id === purchaseOrderId);
+        const receivableLines = lines.filter(line => line.quantity_ordered > line.quantity_received);
+        if (receivableLines.length === 0) return null;
+
+        const createdAt = new Date().toISOString();
+        const site = state.sites.find(item => item.id === warehouse.site_id) || state.sites[0];
+        const receipt: SupplierReceipt = {
+          id: `receipt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          purchase_order_id: purchaseOrderId,
+          warehouse_id: order.warehouse_id,
+          received_by: receivedBy,
+          total_cost: receivableLines.reduce((sum, line) => sum + ((line.quantity_ordered - line.quantity_received) * line.unit_cost), 0),
+          created_at: createdAt,
+        };
+
+        const nextLines = state.purchaseOrderLines.map(line => {
+          if (line.purchase_order_id !== purchaseOrderId) return line;
+          return { ...line, quantity_received: line.quantity_ordered };
+        });
+
+        const nextStockLevels = [...state.stockLevels];
+        receivableLines.forEach(line => {
+          const product = state.products.find(item => item.id === line.product_id);
+          if (!product) return;
+          const quantity = line.quantity_ordered - line.quantity_received;
+          const existingStockIndex = nextStockLevels.findIndex(level => level.product_id === line.product_id && level.warehouse_id === order.warehouse_id);
+          if (existingStockIndex >= 0) {
+            nextStockLevels[existingStockIndex] = {
+              ...nextStockLevels[existingStockIndex],
+              quantity: nextStockLevels[existingStockIndex].quantity + quantity,
+              updated_at: createdAt,
+            };
+          } else {
+            nextStockLevels.push({
+              id: `stock-${line.product_id}-${order.warehouse_id}`,
+              warehouse_id: order.warehouse_id,
+              product_id: line.product_id,
+              quantity,
+              unit: product.unit,
+              alert_threshold: 0,
+              updated_at: createdAt,
+            });
+          }
+        });
+
+        const movements: StockMovement[] = receivableLines.map(line => ({
+          id: `purchase-${Date.now()}-${line.id}`,
+          company_id: site?.company_id || state.companies[0]?.id || 'comp-sartal-demo',
+          site_id: site?.id || 'site-dakar',
+          warehouse_id: order.warehouse_id,
+          product_id: line.product_id,
+          movement_type: 'purchase',
+          quantity: line.quantity_ordered - line.quantity_received,
+          reason: `Réception fournisseur ${order.id}`,
+          reference_type: 'supplier_receipt',
+          reference_id: receipt.id,
+          created_by: receivedBy,
+          created_at: createdAt,
+        }));
+
+        set({
+          purchaseOrders: state.purchaseOrders.map(item => item.id === purchaseOrderId ? { ...item, status: 'received' } : item),
+          purchaseOrderLines: nextLines,
+          supplierReceipts: [receipt, ...state.supplierReceipts],
+          stockLevels: nextStockLevels,
+          stockMovements: [...movements, ...state.stockMovements],
+        });
+        return receipt;
       },
       getRegisterForPOS: (posId) => get().cashRegisters.find(register =>
         register.pos_id === (posId || get().activePOSId) && register.is_active

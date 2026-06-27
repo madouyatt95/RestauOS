@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat } from 'lucide-react';
+import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat, Truck } from 'lucide-react';
 import { useHospiStore } from '../stores/hospiStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
 
@@ -17,6 +17,10 @@ export default function HospiSettings() {
     recipes,
     recipeItems,
     productionBatches,
+    suppliers,
+    purchaseOrders,
+    purchaseOrderLines,
+    supplierReceipts,
     rooms,
     guests,
     stays,
@@ -147,6 +151,54 @@ export default function HospiSettings() {
                   <p className="text-text-tertiary text-[10px]">{warehouse?.name} • {new Date(batch.created_at).toLocaleString('fr-FR')}</p>
                 </div>
                 <span className="text-green font-black text-sm">+{batch.quantity}</span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mb-5">
+        <h3 className="text-white font-black text-sm mb-3 flex items-center gap-2"><Truck size={16} className="text-blue" /> Achats fournisseurs</h3>
+        <div className="space-y-3">
+          {purchaseOrders.map(order => {
+            const supplier = suppliers.find(item => item.id === order.supplier_id);
+            const warehouse = warehouses.find(item => item.id === order.warehouse_id);
+            const lines = purchaseOrderLines.filter(line => line.purchase_order_id === order.id);
+            const total = lines.reduce((sum, line) => sum + line.quantity_ordered * line.unit_cost, 0);
+            return (
+              <div key={order.id} className="glass-card p-4">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <p className="text-white font-black text-sm">{supplier?.name}</p>
+                    <p className="text-text-tertiary text-[10px]">{warehouse?.name} • {fmt(total)} F</p>
+                  </div>
+                  <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${order.status === 'received' ? 'bg-green/10 text-green' : 'bg-orange/10 text-orange'}`}>
+                    {order.status}
+                  </span>
+                </div>
+                {lines.map(line => {
+                  const product = products.find(item => item.id === line.product_id);
+                  return (
+                    <div key={line.id} className="flex justify-between text-xs">
+                      <span className="text-text-secondary">{product?.name}</span>
+                      <span className="text-white font-bold">{line.quantity_received}/{line.quantity_ordered}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+          {supplierReceipts.slice(0, 3).map(receipt => {
+            const order = purchaseOrders.find(item => item.id === receipt.purchase_order_id);
+            const supplier = order ? suppliers.find(item => item.id === order.supplier_id) : undefined;
+            const warehouse = warehouses.find(item => item.id === receipt.warehouse_id);
+            return (
+              <div key={receipt.id} className="glass-card p-4 flex justify-between gap-3">
+                <div>
+                  <p className="text-white font-black text-sm">Réception {supplier?.name}</p>
+                  <p className="text-text-tertiary text-[10px]">{warehouse?.name} • {new Date(receipt.created_at).toLocaleString('fr-FR')}</p>
+                </div>
+                <span className="text-green font-black text-sm">{fmt(receipt.total_cost)} F</span>
               </div>
             );
           })}
