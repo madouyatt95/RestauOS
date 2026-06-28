@@ -37,7 +37,7 @@ export default function HospiSettings() {
     <div className="page-content pt-14 pb-28">
       <div className="mb-6">
         <h1 className="text-white font-black text-2xl">Administration Hospi</h1>
-        <p className="text-text-secondary text-xs uppercase tracking-widest font-bold mt-1">Sártal OS Hospi</p>
+        <p className="text-text-secondary text-xs uppercase tracking-widest font-bold mt-1">RestauOS Hospitality ERP</p>
       </div>
 
       <div className="glass-card-lg p-5 mb-5">
@@ -47,7 +47,7 @@ export default function HospiSettings() {
           </div>
           <div>
             <h2 className="text-white font-black text-sm">{companies[0]?.name}</h2>
-            <p className="text-text-tertiary text-xs">{sites[0]?.name} • {companies[0]?.currency}</p>
+            <p className="text-text-tertiary text-xs">{sites.length} site(s) • {companies[0]?.currency}</p>
           </div>
         </div>
         <div className="grid grid-cols-3 gap-2">
@@ -65,6 +65,32 @@ export default function HospiSettings() {
           </div>
         </div>
       </div>
+
+      <section className="mb-5">
+        <h3 className="text-white font-black text-sm mb-3 flex items-center gap-2"><Building2 size={16} className="text-orange" /> Sites</h3>
+        <div className="space-y-3">
+          {sites.map(site => {
+            const siteWarehouses = warehouses.filter(warehouse => warehouse.site_id === site.id);
+            const sitePOS = posList.filter(pos => pos.site_id === site.id);
+            return (
+              <div key={site.id} className="glass-card p-4">
+                <p className="text-white font-black text-sm">{site.name}</p>
+                <p className="text-text-tertiary text-[10px]">{site.city} • {site.address}</p>
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  <div className="rounded-xl bg-white/5 p-3">
+                    <p className="text-text-tertiary text-[9px] font-black uppercase">POS</p>
+                    <p className="text-white font-black">{sitePOS.length}</p>
+                  </div>
+                  <div className="rounded-xl bg-white/5 p-3">
+                    <p className="text-text-tertiary text-[9px] font-black uppercase">Dépôts</p>
+                    <p className="text-white font-black">{siteWarehouses.length}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="mb-5">
         <h3 className="text-white font-black text-sm mb-3 flex items-center gap-2"><Store size={16} className="text-blue" /> Points de vente</h3>

@@ -39,6 +39,9 @@ export interface POS {
   default_warehouse_id: string;
   is_active: boolean;
   payment_methods: string[];
+  printer_names?: string[];
+  terminal_names?: string[];
+  tax_profile?: string;
   created_at: string;
 }
 
@@ -52,6 +55,14 @@ export interface HospiProduct {
   unit: string;
   is_stockable: boolean;
   is_active: boolean;
+  primary_warehouse_id?: string;
+  secondary_warehouse_id?: string;
+  fallback_warehouse_id?: string;
+  fallback_policy?: 'use_secondary' | 'block_sale';
+  average_purchase_price?: number;
+  supplier_ids?: string[];
+  lot_number?: string;
+  expires_at?: string;
   created_at: string;
 }
 
@@ -305,6 +316,24 @@ const sites: Site[] = [
     country: 'Sénégal',
     created_at: now,
   },
+  {
+    id: 'site-saly',
+    company_id: 'comp-sartal-demo',
+    name: 'Restaurant Saly',
+    address: 'Saly Portudal',
+    city: 'Saly',
+    country: 'Sénégal',
+    created_at: now,
+  },
+  {
+    id: 'site-thies',
+    company_id: 'comp-sartal-demo',
+    name: 'Restaurant Thiès',
+    address: 'Centre-ville',
+    city: 'Thiès',
+    country: 'Sénégal',
+    created_at: now,
+  },
 ];
 
 const warehouses: Warehouse[] = [
@@ -312,6 +341,14 @@ const warehouses: Warehouse[] = [
   { id: 'wh-bar-casino', site_id: 'site-dakar', name: 'Dépôt Bar Casino', type: 'bar', is_active: true, created_at: now },
   { id: 'wh-nightclub', site_id: 'site-dakar', name: 'Dépôt Night Club', type: 'casino', is_active: true, created_at: now },
   { id: 'wh-central', site_id: 'site-dakar', name: 'Dépôt Central', type: 'central', is_active: true, created_at: now },
+  { id: 'wh-dakar-boissons', site_id: 'site-dakar', name: 'Dépôt Boissons', type: 'bar', is_active: true, created_at: now },
+  { id: 'wh-dakar-viandes', site_id: 'site-dakar', name: 'Dépôt Viandes', type: 'cold_room', is_active: true, created_at: now },
+  { id: 'wh-dakar-legumes', site_id: 'site-dakar', name: 'Dépôt Légumes', type: 'kitchen', is_active: true, created_at: now },
+  { id: 'wh-dakar-epicerie', site_id: 'site-dakar', name: 'Dépôt Épicerie', type: 'kitchen', is_active: true, created_at: now },
+  { id: 'wh-saly-bar', site_id: 'site-saly', name: 'Dépôt Bar Saly', type: 'bar', is_active: true, created_at: now },
+  { id: 'wh-saly-cuisine', site_id: 'site-saly', name: 'Dépôt Cuisine Saly', type: 'kitchen', is_active: true, created_at: now },
+  { id: 'wh-saly-congelateur', site_id: 'site-saly', name: 'Dépôt Congélateur Saly', type: 'cold_room', is_active: true, created_at: now },
+  { id: 'wh-thies-cuisine', site_id: 'site-thies', name: 'Dépôt Cuisine Thiès', type: 'kitchen', is_active: true, created_at: now },
 ];
 
 const posList: POS[] = [
@@ -323,6 +360,9 @@ const posList: POS[] = [
     default_warehouse_id: 'wh-restaurant',
     is_active: true,
     payment_methods: ['especes', 'wave', 'orange_money', 'carte', 'room_charge'],
+    printer_names: ['Cuisine Le Jardin', 'Bar Jardin'],
+    terminal_names: ['SoftPOS Jardin 1'],
+    tax_profile: 'TVA 18%',
     created_at: now,
   },
   {
@@ -333,6 +373,9 @@ const posList: POS[] = [
     default_warehouse_id: 'wh-bar-casino',
     is_active: true,
     payment_methods: ['especes', 'wave', 'orange_money', 'carte', 'room_charge'],
+    printer_names: ['Bar Machines'],
+    terminal_names: ['TPE Bar Casino'],
+    tax_profile: 'TVA 18%',
     created_at: now,
   },
   {
@@ -343,6 +386,9 @@ const posList: POS[] = [
     default_warehouse_id: 'wh-nightclub',
     is_active: true,
     payment_methods: ['especes', 'wave', 'orange_money', 'carte'],
+    printer_names: ['Bar Night Club'],
+    terminal_names: ['TPE Night Club'],
+    tax_profile: 'TVA 18%',
     created_at: now,
   },
   {
@@ -353,6 +399,22 @@ const posList: POS[] = [
     default_warehouse_id: 'wh-restaurant',
     is_active: true,
     payment_methods: ['room_charge', 'especes', 'carte'],
+    printer_names: ['Room Service'],
+    terminal_names: ['SoftPOS Room Service'],
+    tax_profile: 'TVA 18%',
+    created_at: now,
+  },
+  {
+    id: 'pos-saly-bar',
+    site_id: 'site-saly',
+    name: 'Bar Saly',
+    type: 'bar',
+    default_warehouse_id: 'wh-saly-bar',
+    is_active: true,
+    payment_methods: ['especes', 'wave', 'orange_money', 'carte'],
+    printer_names: ['Bar Saly'],
+    terminal_names: ['TPE Saly'],
+    tax_profile: 'TVA 18%',
     created_at: now,
   },
 ];
@@ -380,12 +442,21 @@ const products: HospiProduct[] = [
     unit: 'bouteille',
     is_stockable: true,
     is_active: true,
+    primary_warehouse_id: 'wh-dakar-boissons',
+    secondary_warehouse_id: 'wh-central',
+    fallback_policy: 'use_secondary',
+    average_purchase_price: 350,
+    supplier_ids: ['sup-touba-distribution'],
+    lot_number: 'COCA-DAK-001',
     created_at: now,
   },
-  { id: 'ing-riz-brise', company_id: 'comp-sartal-demo', name: 'Riz brisé', sku: 'ING-RIZ', category_id: 'ingredient', unit: 'kg', is_stockable: true, is_active: true, created_at: now },
-  { id: 'ing-poisson', company_id: 'comp-sartal-demo', name: 'Poisson frais', sku: 'ING-POISSON', category_id: 'ingredient', unit: 'kg', is_stockable: true, is_active: true, created_at: now },
-  { id: 'ing-huile', company_id: 'comp-sartal-demo', name: 'Huile végétale', sku: 'ING-HUILE', category_id: 'ingredient', unit: 'L', is_stockable: true, is_active: true, created_at: now },
-  { id: 'ing-legumes', company_id: 'comp-sartal-demo', name: 'Légumes thieb', sku: 'ING-LEGUMES', category_id: 'ingredient', unit: 'kg', is_stockable: true, is_active: true, created_at: now },
+  { id: 'ing-riz-brise', company_id: 'comp-sartal-demo', name: 'Riz brisé', sku: 'ING-RIZ', category_id: 'ingredient', unit: 'kg', is_stockable: true, is_active: true, primary_warehouse_id: 'wh-dakar-epicerie', secondary_warehouse_id: 'wh-central', fallback_policy: 'use_secondary', average_purchase_price: 600, supplier_ids: ['sup-marche-sandaga'], lot_number: 'RIZ-001', created_at: now },
+  { id: 'ing-poisson', company_id: 'comp-sartal-demo', name: 'Poisson frais', sku: 'ING-POISSON', category_id: 'ingredient', unit: 'kg', is_stockable: true, is_active: true, primary_warehouse_id: 'wh-dakar-viandes', secondary_warehouse_id: 'wh-saly-congelateur', fallback_policy: 'block_sale', average_purchase_price: 1800, supplier_ids: ['sup-marche-sandaga'], lot_number: 'POIS-001', expires_at: new Date(Date.now() + 86400000 * 3).toISOString(), created_at: now },
+  { id: 'ing-huile', company_id: 'comp-sartal-demo', name: 'Huile végétale', sku: 'ING-HUILE', category_id: 'ingredient', unit: 'L', is_stockable: true, is_active: true, primary_warehouse_id: 'wh-dakar-epicerie', secondary_warehouse_id: 'wh-central', fallback_policy: 'use_secondary', average_purchase_price: 900, supplier_ids: ['sup-touba-distribution'], created_at: now },
+  { id: 'ing-legumes', company_id: 'comp-sartal-demo', name: 'Légumes thieb', sku: 'ING-LEGUMES', category_id: 'ingredient', unit: 'kg', is_stockable: true, is_active: true, primary_warehouse_id: 'wh-dakar-legumes', secondary_warehouse_id: 'wh-saly-cuisine', fallback_policy: 'block_sale', average_purchase_price: 700, supplier_ids: ['sup-marche-sandaga'], expires_at: new Date(Date.now() + 86400000 * 5).toISOString(), created_at: now },
+  { id: 'ing-steak', company_id: 'comp-sartal-demo', name: 'Steak', sku: 'ING-STEAK', category_id: 'ingredient', unit: 'unité', is_stockable: true, is_active: true, primary_warehouse_id: 'wh-dakar-viandes', secondary_warehouse_id: 'wh-saly-congelateur', fallback_policy: 'block_sale', average_purchase_price: 2200, supplier_ids: ['sup-marche-sandaga'], expires_at: new Date(Date.now() + 86400000 * 4).toISOString(), created_at: now },
+  { id: 'ing-pommes-terre', company_id: 'comp-sartal-demo', name: 'Pommes de terre', sku: 'ING-PDT', category_id: 'ingredient', unit: 'kg', is_stockable: true, is_active: true, primary_warehouse_id: 'wh-dakar-legumes', secondary_warehouse_id: 'wh-saly-cuisine', fallback_policy: 'use_secondary', average_purchase_price: 500, supplier_ids: ['sup-marche-sandaga'], created_at: now },
+  { id: 'ing-sel', company_id: 'comp-sartal-demo', name: 'Sel', sku: 'ING-SEL', category_id: 'ingredient', unit: 'kg', is_stockable: true, is_active: true, primary_warehouse_id: 'wh-dakar-epicerie', secondary_warehouse_id: 'wh-central', fallback_policy: 'use_secondary', average_purchase_price: 150, supplier_ids: ['sup-touba-distribution'], created_at: now },
 ];
 
 const posProductPrices: POSProductPrice[] = [
@@ -395,16 +466,26 @@ const posProductPrices: POSProductPrice[] = [
   { id: 'price-coca-bar', pos_id: 'pos-bar-machines', product_id: 'prod-coca-33', sale_price: 2000, tax_rate: 18, is_available: true, created_at: now },
   { id: 'price-coca-night', pos_id: 'pos-nightclub', product_id: 'prod-coca-33', sale_price: 2500, tax_rate: 18, is_available: true, created_at: now },
   { id: 'price-coca-room', pos_id: 'pos-room-service', product_id: 'prod-coca-33', sale_price: 1800, tax_rate: 18, is_available: true, created_at: now },
+  { id: 'price-coca-saly-bar', pos_id: 'pos-saly-bar', product_id: 'prod-coca-33', sale_price: 2200, tax_rate: 18, is_available: true, created_at: now },
 ];
 
 const stockLevels: StockLevel[] = [
   { id: 'stock-coca-resto', warehouse_id: 'wh-restaurant', product_id: 'prod-coca-33', quantity: 100, unit: 'bouteille', alert_threshold: 20, updated_at: now },
   { id: 'stock-coca-bar', warehouse_id: 'wh-bar-casino', product_id: 'prod-coca-33', quantity: 150, unit: 'bouteille', alert_threshold: 30, updated_at: now },
   { id: 'stock-coca-night', warehouse_id: 'wh-nightclub', product_id: 'prod-coca-33', quantity: 80, unit: 'bouteille', alert_threshold: 20, updated_at: now },
+  { id: 'stock-coca-dakar-boissons', warehouse_id: 'wh-dakar-boissons', product_id: 'prod-coca-33', quantity: 210, unit: 'bouteille', alert_threshold: 30, updated_at: now },
+  { id: 'stock-coca-saly-bar', warehouse_id: 'wh-saly-bar', product_id: 'prod-coca-33', quantity: 250, unit: 'bouteille', alert_threshold: 35, updated_at: now },
   { id: 'stock-riz-resto', warehouse_id: 'wh-restaurant', product_id: 'ing-riz-brise', quantity: 45, unit: 'kg', alert_threshold: 15, updated_at: now },
+  { id: 'stock-riz-epicerie', warehouse_id: 'wh-dakar-epicerie', product_id: 'ing-riz-brise', quantity: 80, unit: 'kg', alert_threshold: 20, updated_at: now },
   { id: 'stock-poisson-resto', warehouse_id: 'wh-restaurant', product_id: 'ing-poisson', quantity: 22, unit: 'kg', alert_threshold: 8, updated_at: now },
+  { id: 'stock-poisson-viandes', warehouse_id: 'wh-dakar-viandes', product_id: 'ing-poisson', quantity: 26, unit: 'kg', alert_threshold: 8, updated_at: now },
   { id: 'stock-huile-resto', warehouse_id: 'wh-restaurant', product_id: 'ing-huile', quantity: 18, unit: 'L', alert_threshold: 5, updated_at: now },
+  { id: 'stock-huile-epicerie', warehouse_id: 'wh-dakar-epicerie', product_id: 'ing-huile', quantity: 36, unit: 'L', alert_threshold: 8, updated_at: now },
   { id: 'stock-legumes-resto', warehouse_id: 'wh-restaurant', product_id: 'ing-legumes', quantity: 28, unit: 'kg', alert_threshold: 10, updated_at: now },
+  { id: 'stock-legumes-dakar', warehouse_id: 'wh-dakar-legumes', product_id: 'ing-legumes', quantity: 60, unit: 'kg', alert_threshold: 12, updated_at: now },
+  { id: 'stock-steak-dakar', warehouse_id: 'wh-dakar-viandes', product_id: 'ing-steak', quantity: 48, unit: 'unité', alert_threshold: 10, updated_at: now },
+  { id: 'stock-pdt-dakar', warehouse_id: 'wh-dakar-legumes', product_id: 'ing-pommes-terre', quantity: 70, unit: 'kg', alert_threshold: 14, updated_at: now },
+  { id: 'stock-sel-dakar', warehouse_id: 'wh-dakar-epicerie', product_id: 'ing-sel', quantity: 12, unit: 'kg', alert_threshold: 2, updated_at: now },
 ];
 
 const recipes: Recipe[] = [
@@ -666,21 +747,48 @@ export const useHospiStore = create<HospiState>()(
 
         const createdAt = new Date().toISOString();
         const movements: StockMovement[] = [];
+        const resolveWarehouseForConsumption = (productId: string, preferredWarehouseId: string, fromRecipe: boolean) => {
+          const product = state.products.find(item => item.id === productId);
+          if (!product) return preferredWarehouseId;
+          if (!fromRecipe) return preferredWarehouseId;
+          const candidates = [
+            product.primary_warehouse_id,
+            product.secondary_warehouse_id,
+            product.fallback_warehouse_id,
+            preferredWarehouseId,
+          ].filter(Boolean) as string[];
+          const inSameSite = candidates.filter(id => state.warehouses.find(warehouse => warehouse.id === id)?.site_id === site.id);
+          const scopedCandidates = inSameSite.length ? inSameSite : [preferredWarehouseId];
+          const firstWithStock = scopedCandidates.find(id => {
+            const stock = state.stockLevels.find(level => level.product_id === productId && level.warehouse_id === id);
+            return stock && stock.quantity > 0;
+          });
+          if (firstWithStock) return firstWithStock;
+          return product.fallback_policy === 'use_secondary' ? scopedCandidates[1] || scopedCandidates[0] : scopedCandidates[0];
+        };
         const consumptionByProduct = lines.flatMap(line => {
           const recipe = state.recipes.find(item => item.product_id === line.productId);
-          if (!recipe) return [{ productId: line.productId, quantity: line.quantity, sourceProductId: line.productId }];
+          if (!recipe) {
+            return [{
+              productId: line.productId,
+              quantity: line.quantity,
+              warehouseId: resolveWarehouseForConsumption(line.productId, warehouseId, false),
+              sourceProductId: line.productId,
+            }];
+          }
           return state.recipeItems
             .filter(item => item.recipe_id === recipe.id)
             .map(item => ({
               productId: item.ingredient_product_id,
               quantity: item.quantity * line.quantity,
+              warehouseId: resolveWarehouseForConsumption(item.ingredient_product_id, warehouseId, true),
               sourceProductId: line.productId,
             }));
         });
 
         const nextStockLevels = state.stockLevels.map(stock => {
           const consumption = consumptionByProduct
-            .filter(item => item.productId === stock.product_id && stock.warehouse_id === warehouseId)
+            .filter(item => item.productId === stock.product_id && stock.warehouse_id === item.warehouseId)
             .reduce((sum, item) => sum + item.quantity, 0);
           if (!consumption) return stock;
           movements.push({
@@ -688,7 +796,7 @@ export const useHospiStore = create<HospiState>()(
             company_id: companyId,
             site_id: site.id,
             pos_id: pos.id,
-            warehouse_id: warehouseId,
+            warehouse_id: stock.warehouse_id,
             product_id: stock.product_id,
             movement_type: 'sale',
             quantity: consumption,

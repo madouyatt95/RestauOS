@@ -92,7 +92,7 @@ const getTableDimensions = (capacity: number): { w: number, h: number } => {
 
 export default function Commandes() {
   const { cart, addToCart, updateQuantity, clearCart, checkout, orders, setLoyaltyClient, updateOrderStatus } = useOrderStore();
-  const { posList, activePOSId, setActivePOS, getProductsForPOS, recordSale } = useHospiStore();
+  const { posList, warehouses, activePOSId, setActivePOS, getProductsForPOS, recordSale } = useHospiStore();
   const { tables, addTable, removeTable, updateTableStatus, updateTablePosition, updateTableCapacity, updateTableFloor } = useTableStore();
   const { reservations, updateStatus, addReservation } = useReservationStore();
   const { clients } = useClientStore();
@@ -303,6 +303,20 @@ export default function Commandes() {
             <p className="text-text-secondary text-xs">
               {designMode ? 'Studio Mode : Configurez vos zones' : assigningRes ? `Attribuer à ${assigningRes.clientName}` : activePOS?.name || 'Gérez vos tables en temps réel'}
             </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <select
+                value={activePOSId}
+                onChange={event => setActivePOS(event.target.value)}
+                className="bg-white/10 border border-white/10 rounded-xl px-3 py-2 text-white text-xs font-bold outline-none"
+              >
+                {posList.filter(pos => pos.is_active).map(pos => (
+                  <option key={pos.id} value={pos.id} className="bg-[#111827] text-white">{pos.name}</option>
+                ))}
+              </select>
+              <span className="text-[10px] text-text-tertiary font-bold">
+                Stock : {warehouses.find(warehouse => warehouse.id === activePOS?.default_warehouse_id)?.name || 'Dépôt non configuré'}
+              </span>
+            </div>
           </div>
           <div className="flex gap-2">
             {(user?.role === 'Gérant' || user?.role === 'Admin') && (

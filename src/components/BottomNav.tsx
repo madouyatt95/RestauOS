@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, ShoppingBag, Package, Users, MoreHorizontal, Truck, ChefHat, Calendar, Wallet } from 'lucide-react';
+import { Home, ShoppingBag, Package, Users, MoreHorizontal, Truck, ChefHat, Calendar, Wallet, BedDouble } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { usePlanningStore } from '../stores/planningStore';
 
@@ -20,7 +20,7 @@ export default function BottomNav() {
         { path: '/commandes', icon: ShoppingBag, label: 'Salle' },
         { path: '/caisse', icon: Wallet, label: 'Caisse' },
         { path: '/stocks', icon: Package, label: 'Stocks' },
-        { path: '/personnel', icon: Users, label: 'Personnel' },
+        { path: '/pms', icon: BedDouble, label: 'Hôtel' },
         { path: '/plus', icon: MoreHorizontal, label: 'Plus' },
       ];
 

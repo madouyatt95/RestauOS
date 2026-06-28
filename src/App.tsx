@@ -24,6 +24,7 @@ import MenuBuilder from './pages/MenuBuilder';
 import Factures from './pages/Factures';
 import WhatsAppBot from './pages/WhatsAppBot';
 import HospiSettings from './pages/HospiSettings';
+import PMS from './pages/PMS';
 import { useThemeStore } from './stores/themeStore';
 import { useEffect } from 'react';
 import './index.css';
@@ -50,6 +51,9 @@ function AppContent() {
           } />
           <Route path="/stocks" element={
             <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Chef cuisine']}><Stocks /></ProtectedRoute>
+          } />
+          <Route path="/pms" element={
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier']}><PMS /></ProtectedRoute>
           } />
           <Route path="/personnel" element={
             <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier', 'Serveur', 'Chef cuisine', 'Livreur']}><Personnel /></ProtectedRoute>
