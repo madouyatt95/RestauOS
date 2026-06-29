@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useMemo, useState } from 'react';
-import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat, Truck, Users, CreditCard, Plus, Edit2, Trash2, X, Search } from 'lucide-react';
+import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat, Truck, Users, CreditCard, Plus, Edit2, Trash2, X, Search, Network, Upload, PlayCircle, AlertTriangle, CheckCircle2, KeyRound, Settings2, Boxes, Landmark, Sparkles } from 'lucide-react';
 import { useHospiStore, type POSType, type WarehouseType } from '../stores/hospiStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
 
@@ -16,6 +16,8 @@ const warehouseTypeLabels: Record<string, string> = {
   other: 'Autre',
 };
 
+type AdminView = 'assistant' | 'architecture' | 'modules' | 'pos' | 'permissions' | 'rules' | 'health' | 'imports' | 'audit' | 'simulation';
+
 export default function HospiSettings() {
   const {
     companies,
@@ -28,6 +30,11 @@ export default function HospiSettings() {
     recipes,
     recipeItems,
     productionBatches,
+    productVariants,
+    unitConversions,
+    stockReservations,
+    internalConsumptions,
+    stockPolicy,
     suppliers,
     purchaseOrders,
     purchaseOrderLines,
@@ -57,6 +64,7 @@ export default function HospiSettings() {
     settleCustomerAccount,
   } = useHospiStore();
   const { auditLogs } = useBusinessRulesStore();
+  const [adminView, setAdminView] = useState<AdminView>('assistant');
   const [configPanel, setConfigPanel] = useState<'pos' | 'warehouse' | 'product' | 'price' | 'recipe'>('pos');
   const [editingPOSId, setEditingPOSId] = useState<string | null>(null);
   const [editingWarehouseId, setEditingWarehouseId] = useState<string | null>(null);
@@ -136,6 +144,112 @@ export default function HospiSettings() {
       || (productFilter === 'recipes' && productHasRecipe);
     return filterMatch && matchesSearch([product.name, product.sku, product.category_id, product.unit]);
   }), [normalizedSearch, productFilter, products, recipes, stockLevels]);
+
+  const adminViews: Array<{ key: AdminView; label: string; icon: typeof Sparkles }> = [
+    { key: 'assistant', label: 'Assistant', icon: Sparkles },
+    { key: 'architecture', label: 'Architecture', icon: Network },
+    { key: 'modules', label: 'Modules métier', icon: Boxes },
+    { key: 'pos', label: 'Centre POS', icon: Store },
+    { key: 'permissions', label: 'Permissions', icon: KeyRound },
+    { key: 'rules', label: 'Règles', icon: Settings2 },
+    { key: 'health', label: 'Santé', icon: AlertTriangle },
+    { key: 'imports', label: 'Imports', icon: Upload },
+    { key: 'audit', label: 'Audit', icon: ShieldCheck },
+    { key: 'simulation', label: 'Simulation', icon: PlayCircle },
+  ];
+
+  const setupSteps = [
+    { title: 'Entreprise', done: companies.length > 0, detail: companies[0]?.name || 'Créer la société' },
+    { title: 'Sites', done: sites.length > 0, detail: `${sites.length} site(s) configuré(s)` },
+    { title: 'Modules métier', done: posList.some(pos => ['restaurant', 'spa', 'casino', 'boutique', 'room_service'].includes(pos.type)), detail: 'Restaurant, hôtel, casino, spa, boutique' },
+    { title: 'POS', done: posList.length > 0, detail: `${posList.length} point(s) de vente` },
+    { title: 'Dépôts', done: warehouses.length > 0, detail: `${warehouses.length} dépôt(s)` },
+    { title: 'Catalogue', done: products.length > 0, detail: `${products.length} produit(s)` },
+    { title: 'Prix par POS', done: posProductPrices.length > 0, detail: `${posProductPrices.length} tarif(s)` },
+    { title: 'Contrôles', done: auditLogs.length > 0 || stockLevels.length > 0, detail: 'Stock, audit et règles prêts' },
+  ];
+
+  const businessModules = [
+    { type: 'restaurant', label: 'Restaurant / RestauOS', icon: Store, color: '#F59E0B' },
+    { type: 'room_service', label: 'Hôtel / PMS / Room service', icon: BedDouble, color: '#22D3EE' },
+    { type: 'casino', label: 'Casino', icon: Landmark, color: '#8B5CF6' },
+    { type: 'spa', label: 'Spa', icon: Sparkles, color: '#22C55E' },
+    { type: 'boutique', label: 'Boutique', icon: ReceiptText, color: '#3B82F6' },
+    { type: 'bar', label: 'Bars', icon: CreditCard, color: '#EF4444' },
+  ].map(module => {
+    const modulePOS = posList.filter(pos => pos.type === module.type);
+    const modulePrices = posProductPrices.filter(price => modulePOS.some(pos => pos.id === price.pos_id));
+    return { ...module, posCount: modulePOS.length, priceCount: modulePrices.length };
+  });
+
+  const healthAlerts = [
+    ...posList
+      .filter(pos => !warehouses.some(warehouse => warehouse.id === pos.default_warehouse_id))
+      .map(pos => ({ level: 'critical', title: `${pos.name} sans dépôt valide`, detail: 'Les ventes ne pourront pas déstocker correctement.' })),
+    ...posList
+      .filter(pos => posProductPrices.filter(price => price.pos_id === pos.id && price.is_available).length === 0)
+      .map(pos => ({ level: 'warning', title: `${pos.name} sans catalogue de vente`, detail: 'Aucun prix actif n’est associé à ce POS.' })),
+    ...products
+      .filter(product => product.is_stockable && !stockLevels.some(level => level.product_id === product.id))
+      .slice(0, 6)
+      .map(product => ({ level: 'warning', title: `${product.name} sans stock initial`, detail: 'Produit stockable sans quantité suivie.' })),
+    ...recipes
+      .filter(recipe => !recipeItems.some(item => item.recipe_id === recipe.id))
+      .map(recipe => ({ level: 'warning', title: `${recipe.name} sans ingrédient`, detail: 'Une recette vide ne déstockera rien.' })),
+    ...warehouses
+      .filter(warehouse => !posList.some(pos => pos.default_warehouse_id === warehouse.id) && !stockLevels.some(level => level.warehouse_id === warehouse.id))
+      .slice(0, 4)
+      .map(warehouse => ({ level: 'info', title: `${warehouse.name} isolé`, detail: 'Aucun POS et aucun stock actif liés.' })),
+  ];
+
+  const roleRows = [
+    { role: 'Direction générale', rights: 'Tout voir, tout configurer, valider les actions sensibles' },
+    { role: 'Manager Restaurant', rights: 'POS restaurant, tables, caisse, remises contrôlées, stocks restaurant' },
+    { role: 'Manager Hôtel', rights: 'Chambres, folios, room charge, housekeeping, clôtures PMS' },
+    { role: 'Responsable stock', rights: 'Achats, transferts, inventaires, pertes et seuils' },
+    { role: 'Réceptionniste', rights: 'Check-in, folios, imputations chambre, encaissements PMS' },
+    { role: 'Caissier', rights: 'Encaissement, caisse X/Z, moyens de paiement autorisés' },
+    { role: 'Serveur', rights: 'Prise de commande, impression, room charge si autorisé' },
+    { role: 'Auditeur', rights: 'Lecture rapports, audit, export sans modification' },
+  ];
+
+  const ruleRows = [
+    { title: 'Stock négatif', value: stockPolicy.allow_negative_stock ? 'Autorisé' : 'Bloqué', detail: 'Empêche les sorties impossibles si le dépôt est vide.' },
+    { title: 'FIFO / lots', value: stockPolicy.fifo_enabled ? 'Actif' : 'Inactif', detail: 'Les lots les plus anciens ou proches péremption sortent d’abord.' },
+    { title: 'Réservation avant préparation', value: stockPolicy.reserve_before_preparation ? 'Active' : 'Inactive', detail: 'Room service ou banquet peut bloquer du stock avant consommation.' },
+    { title: 'Transfert automatique', value: stockPolicy.auto_transfer_enabled ? 'Suggéré' : 'Désactivé', detail: 'Le système propose un dépôt donneur quand un dépôt manque.' },
+    { title: 'Remises sensibles', value: 'Validation manager', detail: 'Les remises fortes sont contrôlées par rôle.' },
+    { title: 'Annulations', value: 'Traçables', detail: 'Annulation ticket, perte et inventaire sont journalisés.' },
+  ];
+
+  const importRows = [
+    { title: 'Produits', detail: 'CSV/Excel avec nom, SKU, famille, unité, coût moyen', count: products.length },
+    { title: 'Stocks initiaux', detail: 'Produit, dépôt, quantité, seuil, lot, péremption', count: stockLevels.length },
+    { title: 'Prix par POS', detail: 'Produit, POS, prix, TVA, disponibilité', count: posProductPrices.length },
+    { title: 'Variantes', detail: 'Suppléments, options, doubles doses, impacts prix et stock', count: productVariants.length },
+    { title: 'Conversions', detail: 'Carton, sac, bidon, kg, grammes et unités vendues', count: unitConversions.length },
+    { title: 'Réservations stock', detail: 'Room service, banquets, productions à préparer', count: stockReservations.length },
+    { title: 'Consommations internes', detail: 'Personnel, VIP, offerts, direction, casino, mini-bar', count: internalConsumptions.length },
+    { title: 'Fournisseurs', detail: 'Nom, téléphone, email, adresse, produits associés', count: suppliers.length },
+    { title: 'Chambres', detail: 'Numéro, type, statut, site, étage futur', count: rooms.length },
+    { title: 'Clients', detail: 'Client hôtel, CRM, compte corporate, limite crédit', count: customerAccounts.length },
+  ];
+
+  const simulationPOS = posList.find(pos => pos.id === 'pos-restaurant-jardin') || posList[0];
+  const simulationProduct = products.find(product => product.id === 'prod-coca-33') || products.find(product => product.is_stockable) || products[0];
+  const simulationPrice = simulationPOS && simulationProduct ? posProductPrices.find(price => price.pos_id === simulationPOS.id && price.product_id === simulationProduct.id) : undefined;
+  const simulationWarehouse = simulationPOS ? warehouses.find(warehouse => warehouse.id === simulationPOS.default_warehouse_id) : undefined;
+  const simulationStock = simulationWarehouse && simulationProduct ? stockLevels.find(level => level.warehouse_id === simulationWarehouse.id && level.product_id === simulationProduct.id) : undefined;
+  const simulationRows = [
+    { label: 'Produit', value: simulationProduct?.name || 'Aucun produit' },
+    { label: 'POS', value: simulationPOS?.name || 'Aucun POS' },
+    { label: 'Prix appliqué', value: simulationPrice ? `${fmt(simulationPrice.sale_price)} F` : 'Prix manquant' },
+    { label: 'TVA', value: simulationPrice ? `${simulationPrice.tax_rate}%` : 'Non définie' },
+    { label: 'Dépôt de sortie', value: simulationWarehouse?.name || 'Dépôt manquant' },
+    { label: 'Stock disponible', value: simulationStock ? `${simulationStock.quantity} ${simulationStock.unit}` : 'Aucune ligne stock' },
+    { label: 'Imprimante', value: simulationPOS?.printer_names?.[0] || 'Non définie' },
+    { label: 'Caisse / rapport Z', value: simulationPOS ? 'Relié au POS' : 'Non relié' },
+  ];
 
   const handleCreatePOS = () => {
     if (!newPOS.name || !newPOS.warehouseId) return;
@@ -383,6 +497,290 @@ export default function HospiSettings() {
           </div>
         </div>
       </div>
+
+      <section className="glass-card-lg p-4 mb-5">
+        <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
+          {adminViews.map(view => {
+            const Icon = view.icon;
+            return (
+              <button
+                key={view.key}
+                type="button"
+                onClick={() => setAdminView(view.key)}
+                className={`shrink-0 min-w-[112px] rounded-2xl px-3 py-3 text-left transition-all ${adminView === view.key ? 'bg-orange text-white shadow-[0_8px_24px_rgba(255,138,0,0.25)]' : 'bg-white/5 text-text-secondary border border-white/10'}`}
+              >
+                <Icon size={16} className="mb-2" />
+                <span className="block text-[10px] font-black uppercase tracking-widest">{view.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mb-5">
+        {adminView === 'assistant' && (
+          <div className="glass-card-lg p-5">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-white font-black text-base">Assistant de configuration</h3>
+                <p className="text-text-secondary text-xs mt-1">Le parcours pour ouvrir un nouveau complexe sans oublier les liens critiques.</p>
+              </div>
+              <Sparkles size={20} className="text-orange" />
+            </div>
+            <div className="space-y-2">
+              {setupSteps.map((step, index) => (
+                <button
+                  key={step.title}
+                  type="button"
+                  onClick={() => {
+                    if (step.title === 'POS') setConfigPanel('pos');
+                    if (step.title === 'Dépôts') setConfigPanel('warehouse');
+                    if (step.title === 'Catalogue') setConfigPanel('product');
+                    if (step.title === 'Prix par POS') setConfigPanel('price');
+                  }}
+                  className="w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3 flex items-center gap-3 text-left"
+                >
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${step.done ? 'bg-green/10 text-green' : 'bg-orange/10 text-orange'}`}>
+                    {step.done ? <CheckCircle2 size={17} /> : <span className="font-black text-xs">{index + 1}</span>}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-white font-black text-xs">{step.title}</p>
+                    <p className="text-text-tertiary text-[10px] truncate">{step.detail}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {adminView === 'architecture' && (
+          <div className="space-y-3">
+            {sites.map(site => {
+              const sitePOS = posList.filter(pos => pos.site_id === site.id);
+              const siteWarehouses = warehouses.filter(warehouse => warehouse.site_id === site.id);
+              return (
+                <div key={site.id} className="glass-card-lg p-5">
+                  <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">{companies[0]?.name}</p>
+                  <h3 className="text-white font-black text-base mt-1">{site.name}</h3>
+                  <p className="text-text-secondary text-xs mt-1">{site.city} • {sitePOS.length} POS • {siteWarehouses.length} dépôt(s)</p>
+                  <div className="mt-4 space-y-3">
+                    {sitePOS.map(pos => {
+                      const warehouse = warehouses.find(item => item.id === pos.default_warehouse_id);
+                      const prices = posProductPrices.filter(price => price.pos_id === pos.id);
+                      return (
+                        <div key={pos.id} className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-white font-black text-sm">{pos.name}</p>
+                              <p className="text-text-tertiary text-[10px]">{pos.type} → {warehouse?.name || 'Dépôt manquant'}</p>
+                            </div>
+                            <span className="text-orange font-black text-xs">{prices.length} prix</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 mt-3">
+                            <div className="rounded-xl bg-black/20 p-2">
+                              <p className="text-text-tertiary text-[9px] font-black uppercase">TVA</p>
+                              <p className="text-white text-xs font-bold">{pos.tax_profile || 'Non définie'}</p>
+                            </div>
+                            <div className="rounded-xl bg-black/20 p-2">
+                              <p className="text-text-tertiary text-[9px] font-black uppercase">Imprimante</p>
+                              <p className="text-white text-xs font-bold truncate">{pos.printer_names?.[0] || 'Aucune'}</p>
+                            </div>
+                            <div className="rounded-xl bg-black/20 p-2">
+                              <p className="text-text-tertiary text-[9px] font-black uppercase">Paiements</p>
+                              <p className="text-white text-xs font-bold">{pos.payment_methods.length}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {adminView === 'modules' && (
+          <div className="grid grid-cols-2 gap-3">
+            {businessModules.map(module => {
+              const Icon = module.icon;
+              return (
+                <div key={module.type} className="glass-card p-4">
+                  <div className="w-10 h-10 rounded-2xl flex items-center justify-center mb-3" style={{ background: `${module.color}1F`, color: module.color }}>
+                    <Icon size={19} />
+                  </div>
+                  <p className="text-white font-black text-sm">{module.label}</p>
+                  <p className="text-text-secondary text-xs mt-1">{module.posCount} POS • {module.priceCount} tarif(s)</p>
+                  <button type="button" onClick={() => setConfigPanel('pos')} className="mt-3 w-full h-10 rounded-xl bg-white/5 text-white text-xs font-black">
+                    Configurer
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {adminView === 'pos' && (
+          <div className="space-y-3">
+            {posList.map(pos => {
+              const warehouse = warehouses.find(item => item.id === pos.default_warehouse_id);
+              const prices = posProductPrices.filter(price => price.pos_id === pos.id);
+              return (
+                <div key={pos.id} className="glass-card-lg p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-white font-black text-sm">{pos.name}</p>
+                      <p className="text-text-tertiary text-[10px]">{warehouse?.name || 'Dépôt manquant'} • {pos.tax_profile}</p>
+                    </div>
+                    <button type="button" onClick={() => startEditPOS(pos.id)} className="h-9 px-3 rounded-xl bg-blue/10 text-blue text-xs font-black">
+                      Éditer
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 mt-3">
+                    <div className="rounded-xl bg-white/5 p-3">
+                      <p className="text-text-tertiary text-[9px] font-black uppercase">Prix</p>
+                      <p className="text-white font-black">{prices.length}</p>
+                    </div>
+                    <div className="rounded-xl bg-white/5 p-3">
+                      <p className="text-text-tertiary text-[9px] font-black uppercase">Paiements</p>
+                      <p className="text-white font-black">{pos.payment_methods.length}</p>
+                    </div>
+                    <div className="rounded-xl bg-white/5 p-3">
+                      <p className="text-text-tertiary text-[9px] font-black uppercase">Impr.</p>
+                      <p className="text-white font-black">{pos.printer_names?.length || 0}</p>
+                    </div>
+                    <div className="rounded-xl bg-white/5 p-3">
+                      <p className="text-text-tertiary text-[9px] font-black uppercase">TPE</p>
+                      <p className="text-white font-black">{pos.terminal_names?.length || 0}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {adminView === 'permissions' && (
+          <div className="glass-card-lg p-5">
+            <h3 className="text-white font-black text-base mb-1">Rôles et permissions</h3>
+            <p className="text-text-secondary text-xs mb-4">La matrice cible pour bloquer clairement les actions sensibles selon le métier.</p>
+            <div className="space-y-2">
+              {roleRows.map(row => (
+                <div key={row.role} className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                  <p className="text-white font-black text-sm">{row.role}</p>
+                  <p className="text-text-secondary text-xs mt-1">{row.rights}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {adminView === 'rules' && (
+          <div className="glass-card-lg p-5">
+            <h3 className="text-white font-black text-base mb-1">Moteur de règles métier</h3>
+            <p className="text-text-secondary text-xs mb-4">Les règles qui contrôlent stock, ventes, remises, annulations, folios et caisse.</p>
+            <div className="space-y-2">
+              {ruleRows.map(row => (
+                <div key={row.title} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-white font-black text-sm">{row.title}</p>
+                    <p className="text-text-secondary text-xs mt-1">{row.detail}</p>
+                  </div>
+                  <span className="shrink-0 text-[10px] font-black px-2.5 py-1 rounded-full bg-green/10 text-green">{row.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {adminView === 'health' && (
+          <div className="glass-card-lg p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-white font-black text-base">Santé système</h3>
+                <p className="text-text-secondary text-xs">{healthAlerts.length} point(s) à surveiller</p>
+              </div>
+              <span className={`text-xs font-black px-3 py-1.5 rounded-full ${healthAlerts.length ? 'bg-orange/10 text-orange' : 'bg-green/10 text-green'}`}>
+                {healthAlerts.length ? 'À corriger' : 'Prêt'}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {healthAlerts.map(alert => (
+                <div key={`${alert.title}-${alert.detail}`} className={`rounded-2xl border p-4 ${alert.level === 'critical' ? 'bg-red/10 border-red/20' : alert.level === 'warning' ? 'bg-orange/10 border-orange/20' : 'bg-blue/10 border-blue/20'}`}>
+                  <p className="text-white font-black text-sm">{alert.title}</p>
+                  <p className="text-text-secondary text-xs mt-1">{alert.detail}</p>
+                </div>
+              ))}
+              {healthAlerts.length === 0 && <p className="text-text-tertiary text-sm text-center py-6">Configuration saine.</p>}
+            </div>
+          </div>
+        )}
+
+        {adminView === 'imports' && (
+          <div className="glass-card-lg p-5">
+            <h3 className="text-white font-black text-base mb-1">Imports et migration</h3>
+            <p className="text-text-secondary text-xs mb-4">Préparer la reprise des données RestauOS et des fichiers terrain.</p>
+            <div className="space-y-2">
+              {importRows.map(row => (
+                <div key={row.title} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-white font-black text-sm">{row.title}</p>
+                    <p className="text-text-secondary text-xs mt-1">{row.detail}</p>
+                  </div>
+                  <span className="text-blue font-black text-sm">{row.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {adminView === 'audit' && (
+          <div className="glass-card-lg p-5">
+            <h3 className="text-white font-black text-base mb-1">Audit complet</h3>
+            <p className="text-text-secondary text-xs mb-4">Actions sensibles, validations manager et traces d’exploitation.</p>
+            <div className="space-y-2">
+              {auditLogs.slice(0, 8).map(log => (
+                <div key={log.id} className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-white font-black text-sm">{log.action}</p>
+                      <p className="text-text-tertiary text-[10px]">{log.actorName} • {log.actorRole}</p>
+                    </div>
+                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${log.managerApprovalRequired ? 'bg-orange/10 text-orange' : 'bg-green/10 text-green'}`}>
+                      {log.managerApprovalRequired ? 'Manager' : 'OK'}
+                    </span>
+                  </div>
+                  <p className="text-text-secondary text-xs mt-2">{log.reason}</p>
+                </div>
+              ))}
+              {auditLogs.length === 0 && <p className="text-text-tertiary text-sm text-center py-6">Aucune action sensible journalisée.</p>}
+            </div>
+          </div>
+        )}
+
+        {adminView === 'simulation' && (
+          <div className="glass-card-lg p-5">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-white font-black text-base">Simulation de vente</h3>
+                <p className="text-text-secondary text-xs mt-1">Test rapide : produit → POS → prix → TVA → dépôt → stock → impression → caisse.</p>
+              </div>
+              <PlayCircle size={22} className="text-green" />
+            </div>
+            <div className="space-y-2">
+              {simulationRows.map(row => (
+                <div key={row.label} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-center justify-between gap-3">
+                  <span className="text-text-secondary text-xs font-bold">{row.label}</span>
+                  <span className="text-white font-black text-xs text-right">{row.value}</span>
+                </div>
+              ))}
+            </div>
+            <button type="button" onClick={() => setConfigNotice({ tone: simulationPrice && simulationWarehouse && simulationStock ? 'success' : 'warning', message: simulationPrice && simulationWarehouse && simulationStock ? 'Simulation valide : la vente peut être tracée de bout en bout.' : 'Simulation incomplète : vérifier prix, dépôt ou stock.' })} className="mt-4 w-full h-12 rounded-2xl bg-green text-white font-black text-sm">
+              Lancer le contrôle
+            </button>
+          </div>
+        )}
+      </section>
 
       <section className="glass-card-lg p-4 mb-5">
         <div className="relative mb-3">
