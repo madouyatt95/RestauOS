@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useMemo, useRef, useState } from 'react';
-import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat, Truck, Users, CreditCard, Plus, Edit2, Trash2, X, Search, Network, Upload, PlayCircle, AlertTriangle, CheckCircle2, KeyRound, Settings2, Boxes, Landmark, Sparkles, History, Copy, Table2, GitCompare, Globe2, PlugZap, RotateCcw, Percent, UserCheck, Layers, PackageCheck } from 'lucide-react';
+import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat, Truck, Users, CreditCard, Plus, Edit2, Trash2, X, Search, Network, Upload, PlayCircle, AlertTriangle, CheckCircle2, KeyRound, Settings2, Boxes, Landmark, Sparkles, History, Copy, Table2, RotateCcw, UserCheck, Layers, PackageCheck } from 'lucide-react';
 import { useHospiStore, type POSType, type WarehouseType } from '../stores/hospiStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
 
@@ -186,17 +186,11 @@ export default function HospiSettings() {
     { key: 'simulation', label: 'Simulation', detail: 'Tester POS, prix, stock et caisse.', icon: PlayCircle },
     { key: 'drafts', label: 'Brouillons', detail: 'Tester puis publier une configuration.', icon: Layers },
     { key: 'history', label: 'Historique', detail: 'Voir les modifications publiées.', icon: History },
-    { key: 'duplicate', label: 'Duplication', detail: 'Copier POS, site, prix ou droits.', icon: Copy },
     { key: 'packs', label: 'Packs métier', detail: 'Créer un métier complet rapidement.', icon: PackageCheck },
     { key: 'priceMatrix', label: 'Matrice prix', detail: 'Prix par produit et par POS.', icon: Table2 },
     { key: 'permissionMatrix', label: 'Matrice droits', detail: 'Autoriser, bloquer ou exiger manager.', icon: KeyRound },
-    { key: 'impact', label: 'Impact', detail: 'Voir les dépendances avant modification.', icon: GitCompare },
-    { key: 'multisite', label: 'Multi-site', detail: 'Comparer les sites et leurs stocks.', icon: Globe2 },
-    { key: 'connectors', label: 'Connecteurs', detail: 'PMS externe, compta, TPE, imprimantes.', icon: PlugZap },
     { key: 'backup', label: 'Sauvegarde', detail: 'Sauvegarder et restaurer la configuration.', icon: RotateCcw },
-    { key: 'taxes', label: 'Taxes', detail: 'Profils fiscaux par métier.', icon: Percent },
     { key: 'approvals', label: 'Validations', detail: 'Demandes manager à approuver.', icon: UserCheck },
-    { key: 'environments', label: 'Environnements', detail: 'Démo, formation et production.', icon: Layers },
   ];
 
   const setupSteps = [
@@ -784,7 +778,7 @@ export default function HospiSettings() {
                   key={step.title}
                   type="button"
                   onClick={() => {
-                    if (step.title === 'Entreprise' || step.title === 'Sites') openAdminView('advanced', 'La création entreprise/site complète sera rangée dans Paramètres avancés.');
+                    if (step.title === 'Entreprise' || step.title === 'Sites') openAdminView('architecture');
                     if (step.title === 'Modules métier') openAdminView('modules');
                     if (step.title === 'POS') openQuickConfig('pos');
                     if (step.title === 'Dépôts') openQuickConfig('warehouse');
@@ -1103,28 +1097,6 @@ export default function HospiSettings() {
             >
               <Upload size={15} /> Choisir un fichier CSV
             </button>
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const report = importAdminCsv('products', `name;sku;category;unit;stockable;cost;quantity;threshold\nProduit import demo;IMP-DEMO;import;unité;true;1200;10;3`, 'Admin');
-                  setConfigNotice({ tone: report.errors.length ? 'warning' : 'success', message: `Import produits : ${report.imported} ligne(s), ${report.errors.length} erreur(s).` });
-                }}
-                className="h-11 rounded-xl bg-blue/10 text-blue text-xs font-black"
-              >
-                Exemple produits
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const report = importAdminCsv('prices', `pos_id;product_id;sale_price;tax_rate;available\n${posList[0]?.id || ''};${products[0]?.id || ''};1990;18;true`, 'Admin');
-                  setConfigNotice({ tone: report.errors.length ? 'warning' : 'success', message: `Import prix : ${report.imported} ligne(s), ${report.errors.length} erreur(s).` });
-                }}
-                className="h-11 rounded-xl bg-green/10 text-green text-xs font-black"
-              >
-                Exemple prix
-              </button>
-            </div>
             {importReports.length > 0 && (
               <div className="mt-4 space-y-2">
                 {importReports.slice(0, 4).map(report => (
@@ -1425,17 +1397,20 @@ export default function HospiSettings() {
             <h3 className="text-white font-black text-base mb-1">Sauvegarde / restauration configuration</h3>
             <p className="text-text-secondary text-xs mb-4">Exporter, restaurer et sécuriser la configuration avant publication.</p>
             <div className="grid grid-cols-2 gap-3">
-              {['Sauvegarder maintenant', 'Exporter config', 'Importer config', 'Restaurer version'].map(action => (
+              {['Sauvegarder maintenant', 'Restaurer dernière sauvegarde', 'Voir brouillons', 'Voir historique'].map(action => (
                 <button key={action} type="button" onClick={() => {
-                  if (action === 'Sauvegarder maintenant' || action === 'Exporter config') {
+                  if (action === 'Sauvegarder maintenant') {
                     const snapshot = createConfigSnapshot(`Snapshot ${new Date().toLocaleString('fr-FR')}`, 'Admin');
                     setConfigNotice({ tone: 'success', message: `${snapshot.name} créé : ${snapshot.summary}` });
-                  } else if (action === 'Restaurer version' && configSnapshots[0]) {
+                  } else if (action === 'Restaurer dernière sauvegarde' && configSnapshots[0]) {
                     restoreConfigSnapshot(configSnapshots[0].id, 'Admin');
                     setConfigNotice({ tone: 'success', message: `${configSnapshots[0].name} restauré.` });
+                  } else if (action === 'Restaurer dernière sauvegarde') {
+                    setConfigNotice({ tone: 'warning', message: 'Aucune sauvegarde disponible à restaurer.' });
+                  } else if (action === 'Voir brouillons') {
+                    openAdminView('drafts');
                   } else {
-                    createConfigDraft({ title: 'Import configuration', module: 'Sauvegarde', change_type: 'backup', before_value: 'Configuration actuelle', after_value: 'Fichier importé', created_by: 'Admin' });
-                    setConfigNotice({ tone: 'success', message: `${action} préparé en brouillon.` });
+                    openAdminView('history');
                   }
                 }} className="h-20 rounded-2xl bg-white/5 border border-white/10 text-white text-xs font-black">
                   {action}
@@ -1492,7 +1467,7 @@ export default function HospiSettings() {
                   </div>
                 </div>
               ))}
-              <button type="button" onClick={() => { createApprovalRequest({ title: 'Validation test', detail: 'Demande sensible créée depuis Admin.', module: 'Admin', requested_by: 'Admin' }); setConfigNotice({ tone: 'success', message: 'Demande de validation créée.' }); }} className="w-full h-11 rounded-xl bg-orange/10 text-orange text-xs font-black">Créer demande</button>
+              {approvalRequests.length === 0 && <p className="text-text-tertiary text-sm text-center py-6">Aucune validation en attente.</p>}
             </div>
           </div>
         )}
