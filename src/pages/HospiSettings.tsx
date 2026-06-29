@@ -42,6 +42,7 @@ export default function HospiSettings() {
     approvalRequests,
     configSnapshots,
     adminEnvironments,
+    importReports,
     suppliers,
     purchaseOrders,
     purchaseOrderLines,
@@ -78,6 +79,8 @@ export default function HospiSettings() {
     resolveApprovalRequest,
     createConfigSnapshot,
     restoreConfigSnapshot,
+    getCriticalConfigAlerts,
+    importAdminCsv,
     getCustomerAccountBalance,
     settleCustomerAccount,
   } = useHospiStore();
@@ -232,6 +235,7 @@ export default function HospiSettings() {
       .slice(0, 4)
       .map(warehouse => ({ level: 'info', title: `${warehouse.name} isolé`, detail: 'Aucun POS et aucun stock actif liés.' })),
   ];
+  const criticalConfigAlerts = getCriticalConfigAlerts();
 
   const roleRows = [
     { role: 'Direction générale', rights: 'Tout voir, tout configurer, valider les actions sensibles' },
@@ -841,6 +845,43 @@ export default function HospiSettings() {
                 </div>
               ))}
             </div>
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  const report = importAdminCsv('products', `name;sku;category;unit;stockable;cost;quantity;threshold\nProduit import demo;IMP-DEMO;import;unité;true;1200;10;3`, 'Admin');
+                  setConfigNotice({ tone: report.errors.length ? 'warning' : 'success', message: `Import produits : ${report.imported} ligne(s), ${report.errors.length} erreur(s).` });
+                }}
+                className="h-11 rounded-xl bg-blue/10 text-blue text-xs font-black"
+              >
+                Importer produits CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const report = importAdminCsv('prices', `pos_id;product_id;sale_price;tax_rate;available\n${posList[0]?.id || ''};${products[0]?.id || ''};1990;18;true`, 'Admin');
+                  setConfigNotice({ tone: report.errors.length ? 'warning' : 'success', message: `Import prix : ${report.imported} ligne(s), ${report.errors.length} erreur(s).` });
+                }}
+                className="h-11 rounded-xl bg-green/10 text-green text-xs font-black"
+              >
+                Importer prix CSV
+              </button>
+            </div>
+            {importReports.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {importReports.slice(0, 4).map(report => (
+                  <div key={report.id} className="rounded-xl bg-white/5 px-3 py-2 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-white font-bold text-xs">{report.kind} • {report.imported} importé(s)</p>
+                      <p className="text-text-tertiary text-[10px]">{report.errors.length ? report.errors[0] : 'Aucune erreur'}</p>
+                    </div>
+                    <span className={report.errors.length ? 'text-orange font-black text-xs' : 'text-green font-black text-xs'}>
+                      {report.errors.length} err.
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -906,7 +947,12 @@ export default function HospiSettings() {
                   <div className="grid grid-cols-3 gap-2 mt-3">
                     <button type="button" onClick={() => setConfigNotice({ tone: 'success', message: `${row.title} : ${row.before_value} → ${row.after_value}` })} className="h-9 rounded-xl bg-white/5 text-white text-[10px] font-black">Prévisualiser</button>
                     <button type="button" onClick={() => { testConfigDraft(row.id); setConfigNotice({ tone: 'success', message: `${row.title} testé.` }); }} className="h-9 rounded-xl bg-white/5 text-white text-[10px] font-black">Tester</button>
-                    <button type="button" onClick={() => { publishConfigDraft(row.id, 'Admin'); setConfigNotice({ tone: 'success', message: `${row.title} publié et historisé.` }); }} className="h-9 rounded-xl bg-green/10 text-green text-[10px] font-black">Publier</button>
+                    <button type="button" onClick={() => {
+                      const published = publishConfigDraft(row.id, 'Admin');
+                      setConfigNotice(published
+                        ? { tone: 'success', message: `${row.title} publié et historisé.` }
+                        : { tone: 'warning', message: `Publication bloquée : ${criticalConfigAlerts[0]?.title || 'santé système à corriger'}.` });
+                    }} className="h-9 rounded-xl bg-green/10 text-green text-[10px] font-black">Publier</button>
                   </div>
                 </div>
               ))}

@@ -380,6 +380,15 @@ export interface AdminEnvironment {
   updated_at: string;
 }
 
+export interface ImportReport {
+  id: string;
+  kind: 'products' | 'prices' | 'stock' | 'suppliers' | 'rooms' | 'customers';
+  imported: number;
+  errors: string[];
+  created_by: string;
+  created_at: string;
+}
+
 export type PurchaseOrderStatus = 'draft' | 'ordered' | 'partially_received' | 'received' | 'cancelled';
 
 export interface Supplier {
@@ -706,6 +715,16 @@ const adminEnvironments: AdminEnvironment[] = [
   { id: 'env-production', name: 'Production', status: 'protected', detail: 'Publication contrôlée, audit obligatoire, sauvegarde avant changement.', updated_at: now },
 ];
 
+const parseSimpleCsv = (csv: string) => {
+  const lines = csv.trim().split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(';').map(header => header.trim());
+  return lines.slice(1).map(line => {
+    const values = line.split(';').map(value => value.trim());
+    return Object.fromEntries(headers.map((header, index) => [header, values[index] || '']));
+  });
+};
+
 const rooms: Room[] = [
   { id: 'room-101', site_id: 'site-dakar', room_number: '101', room_type: 'Deluxe', status: 'occupied', created_at: now },
   { id: 'room-102', site_id: 'site-dakar', room_number: '102', room_type: 'Standard', status: 'available', created_at: now },
@@ -987,6 +1006,7 @@ interface HospiState {
   approvalRequests: ApprovalRequest[];
   configSnapshots: ConfigSnapshot[];
   adminEnvironments: AdminEnvironment[];
+  importReports: ImportReport[];
   suppliers: Supplier[];
   purchaseOrders: PurchaseOrder[];
   purchaseOrderLines: PurchaseOrderLine[];
@@ -1020,11 +1040,14 @@ interface HospiState {
   duplicatePOSConfig: (posId: string, name: string) => POS | null;
   createBusinessPack: (type: POSType, siteId: string, label: string) => { pos: POS; warehouse: Warehouse } | null;
   setPermissionPolicy: (role: string, action: string, mode: PermissionMode) => PermissionPolicy;
+  getPermissionMode: (role: string, action: string) => PermissionMode | undefined;
   upsertTaxProfile: (input: Omit<TaxProfile, 'id' | 'updated_at'> & { id?: string }) => TaxProfile;
   createApprovalRequest: (input: Omit<ApprovalRequest, 'id' | 'status' | 'created_at'>) => ApprovalRequest;
   resolveApprovalRequest: (approvalId: string, status: Exclude<ApprovalStatus, 'pending'>, actor: string) => ApprovalRequest | null;
   createConfigSnapshot: (name: string, createdBy: string) => ConfigSnapshot;
   restoreConfigSnapshot: (snapshotId: string, actor: string) => boolean;
+  getCriticalConfigAlerts: () => Array<{ title: string; detail: string }>;
+  importAdminCsv: (kind: ImportReport['kind'], csv: string, createdBy: string) => ImportReport;
   recordProduction: (productId: string, warehouseId: string, quantity: number, createdBy: string) => ProductionBatch | null;
   reserveStock: (productId: string, warehouseId: string, quantity: number, sourceLabel: string) => StockReservation | null;
   recordInternalConsumption: (productId: string, warehouseId: string, quantity: number, reason: InternalConsumption['reason'], createdBy: string) => StockMovement | null;
@@ -1096,6 +1119,7 @@ export const useHospiStore = create<HospiState>()(
       approvalRequests,
       configSnapshots: [],
       adminEnvironments,
+      importReports: [],
       suppliers,
       purchaseOrders,
       purchaseOrderLines,
@@ -1446,6 +1470,10 @@ export const useHospiStore = create<HospiState>()(
         const state = get();
         const draft = state.configDrafts.find(item => item.id === draftId);
         if (!draft) return null;
+        const criticalAlerts = get().getCriticalConfigAlerts();
+        if (criticalAlerts.length > 0 && !['warehouse', 'pos', 'price'].includes(draft.change_type)) {
+          return null;
+        }
         const publishedAt = new Date().toISOString();
         const updated: ConfigDraft = { ...draft, status: 'published', published_at: publishedAt };
         const history: ConfigHistoryEntry = {
@@ -1543,6 +1571,7 @@ export const useHospiStore = create<HospiState>()(
         });
         return policy;
       },
+      getPermissionMode: (role, action) => get().permissionPolicies.find(item => item.role === role && item.action === action)?.mode,
       upsertTaxProfile: (input) => {
         const state = get();
         const updatedAt = new Date().toISOString();
@@ -1624,6 +1653,78 @@ export const useHospiStore = create<HospiState>()(
           configHistoryEntries: [history, ...state.configHistoryEntries],
         });
         return true;
+      },
+      getCriticalConfigAlerts: () => {
+        const state = get();
+        return [
+          ...state.posList
+            .filter(pos => !state.warehouses.some(warehouse => warehouse.id === pos.default_warehouse_id))
+            .map(pos => ({ title: `${pos.name} sans dépôt valide`, detail: 'Les ventes ne pourront pas déstocker correctement.' })),
+          ...state.posList
+            .filter(pos => state.posProductPrices.filter(price => price.pos_id === pos.id && price.is_available).length === 0)
+            .map(pos => ({ title: `${pos.name} sans catalogue de vente`, detail: 'Aucun prix actif n’est associé à ce POS.' })),
+        ];
+      },
+      importAdminCsv: (kind, csv, createdBy) => {
+        const state = get();
+        const rows = parseSimpleCsv(csv);
+        const errors: string[] = [];
+        let imported = 0;
+        if (kind === 'products') {
+          rows.forEach((row, index) => {
+            if (!row.name || !row.sku) {
+              errors.push(`Ligne ${index + 2}: nom ou SKU manquant`);
+              return;
+            }
+            get().addProduct({
+              company_id: state.companies[0]?.id || 'comp-sartal-demo',
+              name: row.name,
+              sku: row.sku,
+              category_id: row.category || 'import',
+              unit: row.unit || 'unité',
+              is_stockable: row.stockable !== 'false',
+              is_active: true,
+              primary_warehouse_id: row.warehouse_id || state.warehouses[0]?.id,
+              fallback_policy: 'block_sale',
+              average_purchase_price: Number(row.cost) || 0,
+              initial_warehouse_id: row.warehouse_id || state.warehouses[0]?.id,
+              initial_quantity: Number(row.quantity) || 0,
+              alert_threshold: Number(row.threshold) || 0,
+            });
+            imported += 1;
+          });
+        } else if (kind === 'prices') {
+          rows.forEach((row, index) => {
+            if (!row.pos_id || !row.product_id || !row.sale_price) {
+              errors.push(`Ligne ${index + 2}: pos_id, product_id ou sale_price manquant`);
+              return;
+            }
+            if (!state.posList.some(pos => pos.id === row.pos_id) || !state.products.some(product => product.id === row.product_id)) {
+              errors.push(`Ligne ${index + 2}: POS ou produit introuvable`);
+              return;
+            }
+            get().upsertPOSProductPrice({
+              pos_id: row.pos_id,
+              product_id: row.product_id,
+              sale_price: Number(row.sale_price) || 0,
+              tax_rate: Number(row.tax_rate) || 0,
+              is_available: row.available !== 'false',
+            });
+            imported += 1;
+          });
+        } else {
+          errors.push('Import non encore automatisé pour ce type.');
+        }
+        const report: ImportReport = {
+          id: `import-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          kind,
+          imported,
+          errors,
+          created_by: createdBy,
+          created_at: new Date().toISOString(),
+        };
+        set({ importReports: [report, ...get().importReports] });
+        return report;
       },
       recordProduction: (productId, warehouseId, quantity, createdBy) => {
         const state = get();
@@ -2336,6 +2437,7 @@ export const useHospiStore = create<HospiState>()(
           approvalRequests: mergeById(current.approvalRequests, saved.approvalRequests),
           configSnapshots: mergeById(current.configSnapshots, saved.configSnapshots),
           adminEnvironments: mergeById(current.adminEnvironments, saved.adminEnvironments),
+          importReports: mergeById(current.importReports, saved.importReports),
           stockMovements: mergeById(current.stockMovements, saved.stockMovements),
         };
       },

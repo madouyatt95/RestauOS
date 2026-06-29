@@ -60,8 +60,10 @@ function createDraft(title, beforeValue, afterValue) {
 function publishDraft(id) {
   const draft = state.configDrafts.find(item => item.id === id);
   assert.ok(draft, 'draft exists before publish');
+  if (state.criticalAlert && draft.type !== 'fix') return false;
   draft.status = 'published';
   state.configHistory.unshift({ title: draft.title, before_value: draft.before_value, after_value: draft.after_value });
+  return true;
 }
 
 function setPermission(role, action, mode) {
@@ -94,6 +96,24 @@ function resolveApproval(id, status) {
   approval.status = status;
 }
 
+function importCsv(kind, csv) {
+  const rows = csv.trim().split(/\r?\n/);
+  const headers = rows[0].split(';');
+  let imported = 0;
+  const errors = [];
+  rows.slice(1).forEach((line, index) => {
+    const values = line.split(';');
+    const row = Object.fromEntries(headers.map((header, i) => [header, values[i] || '']));
+    if (kind === 'products' && (!row.name || !row.sku)) errors.push(`Ligne ${index + 2}: nom ou SKU manquant`);
+    else imported += 1;
+  });
+  return { imported, errors };
+}
+
+function recordSensitiveAudit(managerApprovalRequired) {
+  if (managerApprovalRequired) state.approvals.unshift({ id: `approval-${state.approvals.length + 1}`, status: 'pending' });
+}
+
 recordSale('prod-coca-33', 5);
 assert.equal(state.stockLevels.find(item => item.warehouse_id === 'wh-restaurant').quantity, 5, 'POS sale decrements restaurant warehouse');
 assert.equal(state.lots[0].quantity, 0, 'FIFO consumes earliest expiring lot first');
@@ -108,12 +128,18 @@ assert.equal(state.purchaseLine.quantity_received, 3, 'partial receipt records a
 assert.equal(state.stockLevels.find(item => item.warehouse_id === 'wh-restaurant').quantity, 8, 'partial receipt increases stock');
 
 const draft = createDraft('Prix Coca Night Club', '2500 F', '2800 F');
-publishDraft(draft.id);
+assert.equal(publishDraft(draft.id), true, 'healthy config draft can publish');
 assert.equal(state.configDrafts[0].status, 'published', 'config draft can be published');
 assert.equal(state.configHistory[0].after_value, '2800 F', 'published draft creates config history');
 
 setPermission('Serveur', 'Remise', 'manager');
 assert.equal(state.permissionPolicies[0].mode, 'manager', 'permission matrix persists manager validation mode');
+assert.equal(state.permissionPolicies.some(item => item.role === 'Serveur' && item.action === 'Remise' && item.mode === 'manager'), true, 'persisted permission can block action behind manager approval');
+
+state.criticalAlert = true;
+const blockedDraft = createDraft('Pack fiscal', 'ancien', 'nouveau');
+assert.equal(publishDraft(blockedDraft.id), false, 'critical config alert blocks unsafe publication');
+state.criticalAlert = false;
 
 const pack = createBusinessPack('Rooftop');
 assert.equal(pack.pos.default_warehouse_id, pack.warehouse.id, 'business pack creates linked POS and warehouse');
@@ -124,4 +150,10 @@ assert.equal(snapshot.posCount, state.posList.length, 'configuration snapshot ca
 resolveApproval('approval-1', 'approved');
 assert.equal(state.approvals[0].status, 'approved', 'manager approval workflow resolves request');
 
-console.log('Regression checks passed: POS stock, FIFO lots, PMS folio, partial supplier receipt, admin config workflows.');
+const badImport = importCsv('products', 'name;sku\nProduit sans sku;');
+assert.equal(badImport.errors.length, 1, 'CSV import reports invalid rows');
+
+recordSensitiveAudit(true);
+assert.equal(state.approvals[0].status, 'pending', 'sensitive audit creates approval request');
+
+console.log('Regression checks passed: POS stock, FIFO lots, PMS folio, partial supplier receipt, admin config workflows, permissions, imports, publication guard.');
