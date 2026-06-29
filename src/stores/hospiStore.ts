@@ -95,6 +95,17 @@ export interface StockLevel {
   updated_at: string;
 }
 
+export interface StockLot {
+  id: string;
+  warehouse_id: string;
+  product_id: string;
+  lot_number: string;
+  expires_at?: string;
+  quantity: number;
+  unit_cost: number;
+  received_at: string;
+}
+
 export interface StockMovement {
   id: string;
   company_id: string;
@@ -261,6 +272,8 @@ export interface PurchaseOrderLine {
   quantity_ordered: number;
   quantity_received: number;
   unit_cost: number;
+  lot_number?: string;
+  expires_at?: string;
 }
 
 export interface PurchaseOrder {
@@ -772,6 +785,7 @@ interface HospiState {
   purchaseOrders: PurchaseOrder[];
   purchaseOrderLines: PurchaseOrderLine[];
   supplierReceipts: SupplierReceipt[];
+  stockLots: StockLot[];
   activePOSId: string;
   setActivePOS: (posId: string) => void;
   addPOS: (input: Omit<POS, 'id' | 'created_at'>) => POS;
@@ -803,9 +817,17 @@ interface HospiState {
     warehouse_id: string;
     ordered_by: string;
     expected_at?: string;
-    lines: Array<{ product_id: string; quantity_ordered: number; unit_cost: number }>;
+    lines: Array<{ product_id: string; quantity_ordered: number; unit_cost: number; lot_number?: string; expires_at?: string }>;
   }) => PurchaseOrder | null;
+  updatePurchaseOrder: (purchaseOrderId: string, input: {
+    supplier_id?: string;
+    warehouse_id?: string;
+    expected_at?: string;
+    lines?: Array<{ product_id: string; quantity_ordered: number; unit_cost: number; lot_number?: string; expires_at?: string }>;
+  }) => PurchaseOrder | null;
+  receivePurchaseOrderLines: (purchaseOrderId: string, receivedBy: string, receivedQuantities: Record<string, number>) => SupplierReceipt | null;
   receivePurchaseOrder: (purchaseOrderId: string, receivedBy: string) => SupplierReceipt | null;
+  updateStockThreshold: (productId: string, warehouseId: string, alertThreshold: number) => StockLevel | null;
   getRegisterForPOS: (posId?: string) => CashRegister | undefined;
   getOpenCashSession: (posId?: string) => CashSession | undefined;
   openCashSession: (posId: string, openedBy: string, openingFloat: number) => CashSession | null;
@@ -830,6 +852,7 @@ export const useHospiStore = create<HospiState>()(
       posProductPrices: [...posProductPrices, ...demoPrices],
       stockLevels: [...stockLevels, ...demoStockLevels],
       stockMovements: [],
+      stockLots: [],
       rooms: [...rooms, ...demoRooms],
       guests: [...guests, ...demoGuests],
       stays: [...stays, ...demoStays],
@@ -1112,11 +1135,31 @@ export const useHospiStore = create<HospiState>()(
             }));
         });
 
+        const nextStockLots = [...state.stockLots];
+        const consumeLots = (productId: string, stockWarehouseId: string, quantity: number) => {
+          let remaining = quantity;
+          const lotIndexes = nextStockLots
+            .map((lot, index) => ({ lot, index }))
+            .filter(item => item.lot.product_id === productId && item.lot.warehouse_id === stockWarehouseId && item.lot.quantity > 0)
+            .sort((a, b) => {
+              const aDate = a.lot.expires_at || a.lot.received_at;
+              const bDate = b.lot.expires_at || b.lot.received_at;
+              return new Date(aDate).getTime() - new Date(bDate).getTime();
+            });
+          lotIndexes.forEach(({ lot, index }) => {
+            if (remaining <= 0) return;
+            const consumed = Math.min(lot.quantity, remaining);
+            nextStockLots[index] = { ...lot, quantity: Math.max(0, lot.quantity - consumed) };
+            remaining -= consumed;
+          });
+        };
+
         const nextStockLevels = state.stockLevels.map(stock => {
           const consumption = consumptionByProduct
             .filter(item => item.productId === stock.product_id && stock.warehouse_id === item.warehouseId)
             .reduce((sum, item) => sum + item.quantity, 0);
           if (!consumption) return stock;
+          consumeLots(stock.product_id, stock.warehouse_id, consumption);
           movements.push({
             id: `mov-${Date.now()}-${stock.product_id}-${Math.random().toString(36).slice(2, 6)}`,
             company_id: companyId,
@@ -1142,6 +1185,7 @@ export const useHospiStore = create<HospiState>()(
         if (movements.length > 0) {
           set({
             stockLevels: nextStockLevels,
+            stockLots: nextStockLots,
             stockMovements: [...movements, ...state.stockMovements],
           });
         }
@@ -1367,6 +1411,8 @@ export const useHospiStore = create<HospiState>()(
           quantity_ordered: line.quantity_ordered,
           quantity_received: 0,
           unit_cost: line.unit_cost,
+          lot_number: line.lot_number,
+          expires_at: line.expires_at,
         }));
 
         set({
@@ -1375,14 +1421,53 @@ export const useHospiStore = create<HospiState>()(
         });
         return order;
       },
-      receivePurchaseOrder: (purchaseOrderId, receivedBy) => {
+      updatePurchaseOrder: (purchaseOrderId, input) => {
+        const state = get();
+        const order = state.purchaseOrders.find(item => item.id === purchaseOrderId);
+        if (!order || order.status === 'received' || order.status === 'cancelled') return null;
+        const nextOrder: PurchaseOrder = {
+          ...order,
+          supplier_id: input.supplier_id || order.supplier_id,
+          warehouse_id: input.warehouse_id || order.warehouse_id,
+          expected_at: input.expected_at ?? order.expected_at,
+        };
+        const nextLines = input.lines
+          ? [
+              ...state.purchaseOrderLines.filter(line => line.purchase_order_id !== purchaseOrderId),
+              ...input.lines
+                .filter(line => state.products.some(product => product.id === line.product_id) && line.quantity_ordered > 0)
+                .map(line => ({
+                  id: `pol-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  purchase_order_id: purchaseOrderId,
+                  product_id: line.product_id,
+                  quantity_ordered: line.quantity_ordered,
+                  quantity_received: 0,
+                  unit_cost: line.unit_cost,
+                  lot_number: line.lot_number,
+                  expires_at: line.expires_at,
+                })),
+            ]
+          : state.purchaseOrderLines;
+        set({
+          purchaseOrders: state.purchaseOrders.map(item => item.id === purchaseOrderId ? nextOrder : item),
+          purchaseOrderLines: nextLines,
+        });
+        return nextOrder;
+      },
+      receivePurchaseOrderLines: (purchaseOrderId, receivedBy, receivedQuantities) => {
         const state = get();
         const order = state.purchaseOrders.find(item => item.id === purchaseOrderId);
         if (!order || order.status === 'received' || order.status === 'cancelled') return null;
         const warehouse = state.warehouses.find(item => item.id === order.warehouse_id);
         if (!warehouse) return null;
         const lines = state.purchaseOrderLines.filter(line => line.purchase_order_id === purchaseOrderId);
-        const receivableLines = lines.filter(line => line.quantity_ordered > line.quantity_received);
+        const receivableLines = lines
+          .map(line => {
+            const remaining = Math.max(0, line.quantity_ordered - line.quantity_received);
+            const requested = Math.max(0, Number(receivedQuantities[line.id] || 0));
+            return { line, quantity: Math.min(remaining, requested) };
+          })
+          .filter(item => item.quantity > 0);
         if (receivableLines.length === 0) return null;
 
         const createdAt = new Date().toISOString();
@@ -1392,20 +1477,21 @@ export const useHospiStore = create<HospiState>()(
           purchase_order_id: purchaseOrderId,
           warehouse_id: order.warehouse_id,
           received_by: receivedBy,
-          total_cost: receivableLines.reduce((sum, line) => sum + ((line.quantity_ordered - line.quantity_received) * line.unit_cost), 0),
+          total_cost: receivableLines.reduce((sum, item) => sum + item.quantity * item.line.unit_cost, 0),
           created_at: createdAt,
         };
 
         const nextLines = state.purchaseOrderLines.map(line => {
           if (line.purchase_order_id !== purchaseOrderId) return line;
-          return { ...line, quantity_received: line.quantity_ordered };
+          const received = receivableLines.find(item => item.line.id === line.id)?.quantity || 0;
+          return { ...line, quantity_received: Math.min(line.quantity_ordered, line.quantity_received + received) };
         });
 
         const nextStockLevels = [...state.stockLevels];
-        receivableLines.forEach(line => {
+        const nextStockLots = [...state.stockLots];
+        receivableLines.forEach(({ line, quantity }) => {
           const product = state.products.find(item => item.id === line.product_id);
           if (!product) return;
-          const quantity = line.quantity_ordered - line.quantity_received;
           const existingStockIndex = nextStockLevels.findIndex(level => level.product_id === line.product_id && level.warehouse_id === order.warehouse_id);
           if (existingStockIndex >= 0) {
             nextStockLevels[existingStockIndex] = {
@@ -1424,31 +1510,81 @@ export const useHospiStore = create<HospiState>()(
               updated_at: createdAt,
             });
           }
+          if (line.lot_number || line.expires_at || ['boissons', 'boissons_premium', 'spa', 'minibar'].includes(product.category_id) || warehouse.type === 'cold_room') {
+            nextStockLots.push({
+              id: `lot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              warehouse_id: order.warehouse_id,
+              product_id: line.product_id,
+              lot_number: line.lot_number || `LOT-${new Date().toISOString().slice(0, 10)}`,
+              expires_at: line.expires_at,
+              quantity,
+              unit_cost: line.unit_cost,
+              received_at: createdAt,
+            });
+          }
         });
 
-        const movements: StockMovement[] = receivableLines.map(line => ({
+        const movements: StockMovement[] = receivableLines.map(({ line, quantity }) => ({
           id: `purchase-${Date.now()}-${line.id}`,
           company_id: site?.company_id || state.companies[0]?.id || 'comp-sartal-demo',
           site_id: site?.id || 'site-dakar',
           warehouse_id: order.warehouse_id,
           product_id: line.product_id,
           movement_type: 'purchase',
-          quantity: line.quantity_ordered - line.quantity_received,
+          quantity,
           reason: `Réception fournisseur ${order.id}`,
           reference_type: 'supplier_receipt',
           reference_id: receipt.id,
           created_by: receivedBy,
           created_at: createdAt,
         }));
+        const allLinesDone = nextLines
+          .filter(line => line.purchase_order_id === purchaseOrderId)
+          .every(line => line.quantity_received >= line.quantity_ordered);
 
         set({
-          purchaseOrders: state.purchaseOrders.map(item => item.id === purchaseOrderId ? { ...item, status: 'received' } : item),
+          purchaseOrders: state.purchaseOrders.map(item => item.id === purchaseOrderId ? { ...item, status: allLinesDone ? 'received' : 'partially_received' } : item),
           purchaseOrderLines: nextLines,
           supplierReceipts: [receipt, ...state.supplierReceipts],
           stockLevels: nextStockLevels,
+          stockLots: nextStockLots,
           stockMovements: [...movements, ...state.stockMovements],
         });
         return receipt;
+      },
+      receivePurchaseOrder: (purchaseOrderId, receivedBy) => {
+        const state = get();
+        const quantities = Object.fromEntries(
+          state.purchaseOrderLines
+            .filter(line => line.purchase_order_id === purchaseOrderId)
+            .map(line => [line.id, Math.max(0, line.quantity_ordered - line.quantity_received)])
+        );
+        return get().receivePurchaseOrderLines(purchaseOrderId, receivedBy, quantities);
+      },
+      updateStockThreshold: (productId, warehouseId, alertThreshold) => {
+        const state = get();
+        const product = state.products.find(item => item.id === productId);
+        const warehouse = state.warehouses.find(item => item.id === warehouseId);
+        if (!product || !warehouse || alertThreshold < 0) return null;
+        const createdAt = new Date().toISOString();
+        const stock = state.stockLevels.find(level => level.product_id === productId && level.warehouse_id === warehouseId);
+        const updated: StockLevel = stock
+          ? { ...stock, alert_threshold: alertThreshold, updated_at: createdAt }
+          : {
+              id: `stock-${productId}-${warehouseId}`,
+              warehouse_id: warehouseId,
+              product_id: productId,
+              quantity: 0,
+              unit: product.unit,
+              alert_threshold: alertThreshold,
+              updated_at: createdAt,
+            };
+        set({
+          stockLevels: stock
+            ? state.stockLevels.map(level => level.id === stock.id ? updated : level)
+            : [...state.stockLevels, updated],
+        });
+        return updated;
       },
       getRegisterForPOS: (posId) => get().cashRegisters.find(register =>
         register.pos_id === (posId || get().activePOSId) && register.is_active
@@ -1678,6 +1814,7 @@ export const useHospiStore = create<HospiState>()(
           products: mergeById(current.products, saved.products),
           posProductPrices: mergeById(current.posProductPrices, saved.posProductPrices),
           stockLevels: mergeById(current.stockLevels, saved.stockLevels),
+          stockLots: mergeById(current.stockLots, saved.stockLots),
           rooms: mergeById(current.rooms, saved.rooms),
           guests: mergeById(current.guests, saved.guests),
           stays: mergeById(current.stays, saved.stays),

@@ -5,7 +5,7 @@ import { useHospiStore } from '../stores/hospiStore';
 import { useAuthStore } from '../stores/authStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package, Settings, Warehouse, Truck, Activity, CreditCard, X, Store, ReceiptText, Download, ShieldCheck, ClipboardCheck } from 'lucide-react';
+import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package, Settings, Warehouse, Truck, Activity, CreditCard, X, Store, ReceiptText, Download, ShieldCheck, ClipboardCheck, Printer } from 'lucide-react';
 
 const purchaseStatusLabels: Record<string, string> = {
   draft: 'Brouillon',
@@ -40,6 +40,7 @@ export default function Stocks() {
     products,
     stockLevels,
     stockMovements,
+    stockLots,
     suppliers,
     purchaseOrders,
     purchaseOrderLines,
@@ -48,7 +49,10 @@ export default function Stocks() {
     adjustInventory,
     recordLoss,
     addPurchaseOrder,
+    updatePurchaseOrder,
+    receivePurchaseOrderLines,
     receivePurchaseOrder,
+    updateStockThreshold,
     getPriceForProduct
   } = useHospiStore();
   const { canPerform, requiresManagerApproval, recordAudit } = useBusinessRulesStore();
@@ -66,15 +70,30 @@ export default function Stocks() {
   const [familyFilter, setFamilyFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<StockStatusFilter>('all');
   const [movementFilter, setMovementFilter] = useState('all');
+  const [movementFrom, setMovementFrom] = useState('');
+  const [movementTo, setMovementTo] = useState('');
   const [inventoryWarehouseId, setInventoryWarehouseId] = useState(warehouses[0]?.id || '');
   const [inventoryCounts, setInventoryCounts] = useState<Record<string, string>>({});
   const [stockNotice, setStockNotice] = useState<string | null>(null);
+  const [showPurchaseForm, setShowPurchaseForm] = useState(false);
+  const [editingPurchaseOrderId, setEditingPurchaseOrderId] = useState<string | null>(null);
+  const [receivingPurchaseOrderId, setReceivingPurchaseOrderId] = useState<string | null>(null);
+  const [receiptQuantities, setReceiptQuantities] = useState<Record<string, string>>({});
+  const [thresholdEdits, setThresholdEdits] = useState<Record<string, string>>({});
   const [moveQty, setMoveQty] = useState('');
   const [moveNote, setMoveNote] = useState('');
   const [newItem, setNewItem] = useState({ name: '', quantity: '', unit: 'kg', minStock: '', category: '' });
   const [transferForm, setTransferForm] = useState({ productId: 'prod-coca-33', fromWarehouseId: 'wh-central', toWarehouseId: 'wh-restaurant', quantity: '', reason: 'Réassort dépôt' });
   const [adjustForm, setAdjustForm] = useState({ productId: 'prod-coca-33', warehouseId: 'wh-restaurant', countedQuantity: '', reason: 'Inventaire physique' });
   const [lossForm, setLossForm] = useState({ productId: 'ing-steak', warehouseId: 'wh-dakar-viandes', quantity: '', reason: 'Erreur cuisine' });
+  const [purchaseForm, setPurchaseForm] = useState({
+    supplierId: suppliers[0]?.id || '',
+    warehouseId: warehouses[0]?.id || '',
+    expectedAt: '',
+    lines: [
+      { productId: products[0]?.id || '', quantity: '1', unitCost: String(products[0]?.average_purchase_price || 0), lotNumber: '', expiresAt: '' },
+    ],
+  });
 
   const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
   const filteredMoves = movements.filter(m =>
@@ -120,7 +139,10 @@ export default function Stocks() {
     [products, search, siteStockLevels, warehouses, warehouseFilter, familyFilter, statusFilter]
   );
   const families = Array.from(new Set(products.map(product => product.category_id))).filter(Boolean);
-  const filteredSiteStockMovements = siteStockMovements.filter(move => movementFilter === 'all' || move.movement_type === movementFilter);
+  const filteredSiteStockMovements = siteStockMovements
+    .filter(move => movementFilter === 'all' || move.movement_type === movementFilter)
+    .filter(move => !movementFrom || new Date(move.created_at) >= new Date(movementFrom))
+    .filter(move => !movementTo || new Date(move.created_at) <= new Date(`${movementTo}T23:59:59`));
   const replenishmentRows = lowHospiStocks.map(level => {
     const product = products.find(item => item.id === level.product_id);
     const warehouse = warehouses.find(item => item.id === level.warehouse_id);
@@ -171,6 +193,14 @@ export default function Stocks() {
     })
     : [];
   const selectedProductValue = selectedProductLevels.reduce((sum, level) => sum + level.quantity * (selectedStockProduct?.average_purchase_price || 0), 0);
+  const selectedProductLots = selectedStockProduct
+    ? stockLots.filter(lot => lot.product_id === selectedStockProduct.id && lot.quantity > 0)
+      .sort((a, b) => new Date(a.expires_at || a.received_at).getTime() - new Date(b.expires_at || b.received_at).getTime())
+    : [];
+  const canManageStock = user?.role === 'Admin' || user?.role === 'Gérant';
+  const canTransferStock = canManageStock || canPerform(user, 'stock_transfer', 1);
+  const canAdjustStock = canManageStock || canPerform(user, 'inventory_adjustment', 1);
+  const canDeclareLoss = canManageStock || canPerform(user, 'stock_loss', 1);
 
   const handleMove = () => {
     if (!showMove || !moveQty) return;
@@ -206,7 +236,10 @@ export default function Stocks() {
     if (!transferForm.productId || !transferForm.fromWarehouseId || !transferForm.toWarehouseId || !transferForm.quantity) return;
     const quantity = Number(transferForm.quantity);
     const needsApproval = requiresManagerApproval(user, 'stock_transfer', quantity);
-    if (!canPerform(user, 'stock_transfer', quantity) && needsApproval) return;
+    if (!canPerform(user, 'stock_transfer', quantity) && needsApproval) {
+      setStockNotice('Action bloquée : ce profil ne peut pas transférer ce stock sans validation manager.');
+      return;
+    }
     const movements = transferStock(
       transferForm.productId,
       transferForm.fromWarehouseId,
@@ -236,7 +269,10 @@ export default function Stocks() {
     if (!adjustForm.productId || !adjustForm.warehouseId || !adjustForm.countedQuantity) return;
     const countedQuantity = Number(adjustForm.countedQuantity);
     const needsApproval = requiresManagerApproval(user, 'inventory_adjustment', countedQuantity);
-    if (!canPerform(user, 'inventory_adjustment', countedQuantity) && needsApproval) return;
+    if (!canPerform(user, 'inventory_adjustment', countedQuantity) && needsApproval) {
+      setStockNotice('Action bloquée : correction inventaire réservée à un profil autorisé.');
+      return;
+    }
     const movement = adjustInventory(
       adjustForm.productId,
       adjustForm.warehouseId,
@@ -265,7 +301,10 @@ export default function Stocks() {
     if (!lossForm.productId || !lossForm.warehouseId || !lossForm.quantity) return;
     const quantity = Number(lossForm.quantity);
     const needsApproval = requiresManagerApproval(user, 'stock_loss', quantity);
-    if (!canPerform(user, 'stock_loss', quantity) && needsApproval) return;
+    if (!canPerform(user, 'stock_loss', quantity) && needsApproval) {
+      setStockNotice('Action bloquée : déclaration de perte sensible réservée à un profil autorisé.');
+      return;
+    }
     const movement = recordLoss(
       lossForm.productId,
       lossForm.warehouseId,
@@ -292,6 +331,90 @@ export default function Stocks() {
 
   const handleReceivePurchase = (purchaseOrderId: string) => {
     receivePurchaseOrder(purchaseOrderId, user?.name || 'Système');
+  };
+
+  const resetPurchaseForm = () => {
+    setEditingPurchaseOrderId(null);
+    setPurchaseForm({
+      supplierId: suppliers[0]?.id || '',
+      warehouseId: warehouses[0]?.id || '',
+      expectedAt: '',
+      lines: [{ productId: products[0]?.id || '', quantity: '1', unitCost: String(products[0]?.average_purchase_price || 0), lotNumber: '', expiresAt: '' }],
+    });
+  };
+
+  const startEditPurchaseOrder = (purchaseOrderId: string) => {
+    const order = purchaseOrders.find(item => item.id === purchaseOrderId);
+    if (!order) return;
+    const lines = purchaseOrderLines.filter(line => line.purchase_order_id === purchaseOrderId);
+    setEditingPurchaseOrderId(purchaseOrderId);
+    setPurchaseForm({
+      supplierId: order.supplier_id,
+      warehouseId: order.warehouse_id,
+      expectedAt: order.expected_at ? order.expected_at.slice(0, 10) : '',
+      lines: lines.map(line => ({
+        productId: line.product_id,
+        quantity: String(line.quantity_ordered),
+        unitCost: String(line.unit_cost),
+        lotNumber: line.lot_number || '',
+        expiresAt: line.expires_at ? line.expires_at.slice(0, 10) : '',
+      })),
+    });
+    setShowPurchaseForm(true);
+    setTab('achats');
+  };
+
+  const savePurchaseOrder = () => {
+    if (!canManageStock) {
+      setStockNotice('Action bloquée : seules la direction et l’administration peuvent créer ou modifier une commande fournisseur.');
+      return;
+    }
+    const lines = purchaseForm.lines
+      .filter(line => line.productId && Number(line.quantity) > 0)
+      .map(line => ({
+        product_id: line.productId,
+        quantity_ordered: Number(line.quantity),
+        unit_cost: Number(line.unitCost) || 0,
+        lot_number: line.lotNumber || undefined,
+        expires_at: line.expiresAt ? new Date(line.expiresAt).toISOString() : undefined,
+      }));
+    const payload = {
+      supplier_id: purchaseForm.supplierId,
+      warehouse_id: purchaseForm.warehouseId,
+      expected_at: purchaseForm.expectedAt ? new Date(purchaseForm.expectedAt).toISOString() : undefined,
+      lines,
+    };
+    const order = editingPurchaseOrderId
+      ? updatePurchaseOrder(editingPurchaseOrderId, payload)
+      : addPurchaseOrder({ ...payload, ordered_by: user?.name || 'Système' });
+    if (order) {
+      setStockNotice(editingPurchaseOrderId ? 'Commande fournisseur modifiée.' : 'Commande fournisseur créée.');
+      setShowPurchaseForm(false);
+      resetPurchaseForm();
+    }
+  };
+
+  const startReceivePurchaseOrder = (purchaseOrderId: string) => {
+    const lines = purchaseOrderLines.filter(line => line.purchase_order_id === purchaseOrderId);
+    setReceivingPurchaseOrderId(purchaseOrderId);
+    setReceiptQuantities(Object.fromEntries(lines.map(line => [line.id, String(Math.max(0, line.quantity_ordered - line.quantity_received))])));
+  };
+
+  const savePartialReceipt = () => {
+    if (!receivingPurchaseOrderId) return;
+    const quantities = Object.fromEntries(Object.entries(receiptQuantities).map(([key, value]) => [key, Number(value) || 0]));
+    const receipt = receivePurchaseOrderLines(receivingPurchaseOrderId, user?.name || 'Système', quantities);
+    if (receipt) {
+      setStockNotice('Réception fournisseur enregistrée.');
+      setReceivingPurchaseOrderId(null);
+      setReceiptQuantities({});
+    }
+  };
+
+  const saveThreshold = (productId: string, warehouseId: string, fallback: number) => {
+    const value = Number(thresholdEdits[`${productId}-${warehouseId}`] ?? fallback);
+    const updated = updateStockThreshold(productId, warehouseId, value);
+    if (updated) setStockNotice('Seuil de stock mis à jour.');
   };
 
   const handleCreateReorder = (productId: string, warehouseId: string, supplierId: string, quantity: number, unitCost: number) => {
@@ -382,6 +505,23 @@ export default function Stocks() {
         ];
       }),
     ]);
+  };
+
+  const printInventory = () => {
+    const rows = siteStockLevels.map(level => {
+      const warehouse = warehouses.find(item => item.id === level.warehouse_id);
+      const product = products.find(item => item.id === level.product_id);
+      return `<tr><td>${warehouse?.name || ''}</td><td>${product?.name || level.product_id}</td><td>${level.quantity} ${level.unit}</td><td>${level.alert_threshold}</td><td>${(level.quantity * (product?.average_purchase_price || 0)).toLocaleString('fr-FR')} F</td></tr>`;
+    }).join('');
+    const printable = window.open('', '_blank');
+    printable?.document.write(`
+      <html><head><title>Inventaire ${selectedSite?.name || ''}</title>
+      <style>body{font-family:Arial;padding:24px;color:#111}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f3f4f6}</style></head>
+      <body><h1>Inventaire stock</h1><p>${selectedSite?.name || ''} - ${new Date().toLocaleDateString('fr-FR')}</p>
+      <table><thead><tr><th>Dépôt</th><th>Produit</th><th>Quantité</th><th>Seuil</th><th>Valeur</th></tr></thead><tbody>${rows}</tbody></table></body></html>
+    `);
+    printable?.document.close();
+    printable?.print();
   };
 
   const getStockBadge = (item: typeof items[0]) => {
@@ -585,12 +725,15 @@ export default function Stocks() {
             </div>
           </section>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <button type="button" onClick={exportInventory} className="py-3 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-xs flex items-center justify-center gap-2">
               <Download size={15} /> Inventaire
             </button>
             <button type="button" onClick={exportLosses} className="py-3 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-xs flex items-center justify-center gap-2">
               <Download size={15} /> Pertes
+            </button>
+            <button type="button" onClick={printInventory} className="py-3 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-xs flex items-center justify-center gap-2">
+              <Printer size={15} /> PDF
             </button>
           </div>
 
@@ -654,10 +797,57 @@ export default function Stocks() {
           <section className="glass-card-lg p-4">
             <div className="flex items-start justify-between gap-3 mb-4">
               <div>
-                <h3 className="text-white font-black text-sm">Réceptions fournisseur</h3>
+                <h3 className="text-white font-black text-sm">Commandes fournisseur</h3>
                 <p className="text-text-secondary text-xs">{pendingPurchaseOrders.length} commande(s) à réceptionner • {supplierReceipts.length} réception(s) enregistrée(s)</p>
               </div>
+              <button type="button" onClick={() => { resetPurchaseForm(); setShowPurchaseForm(prev => !prev); }} className="px-3 py-2 rounded-xl bg-green/10 text-green text-[10px] font-black">
+                Nouvelle
+              </button>
             </div>
+            {showPurchaseForm && (
+              <div className="rounded-2xl bg-white/5 p-4 mb-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <select value={purchaseForm.supplierId} onChange={e => setPurchaseForm(prev => ({ ...prev, supplierId: e.target.value }))}
+                    className="h-11 rounded-xl bg-black/20 border border-white/10 px-3 text-white text-xs font-bold outline-none">
+                    {suppliers.map(supplier => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
+                  </select>
+                  <select value={purchaseForm.warehouseId} onChange={e => setPurchaseForm(prev => ({ ...prev, warehouseId: e.target.value }))}
+                    className="h-11 rounded-xl bg-black/20 border border-white/10 px-3 text-white text-xs font-bold outline-none">
+                    {warehouses.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+                  </select>
+                </div>
+                <input type="date" value={purchaseForm.expectedAt} onChange={e => setPurchaseForm(prev => ({ ...prev, expectedAt: e.target.value }))}
+                  className="w-full h-11 rounded-xl bg-black/20 border border-white/10 px-3 text-white text-xs font-bold outline-none" />
+                <div className="space-y-2">
+                  {purchaseForm.lines.map((line, index) => (
+                    <div key={index} className="rounded-xl bg-black/20 p-3 space-y-2">
+                      <select value={line.productId} onChange={e => setPurchaseForm(prev => ({ ...prev, lines: prev.lines.map((item, i) => i === index ? { ...item, productId: e.target.value } : item) }))}
+                        className="w-full h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-white text-xs font-bold outline-none">
+                        {products.filter(product => product.is_stockable).map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
+                      </select>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input type="number" placeholder="Quantité" value={line.quantity} onChange={e => setPurchaseForm(prev => ({ ...prev, lines: prev.lines.map((item, i) => i === index ? { ...item, quantity: e.target.value } : item) }))}
+                          className="h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-white text-xs outline-none" />
+                        <input type="number" placeholder="Coût unité" value={line.unitCost} onChange={e => setPurchaseForm(prev => ({ ...prev, lines: prev.lines.map((item, i) => i === index ? { ...item, unitCost: e.target.value } : item) }))}
+                          className="h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-white text-xs outline-none" />
+                        <input placeholder="Lot" value={line.lotNumber} onChange={e => setPurchaseForm(prev => ({ ...prev, lines: prev.lines.map((item, i) => i === index ? { ...item, lotNumber: e.target.value } : item) }))}
+                          className="h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-white text-xs outline-none" />
+                        <input type="date" value={line.expiresAt} onChange={e => setPurchaseForm(prev => ({ ...prev, lines: prev.lines.map((item, i) => i === index ? { ...item, expiresAt: e.target.value } : item) }))}
+                          className="h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-white text-xs outline-none" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setPurchaseForm(prev => ({ ...prev, lines: [...prev.lines, { productId: products[0]?.id || '', quantity: '1', unitCost: '0', lotNumber: '', expiresAt: '' }] }))} className="py-3 rounded-xl bg-white/10 text-white text-xs font-black">
+                    Ajouter ligne
+                  </button>
+                  <button type="button" onClick={savePurchaseOrder} className="py-3 rounded-xl bg-green text-white text-xs font-black">
+                    {editingPurchaseOrderId ? 'Modifier' : 'Créer'}
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="space-y-3">
               {purchaseOrders.map(order => {
                 const supplier = suppliers.find(item => item.id === order.supplier_id);
@@ -687,9 +877,17 @@ export default function Stocks() {
                       })}
                     </div>
                     {order.status !== 'received' && (
-                      <button onClick={() => handleReceivePurchase(order.id)} className="w-full py-2.5 rounded-xl bg-green/10 text-green font-black text-[10px] uppercase tracking-widest">
-                        Réceptionner vers dépôt
-                      </button>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button onClick={() => startEditPurchaseOrder(order.id)} className="py-2.5 rounded-xl bg-blue/10 text-blue font-black text-[10px] uppercase tracking-widest">
+                          Modifier
+                        </button>
+                        <button onClick={() => startReceivePurchaseOrder(order.id)} className="py-2.5 rounded-xl bg-green/10 text-green font-black text-[10px] uppercase tracking-widest">
+                          Recevoir
+                        </button>
+                        <button onClick={() => handleReceivePurchase(order.id)} className="py-2.5 rounded-xl bg-white/5 text-white font-black text-[10px] uppercase tracking-widest">
+                          Tout
+                        </button>
+                      </div>
                     )}
                   </div>
                 );
@@ -750,6 +948,12 @@ export default function Stocks() {
               <option value="all">Tous</option>
               {Object.entries(stockMovementLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
             </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <input type="date" value={movementFrom} onChange={e => setMovementFrom(e.target.value)}
+              className="h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-white text-xs outline-none" />
+            <input type="date" value={movementTo} onChange={e => setMovementTo(e.target.value)}
+              className="h-10 rounded-xl bg-white/5 border border-white/10 px-3 text-white text-xs outline-none" />
           </div>
           <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
             {filteredSiteStockMovements.map(move => {
@@ -1002,6 +1206,55 @@ export default function Stocks() {
         </div>
       )}
 
+      {/* Partial Receipt Modal */}
+      <AnimatePresence>
+        {receivingPurchaseOrderId && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setReceivingPurchaseOrderId(null)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25 }}
+              className="modal-sheet max-h-[88vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Réception fournisseur</p>
+                  <h3 className="text-white font-black text-lg">Quantités réellement reçues</h3>
+                </div>
+                <button type="button" onClick={() => setReceivingPurchaseOrderId(null)} className="w-9 h-9 rounded-xl bg-white/5 text-text-secondary flex items-center justify-center">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="space-y-3">
+                {purchaseOrderLines.filter(line => line.purchase_order_id === receivingPurchaseOrderId).map(line => {
+                  const product = products.find(item => item.id === line.product_id);
+                  const remaining = Math.max(0, line.quantity_ordered - line.quantity_received);
+                  return (
+                    <div key={line.id} className="rounded-2xl bg-white/5 p-3">
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <div>
+                          <p className="text-white font-bold text-sm">{product?.name || line.product_id}</p>
+                          <p className="text-text-tertiary text-[10px]">Restant : {remaining} • reçu : {line.quantity_received}/{line.quantity_ordered}</p>
+                          {(line.lot_number || line.expires_at) && <p className="text-text-tertiary text-[10px]">Lot {line.lot_number || '-'} • exp. {line.expires_at ? new Date(line.expires_at).toLocaleDateString('fr-FR') : '-'}</p>}
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          max={remaining}
+                          value={receiptQuantities[line.id] || ''}
+                          onChange={e => setReceiptQuantities(prev => ({ ...prev, [line.id]: e.target.value }))}
+                          className="w-24 h-11 rounded-xl bg-black/20 border border-white/10 px-3 text-white text-xs font-bold outline-none"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <button type="button" onClick={savePartialReceipt} className="w-full mt-4 py-3 rounded-2xl bg-green text-white font-black text-sm">
+                Enregistrer la réception
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Warehouse Detail Modal */}
       <AnimatePresence>
         {selectedWarehouse && (
@@ -1143,20 +1396,51 @@ export default function Stocks() {
                     const site = sites.find(item => item.id === warehouse?.site_id);
                     const isLow = level.quantity <= level.alert_threshold;
                     return (
-                      <div key={level.id} className="rounded-xl bg-white/5 px-3 py-2 flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-white font-bold text-xs">{warehouse?.name || 'Dépôt'}</p>
-                          <p className="text-text-tertiary text-[10px]">{site?.name} • seuil {level.alert_threshold} {level.unit}</p>
-                        </div>
-                        <span className={`font-black text-xs ${isLow ? 'text-orange' : 'text-green'}`}>
-                          {level.quantity} {level.unit}
-                        </span>
-                      </div>
+	                      <div key={level.id} className="rounded-xl bg-white/5 px-3 py-2 flex items-center justify-between gap-3">
+	                        <div>
+	                          <p className="text-white font-bold text-xs">{warehouse?.name || 'Dépôt'}</p>
+	                          <p className="text-text-tertiary text-[10px]">{site?.name} • seuil {level.alert_threshold} {level.unit}</p>
+	                        </div>
+	                        <div className="text-right">
+	                          <span className={`font-black text-xs ${isLow ? 'text-orange' : 'text-green'}`}>{level.quantity} {level.unit}</span>
+	                          <div className="flex items-center gap-1 mt-1">
+	                            <input
+	                              type="number"
+	                              value={thresholdEdits[`${level.product_id}-${level.warehouse_id}`] ?? String(level.alert_threshold)}
+	                              onChange={e => setThresholdEdits(prev => ({ ...prev, [`${level.product_id}-${level.warehouse_id}`]: e.target.value }))}
+	                              className="w-16 h-7 rounded-lg bg-black/20 border border-white/10 px-2 text-white text-[10px] outline-none"
+	                            />
+	                            <button type="button" onClick={() => saveThreshold(level.product_id, level.warehouse_id, level.alert_threshold)} className="h-7 px-2 rounded-lg bg-blue/10 text-blue text-[9px] font-black">
+	                              OK
+	                            </button>
+	                          </div>
+	                        </div>
+	                      </div>
                     );
                   })}
                   {selectedProductLevels.length === 0 && <p className="text-text-tertiary text-xs py-3">Aucun stock enregistré pour ce produit.</p>}
                 </div>
-              </section>
+	              </section>
+
+	              <section className="mb-4">
+	                <h4 className="text-white font-black text-sm mb-2 flex items-center gap-2"><Package size={15} className="text-blue" /> Lots & péremptions FIFO</h4>
+	                <div className="space-y-2">
+	                  {selectedProductLots.map(lot => {
+	                    const warehouse = warehouses.find(item => item.id === lot.warehouse_id);
+	                    const expiresSoon = lot.expires_at && new Date(lot.expires_at).getTime() < Date.now() + 86400000 * 30;
+	                    return (
+	                      <div key={lot.id} className={`rounded-xl px-3 py-2 flex items-center justify-between gap-3 ${expiresSoon ? 'bg-orange/10 border border-orange/15' : 'bg-white/5'}`}>
+	                        <div>
+	                          <p className="text-white font-bold text-xs">{lot.lot_number}</p>
+	                          <p className="text-text-tertiary text-[10px]">{warehouse?.name} • expire {lot.expires_at ? new Date(lot.expires_at).toLocaleDateString('fr-FR') : 'non renseigné'}</p>
+	                        </div>
+	                        <span className="text-white font-black text-xs">{lot.quantity}</span>
+	                      </div>
+	                    );
+	                  })}
+	                  {selectedProductLots.length === 0 && <p className="text-text-tertiary text-xs py-3">Aucun lot suivi pour ce produit.</p>}
+	                </div>
+	              </section>
 
               <section className="mb-4">
                 <h4 className="text-white font-black text-sm mb-2 flex items-center gap-2"><Store size={15} className="text-orange" /> Vendu dans les POS</h4>
@@ -1201,15 +1485,15 @@ export default function Stocks() {
               </section>
 
               <div className="grid grid-cols-3 gap-2">
-                <button type="button" onClick={() => { setTransferForm(prev => ({ ...prev, productId: selectedStockProduct.id })); setSelectedProductId(null); setShowTransfer(true); }} className="py-3 rounded-2xl bg-blue/10 text-blue font-black text-[10px] uppercase tracking-widest">
-                  Transférer
-                </button>
-                <button type="button" onClick={() => { setAdjustForm(prev => ({ ...prev, productId: selectedStockProduct.id })); setSelectedProductId(null); setShowAdjustment(true); }} className="py-3 rounded-2xl bg-orange/10 text-orange font-black text-[10px] uppercase tracking-widest">
-                  Inventaire
-                </button>
-                <button type="button" onClick={() => { setLossForm(prev => ({ ...prev, productId: selectedStockProduct.id })); setSelectedProductId(null); setShowLoss(true); }} className="py-3 rounded-2xl bg-red/10 text-red font-black text-[10px] uppercase tracking-widest">
-                  Perte
-                </button>
+	                <button type="button" disabled={!canTransferStock} onClick={() => { setTransferForm(prev => ({ ...prev, productId: selectedStockProduct.id })); setSelectedProductId(null); setShowTransfer(true); }} className="py-3 rounded-2xl bg-blue/10 text-blue font-black text-[10px] uppercase tracking-widest disabled:opacity-40">
+	                  Transférer
+	                </button>
+	                <button type="button" disabled={!canAdjustStock} onClick={() => { setAdjustForm(prev => ({ ...prev, productId: selectedStockProduct.id })); setSelectedProductId(null); setShowAdjustment(true); }} className="py-3 rounded-2xl bg-orange/10 text-orange font-black text-[10px] uppercase tracking-widest disabled:opacity-40">
+	                  Inventaire
+	                </button>
+	                <button type="button" disabled={!canDeclareLoss} onClick={() => { setLossForm(prev => ({ ...prev, productId: selectedStockProduct.id })); setSelectedProductId(null); setShowLoss(true); }} className="py-3 rounded-2xl bg-red/10 text-red font-black text-[10px] uppercase tracking-widest disabled:opacity-40">
+	                  Perte
+	                </button>
               </div>
             </motion.div>
           </motion.div>
