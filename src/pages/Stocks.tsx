@@ -5,7 +5,7 @@ import { useHospiStore } from '../stores/hospiStore';
 import { useAuthStore } from '../stores/authStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package, Settings, Warehouse, Truck, Activity, CreditCard, X, Store, ReceiptText, Download, ShieldCheck, ClipboardCheck, Printer } from 'lucide-react';
+import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package, Settings, Warehouse, Truck, Activity, CreditCard, X, Store, ReceiptText, Download, ShieldCheck, ClipboardCheck, Printer, ChefHat, Scale, Boxes, RefreshCcw, Ban, CircleDollarSign, BookmarkCheck, Gift } from 'lucide-react';
 
 const purchaseStatusLabels: Record<string, string> = {
   draft: 'Brouillon',
@@ -24,9 +24,11 @@ const stockMovementLabels: Record<string, string> = {
   transfer_in: 'Transfert reçu',
   inventory_adjustment: 'Correction inventaire',
   loss: 'Perte',
+  reservation: 'Réservation',
+  internal_consumption: 'Conso interne',
 };
 
-type StockTab = 'pilotage' | 'reappro' | 'depots' | 'achats' | 'inventaire-guide' | 'mouvements' | 'pertes' | 'inventaire' | 'entrees' | 'sorties';
+type StockTab = 'pilotage' | 'moteur' | 'reappro' | 'depots' | 'achats' | 'inventaire-guide' | 'mouvements' | 'pertes' | 'inventaire' | 'entrees' | 'sorties';
 type StockStatusFilter = 'all' | 'ok' | 'alert' | 'rupture';
 
 export default function Stocks() {
@@ -41,6 +43,14 @@ export default function Stocks() {
     stockLevels,
     stockMovements,
     stockLots,
+    recipes,
+    recipeItems,
+    productionBatches,
+    productVariants,
+    unitConversions,
+    stockReservations,
+    internalConsumptions,
+    stockPolicy,
     suppliers,
     purchaseOrders,
     purchaseOrderLines,
@@ -197,6 +207,48 @@ export default function Stocks() {
     ? stockLots.filter(lot => lot.product_id === selectedStockProduct.id && lot.quantity > 0)
       .sort((a, b) => new Date(a.expires_at || a.received_at).getTime() - new Date(b.expires_at || b.received_at).getTime())
     : [];
+  const recipeProducts = products.filter(product => recipes.some(recipe => recipe.product_id === product.id));
+  const autoTransferSuggestions = replenishmentRows.flatMap(row => {
+    if (!row.product || !row.warehouse) return [];
+    const donor = stockLevels
+      .filter(level => level.product_id === row.product?.id && level.warehouse_id !== row.warehouse?.id && level.quantity > row.suggestedQuantity)
+      .map(level => ({ level, warehouse: warehouses.find(item => item.id === level.warehouse_id) }))
+      .find(item => item.warehouse);
+    return donor ? [{ ...row, donor }] : [];
+  });
+  const theoreticalGaps = siteStockLevels
+    .map(level => {
+      const product = products.find(item => item.id === level.product_id);
+      const reserved = stockReservations
+        .filter(item => item.product_id === level.product_id && item.warehouse_id === level.warehouse_id && item.status === 'reserved')
+        .reduce((sum, item) => sum + item.quantity, 0);
+      return { level, product, available: level.quantity - reserved, reserved };
+    })
+    .filter(item => item.reserved > 0 || item.level.quantity <= item.level.alert_threshold);
+  const getRecipeCost = (productId: string) => {
+    const recipe = recipes.find(item => item.product_id === productId);
+    if (!recipe) return products.find(item => item.id === productId)?.average_purchase_price || 0;
+    return recipeItems
+      .filter(item => item.recipe_id === recipe.id)
+      .reduce((sum, item) => {
+        const ingredient = products.find(product => product.id === item.ingredient_product_id);
+        return sum + item.quantity * (ingredient?.average_purchase_price || 0);
+      }, 0);
+  };
+  const stockEngineCards = [
+    { title: 'Recettes', value: `${recipeProducts.length} recette(s)`, detail: 'Les plats déstockent leurs ingrédients, pas seulement le plat vendu.', icon: ChefHat, tone: 'orange', action: () => navigate('/settings') },
+    { title: 'Variantes', value: `${productVariants.length} variante(s)`, detail: 'Suppléments, doubles doses et options peuvent changer prix et consommation.', icon: ReceiptText, tone: 'blue', action: () => navigate('/settings') },
+    { title: 'Conversions', value: `${unitConversions.length} règle(s)`, detail: 'Carton, sac, bidon ou kg sont convertis vers l’unité réellement vendue.', icon: Scale, tone: 'green', action: () => navigate('/settings') },
+    { title: 'Préparations', value: `${productionBatches.length || 1} production(s)`, detail: 'Sauces, jus maison et préparations peuvent devenir du stock disponible.', icon: Boxes, tone: 'purple', action: () => navigate('/settings') },
+    { title: 'Transferts auto', value: `${autoTransferSuggestions.length} suggestion(s)`, detail: 'Le système repère les dépôts donneurs quand un autre dépôt manque.', icon: RefreshCcw, tone: 'blue', action: () => setShowTransfer(true) },
+    { title: 'Réservations', value: `${stockReservations.filter(item => item.status === 'reserved').length} active(s)`, detail: 'Room service, banquet ou préparation peuvent réserver avant consommation.', icon: BookmarkCheck, tone: 'orange', action: () => setTab('mouvements') },
+    { title: 'Stock négatif', value: stockPolicy.allow_negative_stock ? 'Autorisé' : 'Bloqué', detail: 'Paramètre métier pour empêcher une vente impossible sur le terrain.', icon: Ban, tone: stockPolicy.allow_negative_stock ? 'orange' : 'green', action: () => navigate('/settings') },
+    { title: 'Coût réel', value: `${recipeProducts.length} calcul(s)`, detail: 'Les coûts d’achat alimentent coût recette, marge brute et alertes.', icon: CircleDollarSign, tone: 'green', action: () => setTab('pilotage') },
+    { title: 'Inventaires tournants', value: `${families.length} famille(s)`, detail: 'Contrôler boissons aujourd’hui, cuisine demain, spa vendredi.', icon: ClipboardCheck, tone: 'purple', action: () => setTab('inventaire-guide') },
+    { title: 'Théorique / réel', value: `${theoreticalGaps.length} écart(s)`, detail: 'Compare le stock système, le réservé, le disponible et les seuils.', icon: Activity, tone: 'orange', action: () => setTab('inventaire-guide') },
+    { title: 'Conso internes', value: `${internalConsumptions.length} trace(s)`, detail: 'Personnel, offert, VIP, direction, casino, room service et mini-bar sont tracés.', icon: Gift, tone: 'blue', action: () => setTab('pertes') },
+    { title: 'Règles par POS', value: `${posList.length} POS`, detail: 'Prix, TVA, dépôt, caisse, imprimante, rapport Z et serveur restent liés au POS.', icon: Store, tone: 'green', action: () => navigate('/settings') },
+  ];
   const canManageStock = user?.role === 'Admin' || user?.role === 'Gérant';
   const canTransferStock = canManageStock || canPerform(user, 'stock_transfer', 1);
   const canAdjustStock = canManageStock || canPerform(user, 'inventory_adjustment', 1);
@@ -548,6 +600,7 @@ export default function Stocks() {
       <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-none">
         {([
           ['pilotage', 'Pilotage'],
+          ['moteur', 'Moteur métier'],
           ['reappro', 'Réappro'],
           ['depots', 'Dépôts'],
           ['achats', 'Achats'],
@@ -757,6 +810,134 @@ export default function Stocks() {
               {stockProducts.length === 0 && (
                 <p className="text-text-tertiary text-xs text-center py-5">Aucun produit trouvé.</p>
               )}
+            </div>
+          </section>
+        </div>
+      ) : tab === 'moteur' ? (
+        <div className="space-y-4">
+          <section className="glass-card-lg p-4">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-white font-black text-sm">Moteur métier du stock</h3>
+                <p className="text-text-secondary text-xs mt-1">La logique terrain qui relie produit, POS, dépôt, recette, coût, folio et rapport de caisse.</p>
+              </div>
+              <ShieldCheck size={20} className="text-green" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {stockEngineCards.map(card => {
+                const Icon = card.icon;
+                const color = card.tone === 'green' ? '#22C55E' : card.tone === 'blue' ? '#3B82F6' : card.tone === 'purple' ? '#8B5CF6' : '#F59E0B';
+                return (
+                  <button key={card.title} type="button" onClick={card.action} className="rounded-2xl bg-white/5 border border-white/10 p-3 text-left active:scale-[0.99] transition-transform">
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${color}1F`, color }}>
+                        <Icon size={18} />
+                      </div>
+                      <span className="text-white font-black text-[11px]">{card.value}</span>
+                    </div>
+                    <p className="text-white font-black text-xs">{card.title}</p>
+                    <p className="text-text-secondary text-[10px] leading-relaxed mt-1">{card.detail}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="glass-card-lg p-4">
+            <h3 className="text-white font-black text-sm mb-3">Exemple réel : même produit, règles différentes</h3>
+            <div className="space-y-2">
+              {posList.filter(pos => getPriceForProduct('prod-coca-33', pos.id)).slice(0, 5).map(pos => {
+                const price = getPriceForProduct('prod-coca-33', pos.id);
+                const warehouse = warehouses.find(item => item.id === pos.default_warehouse_id);
+                const stock = stockLevels.find(level => level.product_id === 'prod-coca-33' && level.warehouse_id === pos.default_warehouse_id);
+                return (
+                  <div key={pos.id} className="rounded-xl bg-white/5 px-3 py-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-white font-bold text-xs truncate">{pos.name}</p>
+                        <p className="text-text-tertiary text-[10px] truncate">{warehouse?.name} • {pos.tax_profile} • {pos.printer_names?.[0] || 'Imprimante POS'}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-green font-black text-xs">{price?.sale_price.toLocaleString('fr-FR')} F</p>
+                        <p className="text-text-tertiary text-[10px]">{stock?.quantity ?? 0} en stock</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="glass-card-lg p-4">
+            <h3 className="text-white font-black text-sm mb-3">Recettes, coûts et marges</h3>
+            <div className="space-y-2">
+              {recipeProducts.map(product => {
+                const cost = getRecipeCost(product.id);
+                const prices = posList
+                  .map(pos => ({ pos, price: getPriceForProduct(product.id, pos.id) }))
+                  .filter(item => item.price);
+                return (
+                  <div key={product.id} className="rounded-xl bg-white/5 px-3 py-2">
+                    <p className="text-white font-bold text-xs">{product.name}</p>
+                    <p className="text-text-tertiary text-[10px] mt-0.5">Coût recette estimé : {Math.round(cost).toLocaleString('fr-FR')} F</p>
+                    <div className="mt-2 space-y-1">
+                      {prices.map(({ pos, price }) => (
+                        <div key={pos.id} className="flex justify-between text-[10px]">
+                          <span className="text-text-secondary">{pos.name}</span>
+                          <span className="text-green font-black">
+                            marge {Math.max(0, (price?.sale_price || 0) - cost).toLocaleString('fr-FR')} F
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              {recipeProducts.length === 0 && <p className="text-text-tertiary text-xs text-center py-5">Aucune recette configurée.</p>}
+            </div>
+          </section>
+
+          <section className="glass-card-lg p-4">
+            <h3 className="text-white font-black text-sm mb-3">Conversions fournisseur → terrain</h3>
+            <div className="space-y-2">
+              {unitConversions.map(conversion => {
+                const product = products.find(item => item.id === conversion.product_id);
+                return (
+                  <div key={conversion.id} className="rounded-xl bg-white/5 px-3 py-2 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-white font-bold text-xs">{product?.name || conversion.product_id}</p>
+                      <p className="text-text-tertiary text-[10px]">{conversion.example}</p>
+                    </div>
+                    <span className="text-blue font-black text-xs">x{conversion.factor}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="glass-card-lg p-4">
+            <h3 className="text-white font-black text-sm mb-3">Réservé, réel, interne</h3>
+            <div className="space-y-2">
+              {stockReservations.filter(item => item.status === 'reserved').map(reservation => {
+                const product = products.find(item => item.id === reservation.product_id);
+                const warehouse = warehouses.find(item => item.id === reservation.warehouse_id);
+                return (
+                  <div key={reservation.id} className="rounded-xl bg-orange/10 border border-orange/15 px-3 py-2">
+                    <p className="text-white font-bold text-xs">{product?.name} réservé</p>
+                    <p className="text-text-secondary text-[10px]">{reservation.quantity} • {warehouse?.name} • {reservation.source_label}</p>
+                  </div>
+                );
+              })}
+              {internalConsumptions.map(consumption => {
+                const product = products.find(item => item.id === consumption.product_id);
+                const warehouse = warehouses.find(item => item.id === consumption.warehouse_id);
+                return (
+                  <div key={consumption.id} className="rounded-xl bg-blue/10 border border-blue/15 px-3 py-2">
+                    <p className="text-white font-bold text-xs">{product?.name} sorti en interne</p>
+                    <p className="text-text-secondary text-[10px]">{consumption.quantity} • {warehouse?.name} • {consumption.reason}</p>
+                  </div>
+                );
+              })}
             </div>
           </section>
         </div>

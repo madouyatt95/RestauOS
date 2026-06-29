@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 
 export type POSType = 'restaurant' | 'bar' | 'nightclub' | 'casino' | 'room_service' | 'spa' | 'boutique' | 'other';
 export type WarehouseType = 'restaurant' | 'bar' | 'kitchen' | 'cold_room' | 'central' | 'casino' | 'boutique' | 'other';
-export type StockMovementType = 'sale' | 'purchase' | 'transfer_in' | 'transfer_out' | 'inventory_adjustment' | 'loss' | 'production';
+export type StockMovementType = 'sale' | 'purchase' | 'transfer_in' | 'transfer_out' | 'inventory_adjustment' | 'loss' | 'production' | 'reservation' | 'internal_consumption';
 export type RoomStatus = 'available' | 'occupied' | 'cleaning' | 'maintenance';
 export type StayStatus = 'booked' | 'checked_in' | 'checked_out' | 'cancelled';
 export type FolioStatus = 'open' | 'closed';
@@ -250,6 +250,52 @@ export interface ProductionBatch {
   quantity: number;
   created_by: string;
   created_at: string;
+}
+
+export interface ProductVariant {
+  id: string;
+  product_id: string;
+  name: string;
+  price_delta: number;
+  stock_delta_description: string;
+  created_at: string;
+}
+
+export interface UnitConversion {
+  id: string;
+  product_id: string;
+  from_unit: string;
+  to_unit: string;
+  factor: number;
+  example: string;
+}
+
+export interface StockReservation {
+  id: string;
+  product_id: string;
+  warehouse_id: string;
+  quantity: number;
+  source_type: 'room_service' | 'pos_order' | 'event' | 'production';
+  source_label: string;
+  status: 'reserved' | 'consumed' | 'released';
+  created_at: string;
+}
+
+export interface InternalConsumption {
+  id: string;
+  product_id: string;
+  warehouse_id: string;
+  quantity: number;
+  reason: 'personnel' | 'offert' | 'vip' | 'direction' | 'casino' | 'room_service' | 'mini_bar';
+  created_by: string;
+  created_at: string;
+}
+
+export interface StockPolicy {
+  allow_negative_stock: boolean;
+  auto_transfer_enabled: boolean;
+  fifo_enabled: boolean;
+  reserve_before_preparation: boolean;
 }
 
 export type PurchaseOrderStatus = 'draft' | 'ordered' | 'partially_received' | 'received' | 'cancelled';
@@ -511,6 +557,36 @@ const recipeItems: RecipeItem[] = [
   { id: 'recipe-thieb-huile', recipe_id: 'recipe-thieb', ingredient_product_id: 'ing-huile', quantity: 0.05, unit: 'L' },
   { id: 'recipe-thieb-legumes', recipe_id: 'recipe-thieb', ingredient_product_id: 'ing-legumes', quantity: 0.15, unit: 'kg' },
 ];
+
+const productVariants: ProductVariant[] = [
+  { id: 'variant-thieb-extra-poisson', product_id: 'prod-thieboudienne', name: 'Supplément poisson', price_delta: 1500, stock_delta_description: '+0,2 kg poisson frais', created_at: now },
+  { id: 'variant-coca-grand-service', product_id: 'prod-coca-33', name: 'Service VIP glacé', price_delta: 500, stock_delta_description: '+1 bouteille Coca, glace suivie côté bar', created_at: now },
+  { id: 'variant-whisky-double', product_id: 'prod-whisky', name: 'Double dose', price_delta: 9000, stock_delta_description: 'Consomme 2 doses au lieu de 1', created_at: now },
+];
+
+const unitConversions: UnitConversion[] = [
+  { id: 'conv-coca-carton', product_id: 'prod-coca-33', from_unit: 'carton', to_unit: 'bouteille', factor: 24, example: '1 carton fournisseur = 24 bouteilles vendues' },
+  { id: 'conv-riz-sac', product_id: 'ing-riz-brise', from_unit: 'sac 25 kg', to_unit: 'kg', factor: 25, example: '1 sac reçu = 25 kg disponibles' },
+  { id: 'conv-huile-bidon', product_id: 'ing-huile', from_unit: 'bidon 20 L', to_unit: 'L', factor: 20, example: '1 bidon reçu = 20 litres en stock' },
+  { id: 'conv-sel-gramme', product_id: 'ing-sel', from_unit: 'kg', to_unit: 'g', factor: 1000, example: '1 kg permet de consommer des grammes en recette' },
+];
+
+const stockReservations: StockReservation[] = [
+  { id: 'res-room-201-minibar', product_id: 'prod-eau-minibar', warehouse_id: 'wh-minibar', quantity: 6, source_type: 'room_service', source_label: 'Mini-bar chambre 201 à contrôler', status: 'reserved', created_at: now },
+  { id: 'res-banquet-coca', product_id: 'prod-coca-33', warehouse_id: 'wh-dakar-boissons', quantity: 48, source_type: 'event', source_label: 'Banquet corporate ce soir', status: 'reserved', created_at: now },
+];
+
+const internalConsumptions: InternalConsumption[] = [
+  { id: 'ic-staff-coca', product_id: 'prod-coca-33', warehouse_id: 'wh-restaurant', quantity: 8, reason: 'personnel', created_by: 'Chef de rang', created_at: now },
+  { id: 'ic-vip-champagne', product_id: 'prod-champagne', warehouse_id: 'wh-nightclub', quantity: 1, reason: 'vip', created_by: 'Direction', created_at: now },
+];
+
+const stockPolicy: StockPolicy = {
+  allow_negative_stock: false,
+  auto_transfer_enabled: true,
+  fifo_enabled: true,
+  reserve_before_preparation: true,
+};
 
 const rooms: Room[] = [
   { id: 'room-101', site_id: 'site-dakar', room_number: '101', room_type: 'Deluxe', status: 'occupied', created_at: now },
@@ -781,6 +857,11 @@ interface HospiState {
   recipes: Recipe[];
   recipeItems: RecipeItem[];
   productionBatches: ProductionBatch[];
+  productVariants: ProductVariant[];
+  unitConversions: UnitConversion[];
+  stockReservations: StockReservation[];
+  internalConsumptions: InternalConsumption[];
+  stockPolicy: StockPolicy;
   suppliers: Supplier[];
   purchaseOrders: PurchaseOrder[];
   purchaseOrderLines: PurchaseOrderLine[];
@@ -809,6 +890,8 @@ interface HospiState {
   getRecipeForProduct: (productId: string) => { recipe: Recipe; items: RecipeItem[] } | undefined;
   recordSale: (orderId: string, lines: SaleLineInput[], createdBy?: string, posId?: string) => StockMovement[];
   recordProduction: (productId: string, warehouseId: string, quantity: number, createdBy: string) => ProductionBatch | null;
+  reserveStock: (productId: string, warehouseId: string, quantity: number, sourceLabel: string) => StockReservation | null;
+  recordInternalConsumption: (productId: string, warehouseId: string, quantity: number, reason: InternalConsumption['reason'], createdBy: string) => StockMovement | null;
   transferStock: (productId: string, fromWarehouseId: string, toWarehouseId: string, quantity: number, reason: string, createdBy: string) => StockMovement[];
   adjustInventory: (productId: string, warehouseId: string, countedQuantity: number, reason: string, createdBy: string) => StockMovement | null;
   recordLoss: (productId: string, warehouseId: string, quantity: number, reason: string, createdBy: string) => StockMovement | null;
@@ -865,6 +948,11 @@ export const useHospiStore = create<HospiState>()(
       recipes,
       recipeItems,
       productionBatches: [],
+      productVariants,
+      unitConversions,
+      stockReservations,
+      internalConsumptions,
+      stockPolicy,
       suppliers,
       purchaseOrders,
       purchaseOrderLines,
@@ -1240,6 +1328,67 @@ export const useHospiStore = create<HospiState>()(
           stockMovements: [movement, ...state.stockMovements],
         });
         return batch;
+      },
+      reserveStock: (productId, warehouseId, quantity, sourceLabel) => {
+        const state = get();
+        const product = state.products.find(item => item.id === productId);
+        const warehouse = state.warehouses.find(item => item.id === warehouseId);
+        if (!product || !warehouse || quantity <= 0) return null;
+        const reservation: StockReservation = {
+          id: `stock-res-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          product_id: productId,
+          warehouse_id: warehouseId,
+          quantity,
+          source_type: 'room_service',
+          source_label: sourceLabel,
+          status: 'reserved',
+          created_at: new Date().toISOString(),
+        };
+        set({ stockReservations: [reservation, ...state.stockReservations] });
+        return reservation;
+      },
+      recordInternalConsumption: (productId, warehouseId, quantity, reason, createdBy) => {
+        const state = get();
+        const product = state.products.find(item => item.id === productId);
+        const warehouse = state.warehouses.find(item => item.id === warehouseId);
+        if (!product || !warehouse || quantity <= 0) return null;
+        const createdAt = new Date().toISOString();
+        const site = state.sites.find(item => item.id === warehouse.site_id) || state.sites[0];
+        const stock = state.stockLevels.find(level => level.product_id === productId && level.warehouse_id === warehouseId);
+        const currentQuantity = stock?.quantity || 0;
+        if (!state.stockPolicy.allow_negative_stock && currentQuantity < quantity) return null;
+        const nextQuantity = state.stockPolicy.allow_negative_stock ? currentQuantity - quantity : Math.max(0, currentQuantity - quantity);
+        const consumption: InternalConsumption = {
+          id: `internal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          product_id: productId,
+          warehouse_id: warehouseId,
+          quantity,
+          reason,
+          created_by: createdBy,
+          created_at: createdAt,
+        };
+        const movement: StockMovement = {
+          id: `mov-internal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          company_id: site?.company_id || state.companies[0]?.id || 'comp-sartal-demo',
+          site_id: site?.id || 'site-dakar',
+          warehouse_id: warehouseId,
+          product_id: productId,
+          movement_type: 'internal_consumption',
+          quantity,
+          reason: `Consommation interne : ${reason}`,
+          reference_type: 'internal_consumption',
+          reference_id: consumption.id,
+          created_by: createdBy,
+          created_at: createdAt,
+        };
+        set({
+          internalConsumptions: [consumption, ...state.internalConsumptions],
+          stockMovements: [movement, ...state.stockMovements],
+          stockLevels: stock
+            ? state.stockLevels.map(level => level.id === stock.id ? { ...level, quantity: nextQuantity, updated_at: createdAt } : level)
+            : state.stockLevels,
+        });
+        return movement;
       },
       transferStock: (productId, fromWarehouseId, toWarehouseId, quantity, reason, createdBy) => {
         const state = get();
@@ -1830,6 +1979,11 @@ export const useHospiStore = create<HospiState>()(
           recipes: mergeById(current.recipes, saved.recipes),
           recipeItems: mergeById(current.recipeItems, saved.recipeItems),
           productionBatches: mergeById(current.productionBatches, saved.productionBatches),
+          productVariants: mergeById(current.productVariants, saved.productVariants),
+          unitConversions: mergeById(current.unitConversions, saved.unitConversions),
+          stockReservations: mergeById(current.stockReservations, saved.stockReservations),
+          internalConsumptions: mergeById(current.internalConsumptions, saved.internalConsumptions),
+          stockPolicy: { ...current.stockPolicy, ...saved.stockPolicy },
           stockMovements: mergeById(current.stockMovements, saved.stockMovements),
         };
       },
