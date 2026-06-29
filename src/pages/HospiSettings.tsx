@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
-import { useState } from 'react';
-import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat, Truck, Users, CreditCard, Plus, Edit2, Trash2, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat, Truck, Users, CreditCard, Plus, Edit2, Trash2, X, Search } from 'lucide-react';
 import { useHospiStore, type POSType, type WarehouseType } from '../stores/hospiStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
 
@@ -52,6 +52,9 @@ export default function HospiSettings() {
   const [editingWarehouseId, setEditingWarehouseId] = useState<string | null>(null);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+  const [settingsSearch, setSettingsSearch] = useState('');
+  const [settingsSiteId, setSettingsSiteId] = useState('all');
+  const [productFilter, setProductFilter] = useState<'all' | 'active' | 'inactive' | 'stockable' | 'recipes'>('all');
   const [newPOS, setNewPOS] = useState({
     siteId: sites[0]?.id || 'site-dakar',
     name: '',
@@ -99,6 +102,29 @@ export default function HospiSettings() {
     warehouseId: warehouses[0]?.id || '',
     quantity: '',
   });
+  const normalizedSearch = settingsSearch.trim().toLowerCase();
+  const matchesSearch = (values: Array<string | undefined>) => !normalizedSearch || values.some(value => value?.toLowerCase().includes(normalizedSearch));
+  const visiblePOS = useMemo(() => posList.filter(pos => {
+    const warehouse = warehouses.find(item => item.id === pos.default_warehouse_id);
+    return (settingsSiteId === 'all' || pos.site_id === settingsSiteId)
+      && matchesSearch([pos.name, pos.type, warehouse?.name, pos.tax_profile]);
+  }), [normalizedSearch, posList, settingsSiteId, warehouses]);
+  const visibleWarehouses = useMemo(() => warehouses.filter(warehouse =>
+    (settingsSiteId === 'all' || warehouse.site_id === settingsSiteId)
+    && matchesSearch([warehouse.name, warehouse.type])
+  ), [normalizedSearch, settingsSiteId, warehouses]);
+  const visibleProducts = useMemo(() => products.filter(product => {
+    const productStock = stockLevels
+      .filter(level => level.product_id === product.id)
+      .reduce((sum, level) => sum + level.quantity, 0);
+    const productHasRecipe = recipes.some(recipe => recipe.product_id === product.id);
+    const filterMatch = productFilter === 'all'
+      || (productFilter === 'active' && product.is_active)
+      || (productFilter === 'inactive' && !product.is_active)
+      || (productFilter === 'stockable' && product.is_stockable && productStock > 0)
+      || (productFilter === 'recipes' && productHasRecipe);
+    return filterMatch && matchesSearch([product.name, product.sku, product.category_id, product.unit]);
+  }), [normalizedSearch, productFilter, products, recipes, stockLevels]);
 
   const handleCreatePOS = () => {
     if (!newPOS.name || !newPOS.warehouseId) return;
@@ -320,6 +346,67 @@ export default function HospiSettings() {
         </div>
       </div>
 
+      <section className="glass-card-lg p-4 mb-5">
+        <div className="relative mb-3">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary" />
+          <input
+            value={settingsSearch}
+            onChange={event => setSettingsSearch(event.target.value)}
+            placeholder="Rechercher POS, dépôt, produit, SKU..."
+            className="w-full h-12 rounded-2xl bg-white/5 border border-white/10 pl-11 pr-4 text-white text-sm outline-none placeholder:text-text-tertiary"
+          />
+        </div>
+        <div className="grid grid-cols-[1fr_auto] gap-2 mb-3">
+          <select
+            value={settingsSiteId}
+            onChange={event => setSettingsSiteId(event.target.value)}
+            className="h-11 rounded-xl bg-white/5 border border-white/10 px-3 text-white text-xs font-bold outline-none"
+          >
+            <option value="all">Tous les sites</option>
+            {sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
+          </select>
+          <button
+            type="button"
+            onClick={() => { setSettingsSearch(''); setSettingsSiteId('all'); setProductFilter('all'); }}
+            className="h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-text-secondary text-xs font-black"
+          >
+            Reset
+          </button>
+        </div>
+        <div className="flex gap-2 overflow-x-auto scrollbar-none">
+          {([
+            ['all', 'Tous'],
+            ['active', 'Actifs'],
+            ['stockable', 'Avec stock'],
+            ['recipes', 'Recettes'],
+            ['inactive', 'Inactifs'],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setProductFilter(key)}
+              className={`shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${productFilter === key ? 'bg-blue text-white' : 'bg-white/5 text-text-secondary'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-3 gap-2 mt-4">
+          <div className="rounded-xl bg-white/5 p-3">
+            <p className="text-text-tertiary text-[9px] font-black uppercase">POS visibles</p>
+            <p className="text-white font-black">{visiblePOS.length}</p>
+          </div>
+          <div className="rounded-xl bg-white/5 p-3">
+            <p className="text-text-tertiary text-[9px] font-black uppercase">Dépôts</p>
+            <p className="text-white font-black">{visibleWarehouses.length}</p>
+          </div>
+          <div className="rounded-xl bg-white/5 p-3">
+            <p className="text-text-tertiary text-[9px] font-black uppercase">Produits</p>
+            <p className="text-white font-black">{visibleProducts.length}</p>
+          </div>
+        </div>
+      </section>
+
       <section className="glass-card-lg p-5 mb-5">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
@@ -540,7 +627,7 @@ export default function HospiSettings() {
       <section className="mb-5">
         <h3 className="text-white font-black text-sm mb-3 flex items-center gap-2"><Store size={16} className="text-blue" /> Points de vente</h3>
         <div className="space-y-3">
-          {posList.map(pos => {
+          {visiblePOS.map(pos => {
             const warehouse = warehouses.find(item => item.id === pos.default_warehouse_id);
             const prices = posProductPrices.filter(price => price.pos_id === pos.id);
             return (
@@ -587,13 +674,14 @@ export default function HospiSettings() {
               </motion.div>
             );
           })}
+          {visiblePOS.length === 0 && <p className="text-text-tertiary text-sm text-center py-8">Aucun point de vente ne correspond aux filtres.</p>}
         </div>
       </section>
 
       <section className="mb-5">
         <h3 className="text-white font-black text-sm mb-3 flex items-center gap-2"><ReceiptText size={16} className="text-violet" /> Catalogue produits</h3>
         <div className="space-y-3">
-          {products.map(product => {
+          {visibleProducts.map(product => {
             const productPrices = posProductPrices.filter(price => price.product_id === product.id);
             const productStock = stockLevels
               .filter(level => level.product_id === product.id)
@@ -632,13 +720,14 @@ export default function HospiSettings() {
               </motion.div>
             );
           })}
+          {visibleProducts.length === 0 && <p className="text-text-tertiary text-sm text-center py-8">Aucun produit ne correspond aux filtres.</p>}
         </div>
       </section>
 
       <section className="mb-5">
         <h3 className="text-white font-black text-sm mb-3 flex items-center gap-2"><Warehouse size={16} className="text-green" /> Dépôts & stocks</h3>
         <div className="space-y-3">
-          {warehouses.map(warehouse => {
+          {visibleWarehouses.map(warehouse => {
             const levels = stockLevels.filter(level => level.warehouse_id === warehouse.id);
             return (
               <div key={warehouse.id} className="glass-card p-4">
@@ -672,6 +761,7 @@ export default function HospiSettings() {
               </div>
             );
           })}
+          {visibleWarehouses.length === 0 && <p className="text-text-tertiary text-sm text-center py-8">Aucun dépôt ne correspond aux filtres.</p>}
         </div>
       </section>
 
