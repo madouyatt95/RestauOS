@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { useOrderStore } from '../stores/orderStore';
 import { useAuthStore } from '../stores/authStore';
 import { useHospiStore } from '../stores/hospiStore';
-import { ShoppingBag, Users, Receipt, ArrowDown, Bell, ChevronRight, ShieldAlert, Store, BedDouble, Dice5, Sparkles, Package, Settings } from 'lucide-react';
+import { ShoppingBag, Users, Receipt, ArrowDown, Bell, ChevronRight, ShieldAlert, Store, BedDouble, Dice5, Sparkles, Package } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 
@@ -28,23 +28,22 @@ export default function Dashboard() {
   const casinoPOS = posList.find(pos => pos.type === 'bar' || pos.type === 'casino');
 
   const openBusinessModule = (module: 'restaurant' | 'hotel' | 'casino' | 'spa' | 'boutique') => {
-    if (module === 'restaurant' && restaurantPOS) {
-      setActivePOS(restaurantPOS.id);
-      navigate('/commandes');
-      return;
-    }
     if (module === 'hotel') {
       navigate('/pms');
       return;
     }
-    if (module === 'casino' && casinoPOS) {
-      setActivePOS(casinoPOS.id);
+    const posByModule = {
+      restaurant: restaurantPOS,
+      casino: casinoPOS,
+      spa: posList.find(pos => pos.type === 'spa'),
+      boutique: posList.find(pos => pos.type === 'boutique'),
+    }[module];
+    if (posByModule) {
+      setActivePOS(posByModule.id);
       navigate('/commandes');
       return;
     }
-    if (module === 'spa' || module === 'boutique') {
-      navigate('/settings');
-    }
+    navigate('/modules');
   };
 
   const today = new Date();
@@ -86,8 +85,9 @@ export default function Dashboard() {
             <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Modules métiers</p>
             <h2 className="text-white font-black text-lg">Piloter chaque activité</h2>
           </div>
-          <button onClick={() => navigate('/settings')} className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-text-secondary flex items-center justify-center">
-            <Settings size={18} />
+          <button onClick={() => navigate('/modules')} className="h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-text-secondary flex items-center justify-center gap-2">
+            <Store size={16} />
+            <span className="text-[10px] font-black uppercase tracking-widest">Tous</span>
           </button>
         </div>
 

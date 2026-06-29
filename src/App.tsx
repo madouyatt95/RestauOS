@@ -25,6 +25,7 @@ import Factures from './pages/Factures';
 import WhatsAppBot from './pages/WhatsAppBot';
 import HospiSettings from './pages/HospiSettings';
 import PMS from './pages/PMS';
+import BusinessModules from './pages/BusinessModules';
 import { useThemeStore } from './stores/themeStore';
 import { useEffect } from 'react';
 import './index.css';
@@ -39,6 +40,9 @@ function AppContent() {
           <Route path="/" element={<Landing />} />
           <Route path="/dashboard" element={
             <ProtectedRoute allowedRoles={['Admin', 'Gérant']}><Dashboard /></ProtectedRoute>
+          } />
+          <Route path="/modules" element={
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant']}><BusinessModules /></ProtectedRoute>
           } />
           <Route path="/commandes" element={
             <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Serveur']}><Commandes /></ProtectedRoute>
