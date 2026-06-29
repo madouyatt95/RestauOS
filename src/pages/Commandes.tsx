@@ -8,7 +8,7 @@ import { useClientStore } from '../stores/clientStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useHospiStore } from '../stores/hospiStore';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, ShoppingCart, X, ChefHat, Calendar, UserPlus, Phone, Plus, Minus, Trash2, Layout, Layers, Map as MapIcon, User, QrCode, Gift, Wallet, CheckCircle2 } from 'lucide-react';
+import { Search, ShoppingCart, X, ChefHat, Calendar, UserPlus, Phone, Plus, Minus, Trash2, Layout, Layers, Map as MapIcon, User, QrCode, Gift, Wallet, CheckCircle2, Store, Warehouse, CreditCard, Percent } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 
@@ -144,6 +144,7 @@ export default function Commandes() {
   const floorTables = tables.filter(t => t.floor === selectedFloor && t.zone === selectedZone);
 
   const activePOS = posList.find(pos => pos.id === activePOSId);
+  const activeWarehouse = warehouses.find(warehouse => warehouse.id === activePOS?.default_warehouse_id);
   const hospiProducts = getProductsForPOS(activePOSId);
   const productsForActivePOS = PRODUCTS.map(product => {
     const hospiProduct = hospiProducts.find(item => item.product.legacy_product_id === product.id);
@@ -293,6 +294,9 @@ export default function Commandes() {
 
   const todayString = new Date().toISOString().split('T')[0];
   const todayRes = reservations.filter(r => r.date === todayString && (r.status === 'pending' || r.status === 'confirmed'));
+  const activePOSRevenue = orders
+    .filter(order => order.posId === activePOSId)
+    .reduce((sum, order) => sum + order.total, 0);
 
   if (!selectedTableId) {
     return (
@@ -303,20 +307,6 @@ export default function Commandes() {
             <p className="text-text-secondary text-xs">
               {designMode ? 'Studio Mode : Configurez vos zones' : assigningRes ? `Attribuer à ${assigningRes.clientName}` : activePOS?.name || 'Gérez vos tables en temps réel'}
             </p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <select
-                value={activePOSId}
-                onChange={event => setActivePOS(event.target.value)}
-                className="bg-white/10 border border-white/10 rounded-xl px-3 py-2 text-white text-xs font-bold outline-none"
-              >
-                {posList.filter(pos => pos.is_active).map(pos => (
-                  <option key={pos.id} value={pos.id} className="bg-[#111827] text-white">{pos.name}</option>
-                ))}
-              </select>
-              <span className="text-[10px] text-text-tertiary font-bold">
-                Stock : {warehouses.find(warehouse => warehouse.id === activePOS?.default_warehouse_id)?.name || 'Dépôt non configuré'}
-              </span>
-            </div>
           </div>
           <div className="flex gap-2">
             {(user?.role === 'Gérant' || user?.role === 'Admin') && (
@@ -336,6 +326,44 @@ export default function Commandes() {
                 </span>
               )}
             </button>
+          </div>
+        </div>
+
+        <div className="px-4 mb-4">
+          <div className="rounded-3xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 p-4">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Point de vente actif</p>
+                <h2 className="text-white font-black text-xl mt-1">{activePOS?.name || 'POS non sélectionné'}</h2>
+                <p className="text-text-secondary text-xs mt-1">{activePOS?.type || 'restaurant'} · catalogue et prix dédiés</p>
+              </div>
+              <select
+                value={activePOSId}
+                onChange={event => setActivePOS(event.target.value)}
+                className="max-w-[150px] bg-[#111827] border border-white/10 rounded-2xl px-3 py-3 text-white text-xs font-bold outline-none"
+              >
+                {posList.filter(pos => pos.is_active).map(pos => (
+                  <option key={pos.id} value={pos.id} className="bg-[#111827] text-white">{pos.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: 'Dépôt de sortie', value: activeWarehouse?.name || 'Non configuré', icon: Warehouse, color: 'text-green' },
+                { label: 'Paiements', value: activePOS?.payment_methods.join(', ') || 'Espèces', icon: CreditCard, color: 'text-blue' },
+                { label: 'TVA', value: activePOS?.tax_profile || 'Standard', icon: Percent, color: 'text-orange' },
+                { label: 'CA POS', value: `${activePOSRevenue.toLocaleString('fr-FR')} F`, icon: Store, color: 'text-purple' },
+              ].map(item => (
+                <div key={item.label} className="rounded-2xl bg-black/20 border border-white/5 p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <item.icon size={14} className={item.color} />
+                    <p className="text-text-tertiary text-[9px] font-black uppercase">{item.label}</p>
+                  </div>
+                  <p className="text-white text-xs font-black leading-tight">{item.value}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
