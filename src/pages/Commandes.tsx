@@ -94,7 +94,7 @@ export default function Commandes() {
   const { cart, addToCart, updateQuantity, clearCart, checkout, orders, setLoyaltyClient, updateOrderStatus } = useOrderStore();
   const { posList, warehouses, activePOSId, setActivePOS, getProductsForPOS, recordSale } = useHospiStore();
   const { tables, addTable, removeTable, updateTableStatus, updateTablePosition, updateTableCapacity, updateTableFloor } = useTableStore();
-  const { reservations, updateStatus, addReservation } = useReservationStore();
+  const { reservations, updateStatus, addReservation, cancelReservation } = useReservationStore();
   const { clients } = useClientStore();
   const { addNotification } = useNotificationStore();
   const { user } = useAuthStore();
@@ -111,6 +111,7 @@ export default function Commandes() {
   const [showResList, setShowResList] = useState(false);
   const [assigningRes, setAssigningRes] = useState<Reservation | null>(null);
   const [showTableOptions, setShowTableOptions] = useState<string | null>(null);
+  const [tableToDeleteId, setTableToDeleteId] = useState<string | null>(null);
   const [showQR, setShowQR] = useState<string | null>(null);
   
   const [selectedFloor, setSelectedFloor] = useState('RDC');
@@ -255,10 +256,40 @@ export default function Commandes() {
     setEditingTable(newTable);
   };
 
-  const handleDeleteTable = (id: string) => {
-    if (!confirm("Supprimer cette table ?")) return;
-    removeTable(id);
+  const requestDeleteTable = (id: string) => {
+    const table = tables.find(t => t.id === id);
+    const activeOrder = orders.find(order => order.tableId === id && !['servie', 'annulee'].includes(order.status));
+    if (!table) return;
+    if (table.currentOrderId || activeOrder) {
+      addNotification({
+        type: 'system',
+        title: 'Table non supprimée',
+        message: `La table ${table.number} a une commande active. Libérez ou encaissez la table avant suppression.`,
+      });
+      return;
+    }
+    setTableToDeleteId(id);
+  };
+
+  const confirmDeleteTable = () => {
+    if (!tableToDeleteId) return;
+    const table = tables.find(t => t.id === tableToDeleteId);
+    reservations
+      .filter(reservation => reservation.tableId === tableToDeleteId && ['pending', 'confirmed', 'waitlist'].includes(reservation.status))
+      .forEach(reservation => cancelReservation(reservation.id, `Table ${table?.number || ''} supprimée du plan`));
+    removeTable(tableToDeleteId);
     setEditingTable(null);
+    setShowTableOptions(null);
+    setTableToDeleteId(null);
+    addNotification({
+      type: 'system',
+      title: 'Table supprimée',
+      message: table ? `La table ${table.number} a été retirée du plan de salle.` : 'La table a été retirée du plan de salle.',
+    });
+  };
+
+  const handleDeleteTable = (id: string) => {
+    requestDeleteTable(id);
   };
 
   const handleSendToKitchen = () => {
@@ -575,6 +606,31 @@ export default function Commandes() {
 
         {/* Modals for Reservations/Options */}
         <AnimatePresence>
+          {tableToDeleteId && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setTableToDeleteId(null)}>
+              <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
+                <div className="modal-handle" />
+                <div className="w-14 h-14 rounded-2xl bg-red/10 text-red flex items-center justify-center mx-auto mb-4">
+                  <Trash2 size={26} />
+                </div>
+                <h3 className="text-white font-black text-xl text-center mb-2">
+                  Supprimer la table {tables.find(t => t.id === tableToDeleteId)?.number}
+                </h3>
+                <p className="text-text-secondary text-sm text-center mb-6">
+                  Cette action retire la table du plan. Les réservations liées seront annulées pour éviter un plan incohérent.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => setTableToDeleteId(null)} className="py-4 rounded-2xl bg-white/5 text-white font-black text-sm">
+                    Annuler
+                  </button>
+                  <button onClick={confirmDeleteTable} className="py-4 rounded-2xl bg-red text-white font-black text-sm">
+                    Supprimer
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
           {showTableOptions && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setShowTableOptions(null)}>
               <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
