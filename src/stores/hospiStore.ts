@@ -654,6 +654,10 @@ interface HospiState {
   supplierReceipts: SupplierReceipt[];
   activePOSId: string;
   setActivePOS: (posId: string) => void;
+  addPOS: (input: Omit<POS, 'id' | 'created_at'>) => POS;
+  addWarehouse: (input: Omit<Warehouse, 'id' | 'created_at'>) => Warehouse;
+  addProduct: (input: Omit<HospiProduct, 'id' | 'created_at'> & { initial_warehouse_id?: string; initial_quantity?: number; alert_threshold?: number }) => HospiProduct;
+  upsertPOSProductPrice: (input: Omit<POSProductPrice, 'id' | 'created_at'>) => POSProductPrice;
   getActivePOS: () => POS | undefined;
   getActiveWarehouse: () => Warehouse | undefined;
   getProductsForPOS: (posId?: string) => POSProduct[];
@@ -706,6 +710,85 @@ export const useHospiStore = create<HospiState>()(
       activePOSId: 'pos-restaurant-jardin',
 
       setActivePOS: (posId) => set({ activePOSId: posId }),
+      addPOS: (input) => {
+        const state = get();
+        const createdAt = new Date().toISOString();
+        const pos: POS = {
+          ...input,
+          id: `pos-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          created_at: createdAt,
+        };
+        const register: CashRegister = {
+          id: `reg-${pos.id}`,
+          pos_id: pos.id,
+          name: `Caisse ${pos.name}`,
+          is_active: true,
+          created_at: createdAt,
+        };
+        set({
+          posList: [...state.posList, pos],
+          cashRegisters: [...state.cashRegisters, register],
+        });
+        return pos;
+      },
+      addWarehouse: (input) => {
+        const state = get();
+        const warehouse: Warehouse = {
+          ...input,
+          id: `wh-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          created_at: new Date().toISOString(),
+        };
+        set({ warehouses: [...state.warehouses, warehouse] });
+        return warehouse;
+      },
+      addProduct: (input) => {
+        const state = get();
+        const createdAt = new Date().toISOString();
+        const {
+          initial_warehouse_id,
+          initial_quantity,
+          alert_threshold,
+          ...productInput
+        } = input;
+        const product: HospiProduct = {
+          ...productInput,
+          id: `prod-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          created_at: createdAt,
+        };
+        const initialStock = product.is_stockable && initial_warehouse_id ? [{
+          id: `stock-${product.id}-${initial_warehouse_id}`,
+          warehouse_id: initial_warehouse_id,
+          product_id: product.id,
+          quantity: initial_quantity || 0,
+          unit: product.unit,
+          alert_threshold: alert_threshold || 0,
+          updated_at: createdAt,
+        }] : [];
+        set({
+          products: [...state.products, product],
+          stockLevels: [...state.stockLevels, ...initialStock],
+        });
+        return product;
+      },
+      upsertPOSProductPrice: (input) => {
+        const state = get();
+        const existing = state.posProductPrices.find(price => price.pos_id === input.pos_id && price.product_id === input.product_id);
+        const createdAt = new Date().toISOString();
+        if (existing) {
+          const nextPrice: POSProductPrice = { ...existing, ...input };
+          set({
+            posProductPrices: state.posProductPrices.map(price => price.id === existing.id ? nextPrice : price),
+          });
+          return nextPrice;
+        }
+        const price: POSProductPrice = {
+          ...input,
+          id: `price-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          created_at: createdAt,
+        };
+        set({ posProductPrices: [...state.posProductPrices, price] });
+        return price;
+      },
       getActivePOS: () => get().posList.find(pos => pos.id === get().activePOSId),
       getActiveWarehouse: () => {
         const pos = get().getActivePOS();

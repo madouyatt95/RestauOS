@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
-import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat, Truck, Users, CreditCard } from 'lucide-react';
-import { useHospiStore } from '../stores/hospiStore';
+import { useState } from 'react';
+import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat, Truck, Users, CreditCard, Plus } from 'lucide-react';
+import { useHospiStore, type POSType, type WarehouseType } from '../stores/hospiStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
@@ -28,10 +29,113 @@ export default function HospiSettings() {
     folioLines,
     customerAccounts,
     customerLedgerEntries,
+    addPOS,
+    addWarehouse,
+    addProduct,
+    upsertPOSProductPrice,
     getCustomerAccountBalance,
     settleCustomerAccount,
   } = useHospiStore();
   const { auditLogs } = useBusinessRulesStore();
+  const [configPanel, setConfigPanel] = useState<'pos' | 'warehouse' | 'product' | 'price'>('pos');
+  const [newPOS, setNewPOS] = useState({
+    siteId: sites[0]?.id || 'site-dakar',
+    name: '',
+    type: 'restaurant' as POSType,
+    warehouseId: warehouses[0]?.id || '',
+    paymentMethods: 'especes,wave,orange_money,carte,room_charge',
+    printers: '',
+    terminals: '',
+    taxProfile: 'TVA 18%',
+  });
+  const [newWarehouse, setNewWarehouse] = useState({
+    siteId: sites[0]?.id || 'site-dakar',
+    name: '',
+    type: 'restaurant' as WarehouseType,
+  });
+  const [newProduct, setNewProduct] = useState({
+    name: '',
+    sku: '',
+    category: 'ingredient',
+    unit: 'kg',
+    stockable: true,
+    primaryWarehouseId: warehouses[0]?.id || '',
+    secondaryWarehouseId: '',
+    fallbackPolicy: 'use_secondary' as 'use_secondary' | 'block_sale',
+    averageCost: '',
+    lotNumber: '',
+    expiresAt: '',
+    initialQuantity: '',
+    alertThreshold: '',
+  });
+  const [priceForm, setPriceForm] = useState({
+    posId: posList[0]?.id || '',
+    productId: products[0]?.id || '',
+    salePrice: '',
+    taxRate: '18',
+  });
+
+  const handleCreatePOS = () => {
+    if (!newPOS.name || !newPOS.warehouseId) return;
+    addPOS({
+      site_id: newPOS.siteId,
+      name: newPOS.name,
+      type: newPOS.type,
+      default_warehouse_id: newPOS.warehouseId,
+      is_active: true,
+      payment_methods: newPOS.paymentMethods.split(',').map(item => item.trim()).filter(Boolean),
+      printer_names: newPOS.printers.split(',').map(item => item.trim()).filter(Boolean),
+      terminal_names: newPOS.terminals.split(',').map(item => item.trim()).filter(Boolean),
+      tax_profile: newPOS.taxProfile,
+    });
+    setNewPOS(prev => ({ ...prev, name: '', printers: '', terminals: '' }));
+  };
+
+  const handleCreateWarehouse = () => {
+    if (!newWarehouse.name) return;
+    addWarehouse({
+      site_id: newWarehouse.siteId,
+      name: newWarehouse.name,
+      type: newWarehouse.type,
+      is_active: true,
+    });
+    setNewWarehouse(prev => ({ ...prev, name: '' }));
+  };
+
+  const handleCreateProduct = () => {
+    if (!newProduct.name || !newProduct.sku) return;
+    addProduct({
+      company_id: companies[0]?.id || 'comp-sartal-demo',
+      name: newProduct.name,
+      sku: newProduct.sku,
+      category_id: newProduct.category,
+      unit: newProduct.unit,
+      is_stockable: newProduct.stockable,
+      is_active: true,
+      primary_warehouse_id: newProduct.primaryWarehouseId || undefined,
+      secondary_warehouse_id: newProduct.secondaryWarehouseId || undefined,
+      fallback_policy: newProduct.fallbackPolicy,
+      average_purchase_price: Number(newProduct.averageCost) || 0,
+      lot_number: newProduct.lotNumber || undefined,
+      expires_at: newProduct.expiresAt ? new Date(newProduct.expiresAt).toISOString() : undefined,
+      initial_warehouse_id: newProduct.primaryWarehouseId || undefined,
+      initial_quantity: Number(newProduct.initialQuantity) || 0,
+      alert_threshold: Number(newProduct.alertThreshold) || 0,
+    });
+    setNewProduct(prev => ({ ...prev, name: '', sku: '', averageCost: '', lotNumber: '', expiresAt: '', initialQuantity: '', alertThreshold: '' }));
+  };
+
+  const handleSavePrice = () => {
+    if (!priceForm.posId || !priceForm.productId || !priceForm.salePrice) return;
+    upsertPOSProductPrice({
+      pos_id: priceForm.posId,
+      product_id: priceForm.productId,
+      sale_price: Number(priceForm.salePrice),
+      tax_rate: Number(priceForm.taxRate) || 0,
+      is_available: true,
+    });
+    setPriceForm(prev => ({ ...prev, salePrice: '' }));
+  };
 
   return (
     <div className="page-content pt-14 pb-28">
@@ -65,6 +169,135 @@ export default function HospiSettings() {
           </div>
         </div>
       </div>
+
+      <section className="glass-card-lg p-5 mb-5">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-white font-black text-sm flex items-center gap-2"><Plus size={16} className="text-orange" /> Configuration rapide</h3>
+            <p className="text-text-secondary text-xs mt-1">Créer les éléments clés sans modifier le code.</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-4 gap-2 mb-4">
+          {[
+            ['pos', 'POS'],
+            ['warehouse', 'Dépôt'],
+            ['product', 'Produit'],
+            ['price', 'Prix POS'],
+          ].map(([key, label]) => (
+            <button key={key} type="button" onClick={() => setConfigPanel(key as any)}
+              className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${configPanel === key ? 'bg-orange text-white' : 'bg-white/5 text-text-secondary'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {configPanel === 'pos' && (
+          <div className="space-y-3">
+            <input value={newPOS.name} onChange={e => setNewPOS(p => ({ ...p, name: e.target.value }))} placeholder="Nom du point de vente"
+              className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+            <div className="grid grid-cols-2 gap-3">
+              <select value={newPOS.siteId} onChange={e => setNewPOS(p => ({ ...p, siteId: e.target.value }))}
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
+                {sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
+              </select>
+              <select value={newPOS.type} onChange={e => setNewPOS(p => ({ ...p, type: e.target.value as POSType }))}
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
+                {['restaurant', 'bar', 'nightclub', 'casino', 'room_service', 'spa', 'boutique', 'other'].map(type => <option key={type} value={type}>{type}</option>)}
+              </select>
+            </div>
+            <select value={newPOS.warehouseId} onChange={e => setNewPOS(p => ({ ...p, warehouseId: e.target.value }))}
+              className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
+              {warehouses.filter(warehouse => warehouse.site_id === newPOS.siteId).map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+            </select>
+            <input value={newPOS.paymentMethods} onChange={e => setNewPOS(p => ({ ...p, paymentMethods: e.target.value }))} placeholder="Moyens de paiement"
+              className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+            <div className="grid grid-cols-2 gap-3">
+              <input value={newPOS.printers} onChange={e => setNewPOS(p => ({ ...p, printers: e.target.value }))} placeholder="Imprimantes"
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+              <input value={newPOS.terminals} onChange={e => setNewPOS(p => ({ ...p, terminals: e.target.value }))} placeholder="Terminaux"
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+            </div>
+            <button type="button" onClick={handleCreatePOS} className="w-full py-3 rounded-2xl bg-orange text-white font-black text-sm">Créer le POS</button>
+          </div>
+        )}
+
+        {configPanel === 'warehouse' && (
+          <div className="space-y-3">
+            <input value={newWarehouse.name} onChange={e => setNewWarehouse(p => ({ ...p, name: e.target.value }))} placeholder="Nom du dépôt"
+              className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+            <div className="grid grid-cols-2 gap-3">
+              <select value={newWarehouse.siteId} onChange={e => setNewWarehouse(p => ({ ...p, siteId: e.target.value }))}
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
+                {sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
+              </select>
+              <select value={newWarehouse.type} onChange={e => setNewWarehouse(p => ({ ...p, type: e.target.value as WarehouseType }))}
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
+                {['restaurant', 'bar', 'kitchen', 'cold_room', 'central', 'casino', 'boutique', 'other'].map(type => <option key={type} value={type}>{type}</option>)}
+              </select>
+            </div>
+            <button type="button" onClick={handleCreateWarehouse} className="w-full py-3 rounded-2xl bg-green text-white font-black text-sm">Créer le dépôt</button>
+          </div>
+        )}
+
+        {configPanel === 'product' && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <input value={newProduct.name} onChange={e => setNewProduct(p => ({ ...p, name: e.target.value }))} placeholder="Nom produit / ingrédient"
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+              <input value={newProduct.sku} onChange={e => setNewProduct(p => ({ ...p, sku: e.target.value }))} placeholder="SKU"
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <input value={newProduct.category} onChange={e => setNewProduct(p => ({ ...p, category: e.target.value }))} placeholder="Catégorie"
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+              <select value={newProduct.unit} onChange={e => setNewProduct(p => ({ ...p, unit: e.target.value }))}
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
+                {['kg', 'g', 'L', 'ml', 'unité', 'bouteille', 'portion'].map(unit => <option key={unit} value={unit}>{unit}</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <select value={newProduct.primaryWarehouseId} onChange={e => setNewProduct(p => ({ ...p, primaryWarehouseId: e.target.value }))}
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
+                {warehouses.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+              </select>
+              <select value={newProduct.secondaryWarehouseId} onChange={e => setNewProduct(p => ({ ...p, secondaryWarehouseId: e.target.value }))}
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
+                <option value="">Aucun dépôt secondaire</option>
+                {warehouses.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <input type="number" value={newProduct.averageCost} onChange={e => setNewProduct(p => ({ ...p, averageCost: e.target.value }))} placeholder="Prix achat moyen"
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+              <input type="number" value={newProduct.initialQuantity} onChange={e => setNewProduct(p => ({ ...p, initialQuantity: e.target.value }))} placeholder="Stock initial"
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+              <input type="number" value={newProduct.alertThreshold} onChange={e => setNewProduct(p => ({ ...p, alertThreshold: e.target.value }))} placeholder="Seuil"
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+            </div>
+            <button type="button" onClick={handleCreateProduct} className="w-full py-3 rounded-2xl bg-blue text-white font-black text-sm">Créer le produit</button>
+          </div>
+        )}
+
+        {configPanel === 'price' && (
+          <div className="space-y-3">
+            <select value={priceForm.posId} onChange={e => setPriceForm(p => ({ ...p, posId: e.target.value }))}
+              className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
+              {posList.map(pos => <option key={pos.id} value={pos.id}>{pos.name}</option>)}
+            </select>
+            <select value={priceForm.productId} onChange={e => setPriceForm(p => ({ ...p, productId: e.target.value }))}
+              className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
+              {products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
+            </select>
+            <div className="grid grid-cols-2 gap-3">
+              <input type="number" value={priceForm.salePrice} onChange={e => setPriceForm(p => ({ ...p, salePrice: e.target.value }))} placeholder="Prix de vente"
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+              <input type="number" value={priceForm.taxRate} onChange={e => setPriceForm(p => ({ ...p, taxRate: e.target.value }))} placeholder="TVA"
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+            </div>
+            <button type="button" onClick={handleSavePrice} className="w-full py-3 rounded-2xl bg-violet text-white font-black text-sm">Enregistrer le prix POS</button>
+          </div>
+        )}
+      </section>
 
       <section className="mb-5">
         <h3 className="text-white font-black text-sm mb-3 flex items-center gap-2"><Building2 size={16} className="text-orange" /> Sites</h3>
