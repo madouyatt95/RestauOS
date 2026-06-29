@@ -5,7 +5,7 @@ import { useHospiStore } from '../stores/hospiStore';
 import { useAuthStore } from '../stores/authStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package, Settings, Warehouse, Truck, Activity, CreditCard } from 'lucide-react';
+import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package, Settings, Warehouse, Truck, Activity, CreditCard, X, Store, ReceiptText } from 'lucide-react';
 
 const purchaseStatusLabels: Record<string, string> = {
   draft: 'Brouillon',
@@ -46,7 +46,8 @@ export default function Stocks() {
     transferStock,
     adjustInventory,
     recordLoss,
-    receivePurchaseOrder
+    receivePurchaseOrder,
+    getPriceForProduct
   } = useHospiStore();
   const { canPerform, requiresManagerApproval, recordAudit } = useBusinessRulesStore();
   const [tab, setTab] = useState<StockTab>('pilotage');
@@ -56,6 +57,7 @@ export default function Stocks() {
   const [showTransfer, setShowTransfer] = useState(false);
   const [showAdjustment, setShowAdjustment] = useState(false);
   const [showLoss, setShowLoss] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedSiteId, setSelectedSiteId] = useState(sites[0]?.id || 'site-dakar');
   const [moveQty, setMoveQty] = useState('');
   const [moveNote, setMoveNote] = useState('');
@@ -99,6 +101,20 @@ export default function Stocks() {
       .includes(search.trim().toLowerCase())),
     [products, search, siteStockLevels, warehouses]
   );
+  const selectedStockProduct = selectedProductId ? products.find(product => product.id === selectedProductId) : undefined;
+  const selectedProductLevels = selectedStockProduct
+    ? stockLevels.filter(level => level.product_id === selectedStockProduct.id)
+    : [];
+  const selectedProductMovements = selectedStockProduct
+    ? stockMovements.filter(move => move.product_id === selectedStockProduct.id).slice(0, 8)
+    : [];
+  const selectedProductPOS = selectedStockProduct
+    ? posList.filter(pos => {
+      const price = getPriceForProduct(selectedStockProduct.id, pos.id);
+      return price?.is_available;
+    })
+    : [];
+  const selectedProductValue = selectedProductLevels.reduce((sum, level) => sum + level.quantity * (selectedStockProduct?.average_purchase_price || 0), 0);
 
   const handleMove = () => {
     if (!showMove || !moveQty) return;
@@ -370,7 +386,7 @@ export default function Stocks() {
             </div>
             <div className="space-y-2">
               {stockProducts.slice(0, 8).map(row => (
-                <div key={row.product.id} className="rounded-xl bg-white/5 px-3 py-2">
+                <button key={row.product.id} type="button" onClick={() => setSelectedProductId(row.product.id)} className="w-full rounded-xl bg-white/5 px-3 py-2 text-left active:scale-[0.99] transition-transform">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-white font-bold text-xs truncate">{row.product.name}</p>
@@ -378,7 +394,7 @@ export default function Stocks() {
                     </div>
                     <span className={`font-black text-xs ${row.low ? 'text-orange' : 'text-green'}`}>{row.total} {row.product.unit}</span>
                   </div>
-                </div>
+                </button>
               ))}
               {stockProducts.length === 0 && (
                 <p className="text-text-tertiary text-xs text-center py-5">Aucun produit trouvé.</p>
@@ -555,7 +571,7 @@ export default function Stocks() {
                     const product = products.find(item => item.id === level.product_id);
                     const isLow = level.quantity <= level.alert_threshold;
                     return (
-                      <div key={level.id} className="flex items-center justify-between rounded-xl bg-white/5 px-3 py-2">
+                      <button key={level.id} type="button" onClick={() => setSelectedProductId(level.product_id)} className="w-full flex items-center justify-between rounded-xl bg-white/5 px-3 py-2 text-left active:scale-[0.99] transition-transform">
                         <div>
                           <p className="text-white font-bold text-xs">{product?.name || level.product_id}</p>
                           <p className="text-text-tertiary text-[10px]">{isLow ? 'À réapprovisionner' : `Seuil : ${level.alert_threshold} ${level.unit}`}</p>
@@ -563,7 +579,7 @@ export default function Stocks() {
                         <span className={`font-black text-sm ${isLow ? 'text-orange' : 'text-green'}`}>
                           {level.quantity} {level.unit}
                         </span>
-                      </div>
+                      </button>
                     );
                   })}
                   {levels.length === 0 && <p className="text-text-tertiary text-xs">Aucun stock suivi dans ce dépôt.</p>}
@@ -682,6 +698,120 @@ export default function Stocks() {
           )}
         </div>
       )}
+
+      {/* Product Detail Modal */}
+      <AnimatePresence>
+        {selectedStockProduct && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setSelectedProductId(null)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25 }}
+              className="modal-sheet max-h-[88vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">{selectedStockProduct.sku}</p>
+                  <h3 className="text-white font-black text-lg leading-tight mt-1">{selectedStockProduct.name}</h3>
+                  <p className="text-text-secondary text-xs mt-1">{selectedStockProduct.category_id} • unité {selectedStockProduct.unit}</p>
+                </div>
+                <button type="button" onClick={() => setSelectedProductId(null)} className="w-9 h-9 rounded-xl bg-white/5 text-text-secondary flex items-center justify-center">
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="rounded-xl bg-white/5 p-3">
+                  <p className="text-text-tertiary text-[9px] font-black uppercase">Total</p>
+                  <p className="text-white font-black text-sm">{selectedProductLevels.reduce((sum, level) => sum + level.quantity, 0)} {selectedStockProduct.unit}</p>
+                </div>
+                <div className="rounded-xl bg-white/5 p-3">
+                  <p className="text-text-tertiary text-[9px] font-black uppercase">Valeur</p>
+                  <p className="text-white font-black text-sm">{selectedProductValue.toLocaleString('fr-FR')} F</p>
+                </div>
+                <div className="rounded-xl bg-white/5 p-3">
+                  <p className="text-text-tertiary text-[9px] font-black uppercase">POS</p>
+                  <p className="text-white font-black text-sm">{selectedProductPOS.length}</p>
+                </div>
+              </div>
+
+              <section className="mb-4">
+                <h4 className="text-white font-black text-sm mb-2 flex items-center gap-2"><Warehouse size={15} className="text-blue" /> Stock par dépôt</h4>
+                <div className="space-y-2">
+                  {selectedProductLevels.map(level => {
+                    const warehouse = warehouses.find(item => item.id === level.warehouse_id);
+                    const site = sites.find(item => item.id === warehouse?.site_id);
+                    const isLow = level.quantity <= level.alert_threshold;
+                    return (
+                      <div key={level.id} className="rounded-xl bg-white/5 px-3 py-2 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-white font-bold text-xs">{warehouse?.name || 'Dépôt'}</p>
+                          <p className="text-text-tertiary text-[10px]">{site?.name} • seuil {level.alert_threshold} {level.unit}</p>
+                        </div>
+                        <span className={`font-black text-xs ${isLow ? 'text-orange' : 'text-green'}`}>
+                          {level.quantity} {level.unit}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {selectedProductLevels.length === 0 && <p className="text-text-tertiary text-xs py-3">Aucun stock enregistré pour ce produit.</p>}
+                </div>
+              </section>
+
+              <section className="mb-4">
+                <h4 className="text-white font-black text-sm mb-2 flex items-center gap-2"><Store size={15} className="text-orange" /> Vendu dans les POS</h4>
+                <div className="space-y-2">
+                  {selectedProductPOS.map(pos => {
+                    const price = getPriceForProduct(selectedStockProduct.id, pos.id);
+                    const warehouse = warehouses.find(item => item.id === pos.default_warehouse_id);
+                    return (
+                      <div key={pos.id} className="rounded-xl bg-white/5 px-3 py-2 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-white font-bold text-xs">{pos.name}</p>
+                          <p className="text-text-tertiary text-[10px]">Déstocke : {warehouse?.name || 'Dépôt non lié'}</p>
+                        </div>
+                        <span className="text-orange font-black text-xs">{(price?.sale_price || 0).toLocaleString('fr-FR')} F</span>
+                      </div>
+                    );
+                  })}
+                  {selectedProductPOS.length === 0 && <p className="text-text-tertiary text-xs py-3">Aucun prix POS actif pour ce produit.</p>}
+                </div>
+              </section>
+
+              <section className="mb-4">
+                <h4 className="text-white font-black text-sm mb-2 flex items-center gap-2"><ReceiptText size={15} className="text-green" /> Derniers mouvements</h4>
+                <div className="space-y-2">
+                  {selectedProductMovements.map(move => {
+                    const warehouse = warehouses.find(item => item.id === move.warehouse_id);
+                    const isEntry = move.movement_type === 'production' || move.movement_type === 'purchase' || move.movement_type === 'transfer_in' || move.movement_type === 'inventory_adjustment';
+                    return (
+                      <div key={move.id} className="rounded-xl bg-white/5 px-3 py-2 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-white font-bold text-xs">{stockMovementLabels[move.movement_type] || move.movement_type}</p>
+                          <p className="text-text-tertiary text-[10px]">{warehouse?.name} • {new Date(move.created_at).toLocaleDateString('fr-FR')}</p>
+                        </div>
+                        <span className={`${isEntry ? 'text-green' : 'text-red'} font-black text-xs`}>
+                          {isEntry ? '+' : '-'}{move.quantity}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {selectedProductMovements.length === 0 && <p className="text-text-tertiary text-xs py-3">Aucun mouvement récent.</p>}
+                </div>
+              </section>
+
+              <div className="grid grid-cols-3 gap-2">
+                <button type="button" onClick={() => { setTransferForm(prev => ({ ...prev, productId: selectedStockProduct.id })); setSelectedProductId(null); setShowTransfer(true); }} className="py-3 rounded-2xl bg-blue/10 text-blue font-black text-[10px] uppercase tracking-widest">
+                  Transférer
+                </button>
+                <button type="button" onClick={() => { setAdjustForm(prev => ({ ...prev, productId: selectedStockProduct.id })); setSelectedProductId(null); setShowAdjustment(true); }} className="py-3 rounded-2xl bg-orange/10 text-orange font-black text-[10px] uppercase tracking-widest">
+                  Inventaire
+                </button>
+                <button type="button" onClick={() => { setLossForm(prev => ({ ...prev, productId: selectedStockProduct.id })); setSelectedProductId(null); setShowLoss(true); }} className="py-3 rounded-2xl bg-red/10 text-red font-black text-[10px] uppercase tracking-widest">
+                  Perte
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Stock Movement Modal */}
       <AnimatePresence>
