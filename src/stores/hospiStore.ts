@@ -664,6 +664,7 @@ interface HospiState {
   recordProduction: (productId: string, warehouseId: string, quantity: number, createdBy: string) => ProductionBatch | null;
   transferStock: (productId: string, fromWarehouseId: string, toWarehouseId: string, quantity: number, reason: string, createdBy: string) => StockMovement[];
   adjustInventory: (productId: string, warehouseId: string, countedQuantity: number, reason: string, createdBy: string) => StockMovement | null;
+  recordLoss: (productId: string, warehouseId: string, quantity: number, reason: string, createdBy: string) => StockMovement | null;
   receivePurchaseOrder: (purchaseOrderId: string, receivedBy: string) => SupplierReceipt | null;
   getRegisterForPOS: (posId?: string) => CashRegister | undefined;
   getOpenCashSession: (posId?: string) => CashSession | undefined;
@@ -970,6 +971,43 @@ export const useHospiStore = create<HospiState>()(
               alert_threshold: 0,
               updated_at: createdAt,
             }];
+
+        set({
+          stockLevels: nextStockLevels,
+          stockMovements: [movement, ...state.stockMovements],
+        });
+        return movement;
+      },
+      recordLoss: (productId, warehouseId, quantity, reason, createdBy) => {
+        const state = get();
+        const product = state.products.find(item => item.id === productId);
+        const warehouse = state.warehouses.find(item => item.id === warehouseId);
+        if (!product || !warehouse || quantity <= 0) return null;
+
+        const createdAt = new Date().toISOString();
+        const site = state.sites.find(item => item.id === warehouse.site_id) || state.sites[0];
+        const stock = state.stockLevels.find(level => level.product_id === productId && level.warehouse_id === warehouseId);
+        const currentQuantity = stock?.quantity || 0;
+        const nextQuantity = Math.max(0, currentQuantity - quantity);
+
+        const movement: StockMovement = {
+          id: `loss-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          company_id: site?.company_id || state.companies[0]?.id || 'comp-sartal-demo',
+          site_id: site?.id || 'site-dakar',
+          warehouse_id: warehouseId,
+          product_id: productId,
+          movement_type: 'loss',
+          quantity,
+          reason,
+          reference_type: 'stock_loss',
+          reference_id: `loss-${Date.now()}`,
+          created_by: createdBy,
+          created_at: createdAt,
+        };
+
+        const nextStockLevels = stock
+          ? state.stockLevels.map(level => level.id === stock.id ? { ...level, quantity: nextQuantity, updated_at: createdAt } : level)
+          : state.stockLevels;
 
         set({
           stockLevels: nextStockLevels,

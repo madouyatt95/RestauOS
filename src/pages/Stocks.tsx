@@ -21,24 +21,34 @@ export default function Stocks() {
     supplierReceipts,
     transferStock,
     adjustInventory,
+    recordLoss,
     receivePurchaseOrder
   } = useHospiStore();
-  const [tab, setTab] = useState<'inventaire' | 'entrees' | 'sorties' | 'depots'>('inventaire');
+  const [tab, setTab] = useState<'inventaire' | 'entrees' | 'sorties' | 'depots' | 'pertes'>('inventaire');
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [showMove, setShowMove] = useState<{ type: 'entree' | 'sortie'; itemId: string } | null>(null);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showAdjustment, setShowAdjustment] = useState(false);
+  const [showLoss, setShowLoss] = useState(false);
+  const [selectedSiteId, setSelectedSiteId] = useState(sites[0]?.id || 'site-dakar');
   const [moveQty, setMoveQty] = useState('');
   const [moveNote, setMoveNote] = useState('');
   const [newItem, setNewItem] = useState({ name: '', quantity: '', unit: 'kg', minStock: '', category: '' });
   const [transferForm, setTransferForm] = useState({ productId: 'prod-coca-33', fromWarehouseId: 'wh-central', toWarehouseId: 'wh-restaurant', quantity: '', reason: 'Réassort dépôt' });
   const [adjustForm, setAdjustForm] = useState({ productId: 'prod-coca-33', warehouseId: 'wh-restaurant', countedQuantity: '', reason: 'Inventaire physique' });
+  const [lossForm, setLossForm] = useState({ productId: 'ing-steak', warehouseId: 'wh-dakar-viandes', quantity: '', reason: 'Erreur cuisine' });
 
   const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
   const filteredMoves = movements.filter(m =>
     tab === 'entrees' ? m.type === 'entree' : tab === 'sorties' ? m.type === 'sortie' : true
   );
+  const siteWarehouses = warehouses.filter(warehouse => warehouse.site_id === selectedSiteId);
+  const selectedSite = sites.find(site => site.id === selectedSiteId) || sites[0];
+  const lowHospiStocks = stockLevels.filter(level => {
+    const warehouse = warehouses.find(item => item.id === level.warehouse_id);
+    return warehouse?.site_id === selectedSiteId && level.quantity <= level.alert_threshold;
+  });
 
   const handleMove = () => {
     if (!showMove || !moveQty) return;
@@ -97,6 +107,19 @@ export default function Stocks() {
     setAdjustForm(prev => ({ ...prev, countedQuantity: '' }));
   };
 
+  const handleLoss = () => {
+    if (!lossForm.productId || !lossForm.warehouseId || !lossForm.quantity) return;
+    recordLoss(
+      lossForm.productId,
+      lossForm.warehouseId,
+      Number(lossForm.quantity),
+      lossForm.reason || 'Perte déclarée',
+      user?.name || 'Système'
+    );
+    setShowLoss(false);
+    setLossForm(prev => ({ ...prev, quantity: '' }));
+  };
+
   const handleReceivePurchase = (purchaseOrderId: string) => {
     receivePurchaseOrder(purchaseOrderId, user?.name || 'Système');
   };
@@ -110,7 +133,10 @@ export default function Stocks() {
   return (
     <div className="page-content pt-14 pb-28">
       <div className="flex items-center justify-between mb-5">
-        <h1 className="text-xl font-black text-white">Stocks</h1>
+        <div>
+          <h1 className="text-xl font-black text-white">Stocks multi-dépôts</h1>
+          <p className="text-text-tertiary text-xs mt-1">Site, dépôts, inventaires, transferts, pertes et réceptions</p>
+        </div>
         <div className="flex gap-2">
           <button className="w-9 h-9 glass-card flex items-center justify-center rounded-full">
             <AlertTriangle size={16} className="text-orange" />
@@ -120,7 +146,7 @@ export default function Stocks() {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-5">
-        {([['inventaire', 'Inventaire'], ['depots', 'Dépôts'], ['entrees', 'Entrées'], ['sorties', 'Sorties']] as const).map(([key, label]) => (
+        {([['inventaire', 'Inventaire'], ['depots', 'Dépôts'], ['pertes', 'Pertes'], ['entrees', 'Entrées'], ['sorties', 'Sorties']] as const).map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${tab === key
               ? 'bg-orange text-white shadow-[0_4px_16px_rgba(255,138,0,0.3)]'
@@ -138,20 +164,31 @@ export default function Stocks() {
           className="w-full pl-11 pr-4 py-3 glass-card text-sm text-white placeholder-text-tertiary bg-transparent border-none" />
       </div>
 
+      <div className="glass-card-lg p-4 mb-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Site actif</p>
+            <h2 className="text-white font-black text-base">{selectedSite?.name || 'Site principal'}</h2>
+            <p className="text-text-secondary text-xs mt-1">{siteWarehouses.length} dépôts • {lowHospiStocks.length} alerte(s)</p>
+          </div>
+          <select value={selectedSiteId} onChange={e => setSelectedSiteId(e.target.value)}
+            className="px-3 py-2 rounded-xl bg-white/10 border border-white/10 text-white text-xs font-bold outline-none">
+            {sites.map(site => <option key={site.id} value={site.id} className="bg-[#111827]">{site.name}</option>)}
+          </select>
+        </div>
+      </div>
+
       {tab === 'depots' ? (
         <div className="space-y-4">
-          <div className="glass-card-lg p-4">
-            <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-1">Site</p>
-            <h2 className="text-white font-black text-lg">{sites[0]?.name || 'Site principal'}</h2>
-            <p className="text-text-secondary text-xs mt-1">{posList.length} POS actifs • {warehouses.length} dépôts</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <button onClick={() => setShowTransfer(true)} className="py-3 rounded-2xl bg-blue/10 border border-blue/20 text-blue font-black text-[10px] uppercase tracking-widest">
               Transfert dépôt
             </button>
             <button onClick={() => setShowAdjustment(true)} className="py-3 rounded-2xl bg-orange/10 border border-orange/20 text-orange font-black text-[10px] uppercase tracking-widest">
               Ajustement inventaire
+            </button>
+            <button onClick={() => setShowLoss(true)} className="py-3 rounded-2xl bg-red/10 border border-red/20 text-red font-black text-[10px] uppercase tracking-widest">
+              Déclarer perte
             </button>
           </div>
 
@@ -201,7 +238,7 @@ export default function Stocks() {
             </div>
           </div>
 
-          {warehouses.map(warehouse => {
+          {siteWarehouses.map(warehouse => {
             const linkedPOS = posList.filter(pos => pos.default_warehouse_id === warehouse.id);
             const levels = stockLevels.filter(level => level.warehouse_id === warehouse.id);
             return (
@@ -299,6 +336,30 @@ export default function Stocks() {
             <Plus size={16} className="inline mr-2" />Nouvel inventaire
           </button>
         </>
+      ) : tab === 'pertes' ? (
+        <div className="space-y-4">
+          <button onClick={() => setShowLoss(true)}
+            className="w-full py-4 rounded-2xl bg-red/10 border border-red/20 text-red font-black text-xs uppercase tracking-widest">
+            Déclarer une perte
+          </button>
+          {stockMovements.filter(move => move.movement_type === 'loss').map(move => {
+            const product = products.find(item => item.id === move.product_id);
+            const warehouse = warehouses.find(item => item.id === move.warehouse_id);
+            return (
+              <div key={move.id} className="glass-card p-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-white font-black text-sm">{product?.name || move.product_id}</p>
+                  <p className="text-text-tertiary text-[10px]">{warehouse?.name} • {move.reason}</p>
+                  <p className="text-text-tertiary text-[10px]">{new Date(move.created_at).toLocaleString('fr-FR')}</p>
+                </div>
+                <span className="text-red font-black text-sm">-{move.quantity}</span>
+              </div>
+            );
+          })}
+          {stockMovements.filter(move => move.movement_type === 'loss').length === 0 && (
+            <div className="text-center py-12 text-text-tertiary text-sm">Aucune perte déclarée</div>
+          )}
+        </div>
       ) : (
         <div className="space-y-3">
           {filteredMoves.map(m => (
@@ -372,11 +433,17 @@ export default function Stocks() {
                 <div className="grid grid-cols-2 gap-3">
                   <select value={transferForm.fromWarehouseId} onChange={e => setTransferForm(p => ({ ...p, fromWarehouseId: e.target.value }))}
                     className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
-                    {warehouses.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+                    {warehouses.map(warehouse => {
+                      const site = sites.find(item => item.id === warehouse.site_id);
+                      return <option key={warehouse.id} value={warehouse.id}>{site?.city} • {warehouse.name}</option>;
+                    })}
                   </select>
                   <select value={transferForm.toWarehouseId} onChange={e => setTransferForm(p => ({ ...p, toWarehouseId: e.target.value }))}
                     className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
-                    {warehouses.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+                    {warehouses.map(warehouse => {
+                      const site = sites.find(item => item.id === warehouse.site_id);
+                      return <option key={warehouse.id} value={warehouse.id}>{site?.city} • {warehouse.name}</option>;
+                    })}
                   </select>
                 </div>
                 <input type="number" placeholder="Quantité" value={transferForm.quantity} onChange={e => setTransferForm(p => ({ ...p, quantity: e.target.value }))}
@@ -408,7 +475,7 @@ export default function Stocks() {
                 </select>
                 <select value={adjustForm.warehouseId} onChange={e => setAdjustForm(p => ({ ...p, warehouseId: e.target.value }))}
                   className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
-                  {warehouses.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+                  {siteWarehouses.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
                 </select>
                 <input type="number" placeholder="Quantité comptée" value={adjustForm.countedQuantity} onChange={e => setAdjustForm(p => ({ ...p, countedQuantity: e.target.value }))}
                   className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
@@ -417,6 +484,38 @@ export default function Stocks() {
                 <button onClick={handleAdjustment}
                   className="w-full py-3.5 rounded-2xl bg-orange text-white font-bold text-sm">
                   Valider l’inventaire
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Hospi Loss Modal */}
+      <AnimatePresence>
+        {showLoss && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setShowLoss(false)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25 }}
+              className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <h3 className="text-white font-bold text-lg mb-4">Déclarer une perte</h3>
+              <p className="text-text-secondary text-xs mb-4">Exemples : steak brûlé, casse bouteille, péremption, erreur cuisine.</p>
+              <div className="space-y-3">
+                <select value={lossForm.productId} onChange={e => setLossForm(p => ({ ...p, productId: e.target.value }))}
+                  className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
+                  {products.filter(p => p.is_stockable).map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
+                </select>
+                <select value={lossForm.warehouseId} onChange={e => setLossForm(p => ({ ...p, warehouseId: e.target.value }))}
+                  className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
+                  {siteWarehouses.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+                </select>
+                <input type="number" placeholder="Quantité perdue" value={lossForm.quantity} onChange={e => setLossForm(p => ({ ...p, quantity: e.target.value }))}
+                  className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+                <input type="text" placeholder="Motif" value={lossForm.reason} onChange={e => setLossForm(p => ({ ...p, reason: e.target.value }))}
+                  className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+                <button onClick={handleLoss}
+                  className="w-full py-3.5 rounded-2xl bg-red text-white font-bold text-sm">
+                  Valider la perte
                 </button>
               </div>
             </motion.div>
