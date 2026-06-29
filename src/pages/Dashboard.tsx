@@ -94,11 +94,10 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 gap-3">
           {[
             { key: 'restaurant', label: 'Restaurant', sub: `${restaurantPOS?.name || 'RestauOS'} · salle, tables, caisse`, icon: Store, color: '#FF8A00', value: `${orders} commandes` },
-            { key: 'hotel', label: 'Hôtel', sub: 'PMS · chambres, folios, réception', icon: BedDouble, color: '#06B6D4', value: `${occupiedRooms}/${rooms.length} occupées` },
+            { key: 'hotel', label: 'Hôtel', sub: `PMS · chambres, folios, réception`, icon: BedDouble, color: '#06B6D4', value: `${occupiedRooms}/${rooms.length} occupées · ${openFolios} folios` },
             { key: 'casino', label: 'Casino & Bars', sub: `${casinoPOS?.name || 'POS bar'} · tarifs dédiés`, icon: Dice5, color: '#8B5CF6', value: casinoPOS ? 'POS actif' : 'À configurer' },
             { key: 'spa', label: 'Spa', sub: 'Prestations, planning, forfaits', icon: Sparkles, color: '#22C55E', value: 'Module métier' },
             { key: 'boutique', label: 'Boutique', sub: 'Ventes comptoir, stock, reçus', icon: Package, color: '#EC4899', value: `${warehouses.length} dépôts` },
-            { key: 'hotel', label: 'Folios', sub: 'Imputations chambre en cours', icon: Receipt, color: '#F59E0B', value: `${openFolios} ouverts` },
           ].map(item => (
             <button
               key={`${item.key}-${item.label}`}

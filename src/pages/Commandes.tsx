@@ -330,38 +330,33 @@ export default function Commandes() {
         </div>
 
         <div className="px-4 mb-4">
-          <div className="rounded-3xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 p-4">
-            <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="rounded-2xl bg-white/5 border border-white/10 px-3 py-2">
+            <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Point de vente actif</p>
-                <h2 className="text-white font-black text-xl mt-1">{activePOS?.name || 'POS non sélectionné'}</h2>
-                <p className="text-text-secondary text-xs mt-1">{activePOS?.type || 'restaurant'} · catalogue et prix dédiés</p>
+                <p className="text-text-tertiary text-[9px] font-black uppercase tracking-widest">POS actif</p>
+                <h2 className="text-white font-black text-sm mt-0.5">{activePOS?.name || 'POS non sélectionné'}</h2>
               </div>
               <select
                 value={activePOSId}
                 onChange={event => setActivePOS(event.target.value)}
-                className="max-w-[150px] bg-[#111827] border border-white/10 rounded-2xl px-3 py-3 text-white text-xs font-bold outline-none"
+                className="max-w-[155px] bg-[#111827] border border-white/10 rounded-xl px-3 py-2 text-white text-xs font-bold outline-none"
               >
                 {posList.filter(pos => pos.is_active).map(pos => (
                   <option key={pos.id} value={pos.id} className="bg-[#111827] text-white">{pos.name}</option>
                 ))}
               </select>
             </div>
-
-            <div className="grid grid-cols-2 gap-2">
+            <div className="mt-2 flex gap-2 overflow-x-auto scrollbar-none pb-1">
               {[
-                { label: 'Dépôt de sortie', value: activeWarehouse?.name || 'Non configuré', icon: Warehouse, color: 'text-green' },
-                { label: 'Paiements', value: activePOS?.payment_methods.join(', ') || 'Espèces', icon: CreditCard, color: 'text-blue' },
-                { label: 'TVA', value: activePOS?.tax_profile || 'Standard', icon: Percent, color: 'text-orange' },
-                { label: 'CA POS', value: `${activePOSRevenue.toLocaleString('fr-FR')} F`, icon: Store, color: 'text-purple' },
+                { label: activeWarehouse?.name || 'Dépôt non configuré', icon: Warehouse, color: 'text-green' },
+                { label: activePOS?.payment_methods.join(', ') || 'Espèces', icon: CreditCard, color: 'text-blue' },
+                { label: activePOS?.tax_profile || 'TVA standard', icon: Percent, color: 'text-orange' },
+                { label: `${activePOSRevenue.toLocaleString('fr-FR')} F`, icon: Store, color: 'text-purple' },
               ].map(item => (
-                <div key={item.label} className="rounded-2xl bg-black/20 border border-white/5 p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <item.icon size={14} className={item.color} />
-                    <p className="text-text-tertiary text-[9px] font-black uppercase">{item.label}</p>
-                  </div>
-                  <p className="text-white text-xs font-black leading-tight">{item.value}</p>
-                </div>
+                <span key={item.label} className="shrink-0 rounded-full bg-black/20 border border-white/5 px-2.5 py-1.5 text-[10px] font-bold text-text-secondary flex items-center gap-1.5">
+                  <item.icon size={12} className={item.color} />
+                  {item.label}
+                </span>
               ))}
             </div>
           </div>

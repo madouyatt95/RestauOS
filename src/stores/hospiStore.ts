@@ -655,7 +655,11 @@ interface HospiState {
   activePOSId: string;
   setActivePOS: (posId: string) => void;
   addPOS: (input: Omit<POS, 'id' | 'created_at'>) => POS;
+  updatePOS: (posId: string, input: Partial<Omit<POS, 'id' | 'created_at'>>) => POS | null;
+  deletePOS: (posId: string) => boolean;
   addWarehouse: (input: Omit<Warehouse, 'id' | 'created_at'>) => Warehouse;
+  updateWarehouse: (warehouseId: string, input: Partial<Omit<Warehouse, 'id' | 'created_at'>>) => Warehouse | null;
+  deleteWarehouse: (warehouseId: string) => boolean;
   addProduct: (input: Omit<HospiProduct, 'id' | 'created_at'> & { initial_warehouse_id?: string; initial_quantity?: number; alert_threshold?: number }) => HospiProduct;
   upsertPOSProductPrice: (input: Omit<POSProductPrice, 'id' | 'created_at'>) => POSProductPrice;
   upsertRecipe: (productId: string, name?: string) => Recipe;
@@ -736,6 +740,27 @@ export const useHospiStore = create<HospiState>()(
         });
         return pos;
       },
+      updatePOS: (posId, input) => {
+        const state = get();
+        const pos = state.posList.find(item => item.id === posId);
+        if (!pos) return null;
+        const updated: POS = { ...pos, ...input };
+        set({ posList: state.posList.map(item => item.id === posId ? updated : item) });
+        return updated;
+      },
+      deletePOS: (posId) => {
+        const state = get();
+        const pos = state.posList.find(item => item.id === posId);
+        if (!pos) return false;
+        const nextPOS = state.posList.filter(item => item.id !== posId);
+        set({
+          posList: nextPOS,
+          posProductPrices: state.posProductPrices.filter(price => price.pos_id !== posId),
+          cashRegisters: state.cashRegisters.filter(register => register.pos_id !== posId),
+          activePOSId: state.activePOSId === posId ? nextPOS[0]?.id || '' : state.activePOSId,
+        });
+        return true;
+      },
       addWarehouse: (input) => {
         const state = get();
         const warehouse: Warehouse = {
@@ -745,6 +770,25 @@ export const useHospiStore = create<HospiState>()(
         };
         set({ warehouses: [...state.warehouses, warehouse] });
         return warehouse;
+      },
+      updateWarehouse: (warehouseId, input) => {
+        const state = get();
+        const warehouse = state.warehouses.find(item => item.id === warehouseId);
+        if (!warehouse) return null;
+        const updated: Warehouse = { ...warehouse, ...input };
+        set({ warehouses: state.warehouses.map(item => item.id === warehouseId ? updated : item) });
+        return updated;
+      },
+      deleteWarehouse: (warehouseId) => {
+        const state = get();
+        const isLinkedToPOS = state.posList.some(pos => pos.default_warehouse_id === warehouseId);
+        const hasStock = state.stockLevels.some(level => level.warehouse_id === warehouseId && level.quantity > 0);
+        if (isLinkedToPOS || hasStock) return false;
+        set({
+          warehouses: state.warehouses.filter(warehouse => warehouse.id !== warehouseId),
+          stockLevels: state.stockLevels.filter(level => level.warehouse_id !== warehouseId),
+        });
+        return true;
       },
       addProduct: (input) => {
         const state = get();

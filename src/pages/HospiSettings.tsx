@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useState } from 'react';
-import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat, Truck, Users, CreditCard, Plus } from 'lucide-react';
+import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat, Truck, Users, CreditCard, Plus, Edit2, Trash2, X } from 'lucide-react';
 import { useHospiStore, type POSType, type WarehouseType } from '../stores/hospiStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
 
@@ -30,7 +30,11 @@ export default function HospiSettings() {
     customerAccounts,
     customerLedgerEntries,
     addPOS,
+    updatePOS,
+    deletePOS,
     addWarehouse,
+    updateWarehouse,
+    deleteWarehouse,
     addProduct,
     upsertPOSProductPrice,
     upsertRecipe,
@@ -41,6 +45,8 @@ export default function HospiSettings() {
   } = useHospiStore();
   const { auditLogs } = useBusinessRulesStore();
   const [configPanel, setConfigPanel] = useState<'pos' | 'warehouse' | 'product' | 'price' | 'recipe'>('pos');
+  const [editingPOSId, setEditingPOSId] = useState<string | null>(null);
+  const [editingWarehouseId, setEditingWarehouseId] = useState<string | null>(null);
   const [newPOS, setNewPOS] = useState({
     siteId: sites[0]?.id || 'site-dakar',
     name: '',
@@ -91,7 +97,7 @@ export default function HospiSettings() {
 
   const handleCreatePOS = () => {
     if (!newPOS.name || !newPOS.warehouseId) return;
-    addPOS({
+    const payload = {
       site_id: newPOS.siteId,
       name: newPOS.name,
       type: newPOS.type,
@@ -101,18 +107,66 @@ export default function HospiSettings() {
       printer_names: newPOS.printers.split(',').map(item => item.trim()).filter(Boolean),
       terminal_names: newPOS.terminals.split(',').map(item => item.trim()).filter(Boolean),
       tax_profile: newPOS.taxProfile,
-    });
+    };
+    if (editingPOSId) {
+      updatePOS(editingPOSId, payload);
+      setEditingPOSId(null);
+    } else {
+      addPOS(payload);
+    }
     setNewPOS(prev => ({ ...prev, name: '', printers: '', terminals: '' }));
   };
 
   const handleCreateWarehouse = () => {
     if (!newWarehouse.name) return;
-    addWarehouse({
+    const payload = {
       site_id: newWarehouse.siteId,
       name: newWarehouse.name,
       type: newWarehouse.type,
       is_active: true,
+    };
+    if (editingWarehouseId) {
+      updateWarehouse(editingWarehouseId, payload);
+      setEditingWarehouseId(null);
+    } else {
+      addWarehouse(payload);
+    }
+    setNewWarehouse(prev => ({ ...prev, name: '' }));
+  };
+
+  const startEditPOS = (posId: string) => {
+    const pos = posList.find(item => item.id === posId);
+    if (!pos) return;
+    setConfigPanel('pos');
+    setEditingPOSId(pos.id);
+    setNewPOS({
+      siteId: pos.site_id,
+      name: pos.name,
+      type: pos.type,
+      warehouseId: pos.default_warehouse_id,
+      paymentMethods: pos.payment_methods.join(','),
+      printers: pos.printer_names?.join(',') || '',
+      terminals: pos.terminal_names?.join(',') || '',
+      taxProfile: pos.tax_profile || 'TVA 18%',
     });
+  };
+
+  const startEditWarehouse = (warehouseId: string) => {
+    const warehouse = warehouses.find(item => item.id === warehouseId);
+    if (!warehouse) return;
+    setConfigPanel('warehouse');
+    setEditingWarehouseId(warehouse.id);
+    setNewWarehouse({
+      siteId: warehouse.site_id,
+      name: warehouse.name,
+      type: warehouse.type,
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingPOSId(null);
+    setEditingWarehouseId(null);
+    setNewPOS(prev => ({ ...prev, name: '', printers: '', terminals: '' }));
     setNewWarehouse(prev => ({ ...prev, name: '' }));
   };
 
@@ -251,7 +305,16 @@ export default function HospiSettings() {
               <input value={newPOS.terminals} onChange={e => setNewPOS(p => ({ ...p, terminals: e.target.value }))} placeholder="Terminaux"
                 className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
             </div>
-            <button type="button" onClick={handleCreatePOS} className="w-full py-3 rounded-2xl bg-orange text-white font-black text-sm">Créer le POS</button>
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <button type="button" onClick={handleCreatePOS} className="py-3 rounded-2xl bg-orange text-white font-black text-sm">
+                {editingPOSId ? 'Enregistrer le POS' : 'Créer le POS'}
+              </button>
+              {editingPOSId && (
+                <button type="button" onClick={cancelEdit} className="w-12 rounded-2xl bg-white/10 text-white flex items-center justify-center">
+                  <X size={16} />
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -269,7 +332,16 @@ export default function HospiSettings() {
                 {['restaurant', 'bar', 'kitchen', 'cold_room', 'central', 'casino', 'boutique', 'other'].map(type => <option key={type} value={type}>{type}</option>)}
               </select>
             </div>
-            <button type="button" onClick={handleCreateWarehouse} className="w-full py-3 rounded-2xl bg-green text-white font-black text-sm">Créer le dépôt</button>
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <button type="button" onClick={handleCreateWarehouse} className="py-3 rounded-2xl bg-green text-white font-black text-sm">
+                {editingWarehouseId ? 'Enregistrer le dépôt' : 'Créer le dépôt'}
+              </button>
+              {editingWarehouseId && (
+                <button type="button" onClick={cancelEdit} className="w-12 rounded-2xl bg-white/10 text-white flex items-center justify-center">
+                  <X size={16} />
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -397,7 +469,19 @@ export default function HospiSettings() {
                     <p className="text-white font-black text-sm">{pos.name}</p>
                     <p className="text-text-tertiary text-[10px] uppercase tracking-widest">{pos.type}</p>
                   </div>
-                  <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-green/10 text-green">{pos.is_active ? 'Actif' : 'Inactif'}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-green/10 text-green">{pos.is_active ? 'Actif' : 'Inactif'}</span>
+                    <button type="button" onClick={() => startEditPOS(pos.id)} className="w-8 h-8 rounded-xl bg-white/5 text-blue flex items-center justify-center">
+                      <Edit2 size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deletePOS(pos.id)}
+                      className="w-8 h-8 rounded-xl bg-red/10 text-red flex items-center justify-center"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
                 <p className="text-text-secondary text-xs mb-3">Dépôt de sortie : <span className="text-white font-bold">{warehouse?.name}</span></p>
                 <div className="space-y-2">
@@ -424,7 +508,24 @@ export default function HospiSettings() {
             const levels = stockLevels.filter(level => level.warehouse_id === warehouse.id);
             return (
               <div key={warehouse.id} className="glass-card p-4">
-                <p className="text-white font-black text-sm mb-2">{warehouse.name}</p>
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div>
+                    <p className="text-white font-black text-sm">{warehouse.name}</p>
+                    <p className="text-text-tertiary text-[10px] uppercase tracking-widest">{warehouse.type}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => startEditWarehouse(warehouse.id)} className="w-8 h-8 rounded-xl bg-white/5 text-blue flex items-center justify-center">
+                      <Edit2 size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteWarehouse(warehouse.id)}
+                      className="w-8 h-8 rounded-xl bg-red/10 text-red flex items-center justify-center"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
                 {levels.map(level => {
                   const product = products.find(item => item.id === level.product_id);
                   return (
