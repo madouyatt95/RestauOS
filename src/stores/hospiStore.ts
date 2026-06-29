@@ -798,6 +798,13 @@ interface HospiState {
   transferStock: (productId: string, fromWarehouseId: string, toWarehouseId: string, quantity: number, reason: string, createdBy: string) => StockMovement[];
   adjustInventory: (productId: string, warehouseId: string, countedQuantity: number, reason: string, createdBy: string) => StockMovement | null;
   recordLoss: (productId: string, warehouseId: string, quantity: number, reason: string, createdBy: string) => StockMovement | null;
+  addPurchaseOrder: (input: {
+    supplier_id: string;
+    warehouse_id: string;
+    ordered_by: string;
+    expected_at?: string;
+    lines: Array<{ product_id: string; quantity_ordered: number; unit_cost: number }>;
+  }) => PurchaseOrder | null;
   receivePurchaseOrder: (purchaseOrderId: string, receivedBy: string) => SupplierReceipt | null;
   getRegisterForPOS: (posId?: string) => CashRegister | undefined;
   getOpenCashSession: (posId?: string) => CashSession | undefined;
@@ -1332,6 +1339,41 @@ export const useHospiStore = create<HospiState>()(
           stockMovements: [movement, ...state.stockMovements],
         });
         return movement;
+      },
+      addPurchaseOrder: (input) => {
+        const state = get();
+        const supplier = state.suppliers.find(item => item.id === input.supplier_id && item.is_active);
+        const warehouse = state.warehouses.find(item => item.id === input.warehouse_id);
+        const validLines = input.lines.filter(line =>
+          state.products.some(product => product.id === line.product_id)
+          && line.quantity_ordered > 0
+        );
+        if (!supplier || !warehouse || validLines.length === 0) return null;
+
+        const createdAt = new Date().toISOString();
+        const order: PurchaseOrder = {
+          id: `po-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          supplier_id: input.supplier_id,
+          warehouse_id: input.warehouse_id,
+          status: 'ordered',
+          ordered_by: input.ordered_by,
+          expected_at: input.expected_at,
+          created_at: createdAt,
+        };
+        const lines: PurchaseOrderLine[] = validLines.map(line => ({
+          id: `pol-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          purchase_order_id: order.id,
+          product_id: line.product_id,
+          quantity_ordered: line.quantity_ordered,
+          quantity_received: 0,
+          unit_cost: line.unit_cost,
+        }));
+
+        set({
+          purchaseOrders: [order, ...state.purchaseOrders],
+          purchaseOrderLines: [...lines, ...state.purchaseOrderLines],
+        });
+        return order;
       },
       receivePurchaseOrder: (purchaseOrderId, receivedBy) => {
         const state = get();

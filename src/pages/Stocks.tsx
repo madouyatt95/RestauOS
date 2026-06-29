@@ -5,7 +5,7 @@ import { useHospiStore } from '../stores/hospiStore';
 import { useAuthStore } from '../stores/authStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package, Settings, Warehouse, Truck, Activity, CreditCard, X, Store, ReceiptText } from 'lucide-react';
+import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package, Settings, Warehouse, Truck, Activity, CreditCard, X, Store, ReceiptText, Download, ShieldCheck, ClipboardCheck } from 'lucide-react';
 
 const purchaseStatusLabels: Record<string, string> = {
   draft: 'Brouillon',
@@ -26,7 +26,8 @@ const stockMovementLabels: Record<string, string> = {
   loss: 'Perte',
 };
 
-type StockTab = 'pilotage' | 'depots' | 'achats' | 'mouvements' | 'pertes' | 'inventaire' | 'entrees' | 'sorties';
+type StockTab = 'pilotage' | 'reappro' | 'depots' | 'achats' | 'inventaire-guide' | 'mouvements' | 'pertes' | 'inventaire' | 'entrees' | 'sorties';
+type StockStatusFilter = 'all' | 'ok' | 'alert' | 'rupture';
 
 export default function Stocks() {
   const { items, movements, addMovement, addItem } = useStockStore();
@@ -46,6 +47,7 @@ export default function Stocks() {
     transferStock,
     adjustInventory,
     recordLoss,
+    addPurchaseOrder,
     receivePurchaseOrder,
     getPriceForProduct
   } = useHospiStore();
@@ -58,7 +60,15 @@ export default function Stocks() {
   const [showAdjustment, setShowAdjustment] = useState(false);
   const [showLoss, setShowLoss] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | null>(null);
   const [selectedSiteId, setSelectedSiteId] = useState(sites[0]?.id || 'site-dakar');
+  const [warehouseFilter, setWarehouseFilter] = useState('all');
+  const [familyFilter, setFamilyFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<StockStatusFilter>('all');
+  const [movementFilter, setMovementFilter] = useState('all');
+  const [inventoryWarehouseId, setInventoryWarehouseId] = useState(warehouses[0]?.id || '');
+  const [inventoryCounts, setInventoryCounts] = useState<Record<string, string>>({});
+  const [stockNotice, setStockNotice] = useState<string | null>(null);
   const [moveQty, setMoveQty] = useState('');
   const [moveNote, setMoveNote] = useState('');
   const [newItem, setNewItem] = useState({ name: '', quantity: '', unit: 'kg', minStock: '', category: '' });
@@ -95,12 +105,58 @@ export default function Stocks() {
       return { product, levels, total, low, locations };
     })
     .filter(row => row.levels.length > 0)
+    .filter(row => warehouseFilter === 'all' || row.levels.some(level => level.warehouse_id === warehouseFilter))
+    .filter(row => familyFilter === 'all' || row.product.category_id === familyFilter)
+    .filter(row => {
+      if (statusFilter === 'all') return true;
+      if (statusFilter === 'rupture') return row.levels.some(level => level.quantity <= 0);
+      if (statusFilter === 'alert') return row.low;
+      return !row.low;
+    })
     .filter(row => !search.trim() || [row.product.name, row.product.sku, row.product.category_id, row.locations.join(' ')]
       .join(' ')
       .toLowerCase()
       .includes(search.trim().toLowerCase())),
-    [products, search, siteStockLevels, warehouses]
+    [products, search, siteStockLevels, warehouses, warehouseFilter, familyFilter, statusFilter]
   );
+  const families = Array.from(new Set(products.map(product => product.category_id))).filter(Boolean);
+  const filteredSiteStockMovements = siteStockMovements.filter(move => movementFilter === 'all' || move.movement_type === movementFilter);
+  const replenishmentRows = lowHospiStocks.map(level => {
+    const product = products.find(item => item.id === level.product_id);
+    const warehouse = warehouses.find(item => item.id === level.warehouse_id);
+    const preferredSupplier = suppliers.find(item => product?.supplier_ids?.includes(item.id)) || suppliers[0];
+    const suggestedQuantity = Math.max(level.alert_threshold * 2 - level.quantity, level.alert_threshold || 1);
+    return { level, product, warehouse, preferredSupplier, suggestedQuantity };
+  }).filter(row => row.product && row.warehouse);
+  const selectedWarehouse = selectedWarehouseId ? warehouses.find(warehouse => warehouse.id === selectedWarehouseId) : undefined;
+  const selectedWarehouseLevels = selectedWarehouse ? stockLevels.filter(level => level.warehouse_id === selectedWarehouse.id) : [];
+  const selectedWarehouseValue = selectedWarehouseLevels.reduce((sum, level) => {
+    const product = products.find(item => item.id === level.product_id);
+    return sum + level.quantity * (product?.average_purchase_price || 0);
+  }, 0);
+  const selectedWarehousePOS = selectedWarehouse ? posList.filter(pos => pos.default_warehouse_id === selectedWarehouse.id) : [];
+  const selectedWarehouseMovements = selectedWarehouse ? stockMovements.filter(move => move.warehouse_id === selectedWarehouse.id).slice(0, 8) : [];
+  const guidedInventoryLevels = stockLevels.filter(level => level.warehouse_id === inventoryWarehouseId);
+  const unlinkedWarehouses = siteWarehouses.filter(warehouse => !posList.some(pos => pos.default_warehouse_id === warehouse.id));
+  const posStockGaps = posList.flatMap(pos => products
+    .filter(product => getPriceForProduct(product.id, pos.id)?.is_available)
+    .filter(product => product.is_stockable && !stockLevels.some(level => level.product_id === product.id && level.warehouse_id === pos.default_warehouse_id))
+    .map(product => ({ pos, product }))
+  );
+  const smartAlerts = [
+    ...unlinkedWarehouses.map(warehouse => ({
+      id: `warehouse-${warehouse.id}`,
+      title: `${warehouse.name} n'est lié à aucun POS`,
+      detail: 'Ce dépôt existe mais aucune vente ne le déstocke automatiquement.',
+      tone: 'orange',
+    })),
+    ...posStockGaps.slice(0, 5).map(item => ({
+      id: `gap-${item.pos.id}-${item.product.id}`,
+      title: `${item.product.name} vendu sans stock local`,
+      detail: `${item.pos.name} vend ce produit mais son dépôt n'a aucune ligne de stock.`,
+      tone: 'red',
+    })),
+  ];
   const selectedStockProduct = selectedProductId ? products.find(product => product.id === selectedProductId) : undefined;
   const selectedProductLevels = selectedStockProduct
     ? stockLevels.filter(level => level.product_id === selectedStockProduct.id)
@@ -238,6 +294,96 @@ export default function Stocks() {
     receivePurchaseOrder(purchaseOrderId, user?.name || 'Système');
   };
 
+  const handleCreateReorder = (productId: string, warehouseId: string, supplierId: string, quantity: number, unitCost: number) => {
+    const order = addPurchaseOrder({
+      supplier_id: supplierId,
+      warehouse_id: warehouseId,
+      ordered_by: user?.name || 'Système',
+      expected_at: new Date(Date.now() + 86400000 * 2).toISOString(),
+      lines: [{ product_id: productId, quantity_ordered: quantity, unit_cost: unitCost }],
+    });
+    if (order) {
+      setStockNotice('Commande fournisseur créée. Elle est disponible dans Achats.');
+      setTab('achats');
+    }
+  };
+
+  const handleGuidedInventory = () => {
+    const changed = guidedInventoryLevels.filter(level => {
+      const raw = inventoryCounts[level.id];
+      return raw !== undefined && raw !== '' && Number(raw) !== level.quantity;
+    });
+    changed.forEach(level => {
+      const counted = Number(inventoryCounts[level.id]);
+      const movement = adjustInventory(level.product_id, level.warehouse_id, counted, 'Inventaire guidé', user?.name || 'Système');
+      if (movement && user) {
+        recordAudit({
+          action: 'inventory_adjustment',
+          actorId: user.id,
+          actorName: user.name,
+          actorRole: user.role,
+          targetType: 'stock',
+          targetId: movement.id,
+          amount: Math.abs(counted - level.quantity),
+          reason: 'Inventaire guidé',
+          managerApprovalRequired: requiresManagerApproval(user, 'inventory_adjustment', Math.abs(counted - level.quantity)),
+        });
+      }
+    });
+    setInventoryCounts({});
+    setStockNotice(`${changed.length} correction(s) d'inventaire enregistrée(s).`);
+  };
+
+  const exportRows = (filename: string, rows: string[][]) => {
+    const csv = rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportInventory = () => {
+    exportRows('inventaire-stock.csv', [
+      ['Site', 'Dépôt', 'Produit', 'SKU', 'Famille', 'Quantité', 'Unité', 'Seuil', 'Valeur estimée'],
+      ...siteStockLevels.map(level => {
+        const warehouse = warehouses.find(item => item.id === level.warehouse_id);
+        const product = products.find(item => item.id === level.product_id);
+        return [
+          selectedSite?.name || '',
+          warehouse?.name || '',
+          product?.name || level.product_id,
+          product?.sku || '',
+          product?.category_id || '',
+          String(level.quantity),
+          level.unit,
+          String(level.alert_threshold),
+          String(level.quantity * (product?.average_purchase_price || 0)),
+        ];
+      }),
+    ]);
+  };
+
+  const exportLosses = () => {
+    exportRows('pertes-stock.csv', [
+      ['Date', 'Produit', 'Dépôt', 'Quantité', 'Motif', 'Utilisateur'],
+      ...stockMovements.filter(move => move.movement_type === 'loss').map(move => {
+        const product = products.find(item => item.id === move.product_id);
+        const warehouse = warehouses.find(item => item.id === move.warehouse_id);
+        return [
+          new Date(move.created_at).toLocaleString('fr-FR'),
+          product?.name || move.product_id,
+          warehouse?.name || '',
+          String(move.quantity),
+          move.reason,
+          move.created_by || '',
+        ];
+      }),
+    ]);
+  };
+
   const getStockBadge = (item: typeof items[0]) => {
     if (item.quantity <= item.minStock * 0.5) return { label: 'Stock faible', color: '#EF4444', bg: 'rgba(239,68,68,0.12)' };
     if (item.quantity <= item.minStock) return { label: 'Stock faible', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' };
@@ -262,8 +408,10 @@ export default function Stocks() {
       <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-none">
         {([
           ['pilotage', 'Pilotage'],
+          ['reappro', 'Réappro'],
           ['depots', 'Dépôts'],
           ['achats', 'Achats'],
+          ['inventaire-guide', 'Inventaire'],
           ['mouvements', 'Mouvements'],
           ['pertes', 'Pertes'],
           ['inventaire', 'Ancien stock'],
@@ -285,6 +433,12 @@ export default function Stocks() {
           className="w-full pl-11 pr-4 py-3 glass-card text-sm text-white placeholder-text-tertiary bg-transparent border-none" />
       </div>
 
+      {stockNotice && (
+        <button type="button" onClick={() => setStockNotice(null)} className="w-full text-left rounded-2xl bg-green/10 border border-green/20 text-green text-xs font-bold px-4 py-3 mb-4">
+          {stockNotice}
+        </button>
+      )}
+
       <div className="glass-card-lg p-4 mb-5">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -302,6 +456,29 @@ export default function Stocks() {
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <select value={warehouseFilter} onChange={e => setWarehouseFilter(e.target.value)}
+          className="h-11 rounded-xl bg-white/5 border border-white/10 px-3 text-white text-xs font-bold outline-none">
+          <option value="all">Tous les dépôts</option>
+          {siteWarehouses.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+        </select>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as StockStatusFilter)}
+          className="h-11 rounded-xl bg-white/5 border border-white/10 px-3 text-white text-xs font-bold outline-none">
+          <option value="all">Tous statuts</option>
+          <option value="alert">En alerte</option>
+          <option value="rupture">En rupture</option>
+          <option value="ok">Stock OK</option>
+        </select>
+        <select value={familyFilter} onChange={e => setFamilyFilter(e.target.value)}
+          className="h-11 rounded-xl bg-white/5 border border-white/10 px-3 text-white text-xs font-bold outline-none">
+          <option value="all">Toutes familles</option>
+          {families.map(family => <option key={family} value={family}>{family}</option>)}
+        </select>
+        <button type="button" onClick={() => { setWarehouseFilter('all'); setStatusFilter('all'); setFamilyFilter('all'); setMovementFilter('all'); }} className="h-11 rounded-xl bg-white/5 border border-white/10 text-text-secondary text-xs font-black">
+          Réinitialiser
+        </button>
       </div>
 
       {tab === 'pilotage' ? (
@@ -380,6 +557,44 @@ export default function Stocks() {
           </section>
 
           <section className="glass-card-lg p-4">
+            <h3 className="text-white font-black text-sm mb-3">Alertes intelligentes</h3>
+            <div className="space-y-2">
+              {smartAlerts.slice(0, 5).map(alert => (
+                <div key={alert.id} className={`rounded-xl px-3 py-2 border ${alert.tone === 'red' ? 'bg-red/10 border-red/15' : 'bg-orange/10 border-orange/15'}`}>
+                  <p className="text-white font-bold text-xs">{alert.title}</p>
+                  <p className="text-text-secondary text-[10px] mt-0.5">{alert.detail}</p>
+                </div>
+              ))}
+              {smartAlerts.length === 0 && <p className="text-text-tertiary text-xs text-center py-5">Aucune anomalie détectée.</p>}
+            </div>
+          </section>
+
+          <section className="glass-card p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue/10 text-blue flex items-center justify-center shrink-0">
+                <ShieldCheck size={18} />
+              </div>
+              <div>
+                <h3 className="text-white font-black text-sm">Permissions stock</h3>
+                <p className="text-text-secondary text-xs mt-1">
+                  {user?.role === 'Admin' || user?.role === 'Gérant'
+                    ? 'Vous pouvez transférer, corriger, déclarer des pertes et configurer les dépôts.'
+                    : 'Les transferts, pertes et corrections sensibles peuvent demander validation manager.'}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button type="button" onClick={exportInventory} className="py-3 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-xs flex items-center justify-center gap-2">
+              <Download size={15} /> Inventaire
+            </button>
+            <button type="button" onClick={exportLosses} className="py-3 rounded-2xl bg-white/5 border border-white/10 text-white font-black text-xs flex items-center justify-center gap-2">
+              <Download size={15} /> Pertes
+            </button>
+          </div>
+
+          <section className="glass-card-lg p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-white font-black text-sm">Catalogue multi-dépôts</h3>
               <button type="button" onClick={() => setTab('depots')} className="text-blue text-xs font-black">Détails</button>
@@ -399,6 +614,38 @@ export default function Stocks() {
               {stockProducts.length === 0 && (
                 <p className="text-text-tertiary text-xs text-center py-5">Aucun produit trouvé.</p>
               )}
+            </div>
+          </section>
+        </div>
+      ) : tab === 'reappro' ? (
+        <div className="space-y-4">
+          <section className="glass-card-lg p-4">
+            <h3 className="text-white font-black text-sm mb-1">Réapprovisionnement conseillé</h3>
+            <p className="text-text-secondary text-xs mb-4">Produits sous seuil, quantité conseillée et fournisseur proposé.</p>
+            <div className="space-y-3">
+              {replenishmentRows.map(row => (
+                <div key={row.level.id} className="rounded-2xl bg-white/5 p-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <p className="text-white font-black text-sm">{row.product?.name}</p>
+                      <p className="text-text-tertiary text-[10px]">{row.warehouse?.name} • actuel {row.level.quantity} {row.level.unit} • seuil {row.level.alert_threshold}</p>
+                    </div>
+                    <span className="text-orange font-black text-xs">+{row.suggestedQuantity}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-text-secondary text-xs">Fournisseur : <span className="text-white font-bold">{row.preferredSupplier?.name || 'À définir'}</span></p>
+                    <button
+                      type="button"
+                      disabled={!row.preferredSupplier || !row.product || !row.warehouse}
+                      onClick={() => row.product && row.warehouse && row.preferredSupplier && handleCreateReorder(row.product.id, row.warehouse.id, row.preferredSupplier.id, row.suggestedQuantity, row.product.average_purchase_price || 0)}
+                      className="px-3 py-2 rounded-xl bg-green/10 text-green text-[10px] font-black disabled:opacity-40"
+                    >
+                      Commander
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {replenishmentRows.length === 0 && <p className="text-text-tertiary text-sm text-center py-8">Aucun réapprovisionnement urgent.</p>}
             </div>
           </section>
         </div>
@@ -450,11 +697,62 @@ export default function Stocks() {
             </div>
           </section>
         </div>
+      ) : tab === 'inventaire-guide' ? (
+        <div className="space-y-4">
+          <section className="glass-card-lg p-4">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-white font-black text-sm">Inventaire guidé</h3>
+                <p className="text-text-secondary text-xs">Choisir un dépôt, compter, puis valider seulement les écarts.</p>
+              </div>
+              <ClipboardCheck size={20} className="text-orange" />
+            </div>
+            <select value={inventoryWarehouseId} onChange={e => { setInventoryWarehouseId(e.target.value); setInventoryCounts({}); }}
+              className="w-full h-11 rounded-xl bg-white/5 border border-white/10 px-3 text-white text-xs font-bold outline-none mb-4">
+              {siteWarehouses.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+            </select>
+            <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
+              {guidedInventoryLevels.map(level => {
+                const product = products.find(item => item.id === level.product_id);
+                const counted = inventoryCounts[level.id] ?? '';
+                const hasDiff = counted !== '' && Number(counted) !== level.quantity;
+                return (
+                  <div key={level.id} className={`rounded-xl px-3 py-2 border ${hasDiff ? 'bg-orange/10 border-orange/20' : 'bg-white/5 border-white/5'}`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-white font-bold text-xs truncate">{product?.name || level.product_id}</p>
+                        <p className="text-text-tertiary text-[10px]">Système : {level.quantity} {level.unit}</p>
+                      </div>
+                      <input
+                        type="number"
+                        value={counted}
+                        onChange={e => setInventoryCounts(prev => ({ ...prev, [level.id]: e.target.value }))}
+                        placeholder="Compté"
+                        className="w-24 h-10 rounded-xl bg-black/20 border border-white/10 px-3 text-white text-xs font-bold outline-none"
+                      />
+                    </div>
+                    {hasDiff && <p className="text-orange text-[10px] font-bold mt-1">Écart : {Number(counted) - level.quantity} {level.unit}</p>}
+                  </div>
+                );
+              })}
+            </div>
+            <button type="button" onClick={handleGuidedInventory} className="w-full mt-4 py-3 rounded-2xl bg-orange text-white font-black text-sm">
+              Valider les écarts
+            </button>
+          </section>
+        </div>
       ) : tab === 'mouvements' ? (
         <div className="glass-card-lg p-4">
-          <h3 className="text-white font-black text-sm mb-3">Traçabilité du stock</h3>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h3 className="text-white font-black text-sm">Traçabilité du stock</h3>
+            <select value={movementFilter} onChange={e => setMovementFilter(e.target.value)}
+              className="h-9 rounded-xl bg-white/5 border border-white/10 px-2 text-white text-[10px] font-bold outline-none">
+              <option value="all">Tous</option>
+              {Object.entries(stockMovementLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </select>
+          </div>
           <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-            {siteStockMovements.map(move => {
+            {filteredSiteStockMovements.map(move => {
               const product = products.find(item => item.id === move.product_id);
               const warehouse = warehouses.find(item => item.id === move.warehouse_id);
               const pos = move.pos_id ? posList.find(item => item.id === move.pos_id) : undefined;
@@ -471,7 +769,7 @@ export default function Stocks() {
                 </div>
               );
             })}
-            {siteStockMovements.length === 0 && <p className="text-text-tertiary text-xs text-center py-6">Aucun mouvement pour ce site.</p>}
+            {filteredSiteStockMovements.length === 0 && <p className="text-text-tertiary text-xs text-center py-6">Aucun mouvement pour ce filtre.</p>}
           </div>
         </div>
       ) : tab === 'depots' ? (
@@ -558,9 +856,14 @@ export default function Stocks() {
                     <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${lowLevels.length ? 'bg-orange/10 text-orange' : 'bg-green/10 text-green'}`}>
                       {lowLevels.length ? `${lowLevels.length} alerte(s)` : 'Stock OK'}
                     </span>
-                    <button type="button" onClick={() => navigate('/settings')} className="text-[10px] font-black text-blue bg-blue/10 px-2.5 py-1 rounded-full">
-                      Modifier
-                    </button>
+                    <div className="flex gap-1">
+                      <button type="button" onClick={() => setSelectedWarehouseId(warehouse.id)} className="text-[10px] font-black text-green bg-green/10 px-2.5 py-1 rounded-full">
+                        Détails
+                      </button>
+                      <button type="button" onClick={() => navigate('/settings')} className="text-[10px] font-black text-blue bg-blue/10 px-2.5 py-1 rounded-full">
+                        Modifier
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <p className="text-text-secondary text-xs mb-3">
@@ -698,6 +1001,106 @@ export default function Stocks() {
           )}
         </div>
       )}
+
+      {/* Warehouse Detail Modal */}
+      <AnimatePresence>
+        {selectedWarehouse && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setSelectedWarehouseId(null)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25 }}
+              className="modal-sheet max-h-[88vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Dépôt</p>
+                  <h3 className="text-white font-black text-lg leading-tight mt-1">{selectedWarehouse.name}</h3>
+                  <p className="text-text-secondary text-xs mt-1">{selectedWarehouse.type} • {selectedWarehousePOS.length} POS lié(s)</p>
+                </div>
+                <button type="button" onClick={() => setSelectedWarehouseId(null)} className="w-9 h-9 rounded-xl bg-white/5 text-text-secondary flex items-center justify-center">
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="rounded-xl bg-white/5 p-3">
+                  <p className="text-text-tertiary text-[9px] font-black uppercase">Références</p>
+                  <p className="text-white font-black text-sm">{selectedWarehouseLevels.length}</p>
+                </div>
+                <div className="rounded-xl bg-white/5 p-3">
+                  <p className="text-text-tertiary text-[9px] font-black uppercase">Valeur</p>
+                  <p className="text-white font-black text-sm">{selectedWarehouseValue.toLocaleString('fr-FR')} F</p>
+                </div>
+                <div className="rounded-xl bg-white/5 p-3">
+                  <p className="text-text-tertiary text-[9px] font-black uppercase">Alertes</p>
+                  <p className="text-white font-black text-sm">{selectedWarehouseLevels.filter(level => level.quantity <= level.alert_threshold).length}</p>
+                </div>
+              </div>
+
+              <section className="mb-4">
+                <h4 className="text-white font-black text-sm mb-2 flex items-center gap-2"><Store size={15} className="text-orange" /> POS connectés</h4>
+                <div className="space-y-2">
+                  {selectedWarehousePOS.map(pos => (
+                    <div key={pos.id} className="rounded-xl bg-white/5 px-3 py-2">
+                      <p className="text-white font-bold text-xs">{pos.name}</p>
+                      <p className="text-text-tertiary text-[10px]">{pos.type} • {pos.tax_profile}</p>
+                    </div>
+                  ))}
+                  {selectedWarehousePOS.length === 0 && <p className="text-orange text-xs py-3">Aucun POS ne déstocke ce dépôt.</p>}
+                </div>
+              </section>
+
+              <section className="mb-4">
+                <h4 className="text-white font-black text-sm mb-2 flex items-center gap-2"><Package size={15} className="text-blue" /> Produits du dépôt</h4>
+                <div className="space-y-2">
+                  {selectedWarehouseLevels.slice(0, 12).map(level => {
+                    const product = products.find(item => item.id === level.product_id);
+                    const isLow = level.quantity <= level.alert_threshold;
+                    return (
+                      <button key={level.id} type="button" onClick={() => { setSelectedWarehouseId(null); setSelectedProductId(level.product_id); }} className="w-full rounded-xl bg-white/5 px-3 py-2 flex items-center justify-between gap-3 text-left">
+                        <div>
+                          <p className="text-white font-bold text-xs">{product?.name || level.product_id}</p>
+                          <p className="text-text-tertiary text-[10px]">Seuil {level.alert_threshold} {level.unit}</p>
+                        </div>
+                        <span className={`${isLow ? 'text-orange' : 'text-green'} font-black text-xs`}>{level.quantity} {level.unit}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section className="mb-4">
+                <h4 className="text-white font-black text-sm mb-2 flex items-center gap-2"><ReceiptText size={15} className="text-green" /> Derniers mouvements</h4>
+                <div className="space-y-2">
+                  {selectedWarehouseMovements.map(move => {
+                    const product = products.find(item => item.id === move.product_id);
+                    return (
+                      <div key={move.id} className="rounded-xl bg-white/5 px-3 py-2 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-white font-bold text-xs">{product?.name || move.product_id}</p>
+                          <p className="text-text-tertiary text-[10px]">{stockMovementLabels[move.movement_type] || move.movement_type}</p>
+                        </div>
+                        <span className="text-white font-black text-xs">{move.quantity}</span>
+                      </div>
+                    );
+                  })}
+                  {selectedWarehouseMovements.length === 0 && <p className="text-text-tertiary text-xs py-3">Aucun mouvement récent.</p>}
+                </div>
+              </section>
+
+              <div className="grid grid-cols-3 gap-2">
+                <button type="button" onClick={() => { setTransferForm(prev => ({ ...prev, fromWarehouseId: selectedWarehouse.id })); setSelectedWarehouseId(null); setShowTransfer(true); }} className="py-3 rounded-2xl bg-blue/10 text-blue font-black text-[10px] uppercase tracking-widest">
+                  Transférer
+                </button>
+                <button type="button" onClick={() => { setInventoryWarehouseId(selectedWarehouse.id); setSelectedWarehouseId(null); setTab('inventaire-guide'); }} className="py-3 rounded-2xl bg-orange/10 text-orange font-black text-[10px] uppercase tracking-widest">
+                  Inventaire
+                </button>
+                <button type="button" onClick={() => navigate('/settings')} className="py-3 rounded-2xl bg-white/5 text-white font-black text-[10px] uppercase tracking-widest">
+                  Régler
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Product Detail Modal */}
       <AnimatePresence>
