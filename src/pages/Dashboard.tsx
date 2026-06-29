@@ -73,7 +73,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Business Modules */}
+      {/* Business Overview */}
       <motion.section
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -82,12 +82,12 @@ export default function Dashboard() {
       >
         <div className="flex items-center justify-between mb-3">
           <div>
-            <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Modules métiers</p>
-            <h2 className="text-white font-black text-lg">Piloter chaque activité</h2>
+            <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Vue rapide</p>
+            <h2 className="text-white font-black text-lg">Activité par métier</h2>
           </div>
           <button onClick={() => navigate('/modules')} className="h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-text-secondary flex items-center justify-center gap-2">
             <Store size={16} />
-            <span className="text-[10px] font-black uppercase tracking-widest">Tous</span>
+            <span className="text-[10px] font-black uppercase tracking-widest">Gérer</span>
           </button>
         </div>
 

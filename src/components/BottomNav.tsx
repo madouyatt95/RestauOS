@@ -16,8 +16,8 @@ export default function BottomNav() {
     case 'Admin':
     case 'Gérant':
       navItems = [
-        { path: '/dashboard', icon: Home, label: 'Hub' },
-        { path: '/modules', icon: Grid2X2, label: 'Métiers' },
+        { path: '/dashboard', icon: Home, label: 'Accueil' },
+        { path: '/modules', icon: Grid2X2, label: 'Activités' },
         { path: '/commandes', icon: ShoppingBag, label: 'Opérations' },
         { path: '/rapports', icon: BarChart3, label: 'Rapports' },
         { path: '/settings', icon: Settings, label: 'Admin' },

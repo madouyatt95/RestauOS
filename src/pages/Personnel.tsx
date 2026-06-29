@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useStaffStore, type Employee } from '../stores/staffStore';
 import { useAuthStore } from '../stores/authStore';
 import { usePlanningStore, type ShiftType } from '../stores/planningStore';
+import { useHospiStore } from '../stores/hospiStore';
 import { Phone, ChevronLeft, ChevronRight, Plus, X, Sun, Moon, Clock, Users, RefreshCw, Check, AlertCircle, UserPlus, Trash2, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -38,6 +39,7 @@ function getWeekDates(weekOffset: number): { label: string; date: string; isToda
 export default function Personnel() {
   const { employees, updateStatus, addEmployee, removeEmployee } = useStaffStore();
   const { shifts, addShift, removeShift, swapRequests, addSwapRequest, colleagueRespond, managerRespond } = usePlanningStore();
+  const { sites, posList } = useHospiStore();
   const { user } = useAuthStore();
   
   const [activeTab, setActiveTab] = useState<'planning' | 'presences' | 'echanges'>('planning');
@@ -71,6 +73,35 @@ export default function Personnel() {
     'Cuisine': ['Chef Cuisine', 'Second Cuisine', 'Commis', 'Plongeur', 'Plongeuse', 'Cuisinier'],
     'Livraison': ['Livreur', 'Livreur Indépendant'],
     'Management': ['Caissier', 'Gérant', 'Admin']
+  };
+
+  const moduleLabels: Record<string, string> = {
+    restaurant: 'Restaurant',
+    hotel: 'Hôtel',
+    casino: 'Casino',
+    spa: 'Spa',
+    boutique: 'Boutique',
+    stock: 'Stock',
+    direction: 'Direction',
+  };
+
+  const accessLabels: Record<string, string> = {
+    direction: 'Direction',
+    manager: 'Gérant',
+    supervisor: 'Responsable',
+    staff: 'Équipe',
+  };
+
+  const getEmployeeScope = (emp: Employee) => {
+    const siteNames = (emp.siteIds || []).map(id => sites.find(site => site.id === id)?.name).filter(Boolean);
+    const posNames = (emp.posIds || []).map(id => posList.find(pos => pos.id === id)?.name).filter(Boolean);
+    const moduleNames = (emp.businessModules || []).map(module => moduleLabels[module] || module);
+    return {
+      sites: siteNames.join(', ') || 'Site non affecté',
+      pos: posNames.join(', ') || 'Aucun point de vente',
+      modules: moduleNames.join(', ') || 'Aucune activité',
+      access: emp.accessLevel ? accessLabels[emp.accessLevel] : 'Équipe',
+    };
   };
 
   const availableRoles = ['Tous', 'Salle', 'Cuisine', 'Livraison', 'Management'];
@@ -194,6 +225,11 @@ export default function Personnel() {
                     <div className="min-w-0">
                       <span className="text-white font-bold text-[10px] block truncate">{emp.name.split(' ')[0]}</span>
                       <span className="text-text-tertiary text-[8px] font-bold uppercase">{emp.role}</span>
+                      {isManager && (
+                        <span className="text-orange text-[7px] font-black uppercase block truncate">
+                          {getEmployeeScope(emp).access}
+                        </span>
+                      )}
                     </div>
                   </div>
                   {weekDates.map(d => {
@@ -286,6 +322,16 @@ export default function Personnel() {
                 <div className="flex-1 min-w-0">
                   <h4 className="text-white font-black text-sm">{emp.name}</h4>
                   <p className="text-text-tertiary text-[10px] font-bold uppercase">{emp.role}</p>
+                  {isManager && (
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      <span className="px-2 py-0.5 rounded-md bg-blue/10 text-blue text-[8px] font-black uppercase">
+                        {getEmployeeScope(emp).modules}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md bg-white/5 text-text-secondary text-[8px] font-black uppercase">
+                        {getEmployeeScope(emp).pos}
+                      </span>
+                    </div>
+                  )}
                   {todayShifts.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
                       {todayShifts.map(ts => {
@@ -576,6 +622,33 @@ export default function Personnel() {
                 <h3 className="text-white font-black text-2xl">{selectedEmp.name}</h3>
                 <p className="text-orange font-bold text-xs uppercase tracking-widest">{selectedEmp.role}</p>
               </div>
+
+              {(() => {
+                const scope = getEmployeeScope(selectedEmp);
+                return (
+                  <div className="glass-card p-4 mb-6">
+                    <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-3">Affectation & accès</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-xl bg-white/5 p-3">
+                        <p className="text-text-tertiary text-[9px] font-bold uppercase">Site</p>
+                        <p className="text-white text-xs font-black mt-1">{scope.sites}</p>
+                      </div>
+                      <div className="rounded-xl bg-white/5 p-3">
+                        <p className="text-text-tertiary text-[9px] font-bold uppercase">Accès</p>
+                        <p className="text-white text-xs font-black mt-1">{scope.access}</p>
+                      </div>
+                      <div className="rounded-xl bg-white/5 p-3 col-span-2">
+                        <p className="text-text-tertiary text-[9px] font-bold uppercase">Activités</p>
+                        <p className="text-white text-xs font-black mt-1">{scope.modules}</p>
+                      </div>
+                      <div className="rounded-xl bg-white/5 p-3 col-span-2">
+                        <p className="text-text-tertiary text-[9px] font-bold uppercase">Points de vente</p>
+                        <p className="text-white text-xs font-black mt-1">{scope.pos}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Show today's shifts info in the modal */}
               {(() => {

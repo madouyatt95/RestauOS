@@ -78,9 +78,9 @@ export default function BusinessModules() {
     <div className="page-content pt-14 pb-28">
       <div className="flex items-start justify-between gap-3 mb-5">
         <div>
-          <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Cockpit métier</p>
-          <h1 className="text-white font-black text-2xl">Modules</h1>
-          <p className="text-text-secondary text-xs mt-1">Choisir une activité, puis ouvrir ses ventes, sa caisse ou son stock.</p>
+          <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Activités du complexe</p>
+          <h1 className="text-white font-black text-2xl">Restaurant, hôtel, casino, spa</h1>
+          <p className="text-text-secondary text-xs mt-1">Entrer dans un métier, choisir son point de vente, puis ouvrir ses ventes, sa caisse, son stock ou ses réglages.</p>
         </div>
         <button
           type="button"
@@ -217,7 +217,7 @@ export default function BusinessModules() {
         </div>
         <div>
           <p className="text-white font-black text-sm">Configuration globale</p>
-          <p className="text-text-secondary text-xs mt-1">Les sites, POS, dépôts, produits et prix restent modifiables depuis Paramètres.</p>
+          <p className="text-text-secondary text-xs mt-1">Les sites, points de vente, dépôts, produits, prix et affectations restent modifiables depuis Admin.</p>
           <button type="button" onClick={() => navigate('/settings')} className="mt-3 text-blue font-black text-xs">
             Ouvrir les paramètres
           </button>
