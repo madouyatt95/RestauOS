@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
 import { useOrderStore } from '../stores/orderStore';
 import { useAuthStore } from '../stores/authStore';
-import { ShoppingBag, Users, Receipt, ArrowDown, Bell, ChevronRight, ShieldAlert } from 'lucide-react';
+import { useHospiStore } from '../stores/hospiStore';
+import { ShoppingBag, Users, Receipt, ArrowDown, Bell, ChevronRight, ShieldAlert, Store, BedDouble, Dice5, Sparkles, Package, Settings } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 
@@ -10,6 +11,7 @@ const fmt = (n: number) => n.toLocaleString('fr-FR');
 export default function Dashboard() {
   const { getCA, getOrderCount, getClientCount, getAvgTicket, getTopProducts, getCAByDay } = useOrderStore();
   const { user } = useAuthStore();
+  const { posList, rooms, folios, warehouses, setActivePOS } = useHospiStore();
   const navigate = useNavigate();
 
   const ca = getCA(0);
@@ -20,6 +22,30 @@ export default function Dashboard() {
   const avgTicket = getAvgTicket(0);
   const topProducts = getTopProducts();
   const caByDay = getCAByDay();
+  const occupiedRooms = rooms.filter(room => room.status === 'occupied').length;
+  const openFolios = folios.filter(folio => folio.status === 'open').length;
+  const restaurantPOS = posList.find(pos => pos.type === 'restaurant');
+  const casinoPOS = posList.find(pos => pos.type === 'bar' || pos.type === 'casino');
+
+  const openBusinessModule = (module: 'restaurant' | 'hotel' | 'casino' | 'spa' | 'boutique') => {
+    if (module === 'restaurant' && restaurantPOS) {
+      setActivePOS(restaurantPOS.id);
+      navigate('/commandes');
+      return;
+    }
+    if (module === 'hotel') {
+      navigate('/pms');
+      return;
+    }
+    if (module === 'casino' && casinoPOS) {
+      setActivePOS(casinoPOS.id);
+      navigate('/commandes');
+      return;
+    }
+    if (module === 'spa' || module === 'boutique') {
+      navigate('/settings');
+    }
+  };
 
   const today = new Date();
   const dateStr = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -47,6 +73,51 @@ export default function Dashboard() {
           📍 Tous les points de vente
         </div>
       </div>
+
+      {/* Business Modules */}
+      <motion.section
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="mb-6"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Modules métiers</p>
+            <h2 className="text-white font-black text-lg">Piloter chaque activité</h2>
+          </div>
+          <button onClick={() => navigate('/settings')} className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-text-secondary flex items-center justify-center">
+            <Settings size={18} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { key: 'restaurant', label: 'Restaurant', sub: `${restaurantPOS?.name || 'RestauOS'} · salle, tables, caisse`, icon: Store, color: '#FF8A00', value: `${orders} commandes` },
+            { key: 'hotel', label: 'Hôtel', sub: 'PMS · chambres, folios, réception', icon: BedDouble, color: '#06B6D4', value: `${occupiedRooms}/${rooms.length} occupées` },
+            { key: 'casino', label: 'Casino & Bars', sub: `${casinoPOS?.name || 'POS bar'} · tarifs dédiés`, icon: Dice5, color: '#8B5CF6', value: casinoPOS ? 'POS actif' : 'À configurer' },
+            { key: 'spa', label: 'Spa', sub: 'Prestations, planning, forfaits', icon: Sparkles, color: '#22C55E', value: 'Module métier' },
+            { key: 'boutique', label: 'Boutique', sub: 'Ventes comptoir, stock, reçus', icon: Package, color: '#EC4899', value: `${warehouses.length} dépôts` },
+            { key: 'hotel', label: 'Folios', sub: 'Imputations chambre en cours', icon: Receipt, color: '#F59E0B', value: `${openFolios} ouverts` },
+          ].map(item => (
+            <button
+              key={`${item.key}-${item.label}`}
+              onClick={() => openBusinessModule(item.key as 'restaurant' | 'hotel' | 'casino' | 'spa' | 'boutique')}
+              className="glass-card p-4 text-left active:scale-[0.98] transition-transform"
+            >
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: `${item.color}20` }}>
+                  <item.icon size={20} style={{ color: item.color }} />
+                </div>
+                <ChevronRight size={16} className="text-text-tertiary" />
+              </div>
+              <p className="text-white font-black text-sm">{item.label}</p>
+              <p className="text-text-secondary text-[11px] leading-snug mt-1 min-h-[32px]">{item.sub}</p>
+              <p className="text-[10px] font-black uppercase tracking-wider mt-3" style={{ color: item.color }}>{item.value}</p>
+            </button>
+          ))}
+        </div>
+      </motion.section>
 
       {/* CA Card */}
       <motion.div
