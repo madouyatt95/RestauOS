@@ -306,7 +306,7 @@ export interface ConfigDraft {
   id: string;
   title: string;
   module: string;
-  change_type: 'price' | 'pos' | 'warehouse' | 'product' | 'pack' | 'permission' | 'tax' | 'backup' | 'connector';
+  change_type: 'site' | 'price' | 'pos' | 'warehouse' | 'product' | 'pack' | 'permission' | 'tax' | 'backup' | 'connector';
   before_value: string;
   after_value: string;
   status: ConfigDraftStatus;
@@ -363,6 +363,7 @@ export interface ConfigSnapshot {
   created_by: string;
   created_at: string;
   payload: {
+    sites: Site[];
     posList: POS[];
     warehouses: Warehouse[];
     products: HospiProduct[];
@@ -1018,6 +1019,9 @@ interface HospiState {
   stockLots: StockLot[];
   activePOSId: string;
   setActivePOS: (posId: string) => void;
+  addSite: (input: Omit<Site, 'id' | 'created_at'>) => Site;
+  updateSite: (siteId: string, input: Partial<Omit<Site, 'id' | 'created_at'>>) => Site | null;
+  deleteSite: (siteId: string) => boolean;
   addPOS: (input: Omit<POS, 'id' | 'created_at'>) => POS;
   updatePOS: (posId: string, input: Partial<Omit<POS, 'id' | 'created_at'>>) => POS | null;
   deletePOS: (posId: string) => boolean;
@@ -1131,6 +1135,33 @@ export const useHospiStore = create<HospiState>()(
       activePOSId: 'pos-restaurant-jardin',
 
       setActivePOS: (posId) => set({ activePOSId: posId }),
+      addSite: (input) => {
+        const state = get();
+        const site: Site = {
+          ...input,
+          id: `site-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          created_at: new Date().toISOString(),
+        };
+        set({ sites: [...state.sites, site] });
+        return site;
+      },
+      updateSite: (siteId, input) => {
+        const state = get();
+        const site = state.sites.find(item => item.id === siteId);
+        if (!site) return null;
+        const updated: Site = { ...site, ...input };
+        set({ sites: state.sites.map(item => item.id === siteId ? updated : item) });
+        return updated;
+      },
+      deleteSite: (siteId) => {
+        const state = get();
+        const linked = state.posList.some(pos => pos.site_id === siteId)
+          || state.warehouses.some(warehouse => warehouse.site_id === siteId)
+          || state.rooms.some(room => room.site_id === siteId);
+        if (linked) return false;
+        set({ sites: state.sites.filter(item => item.id !== siteId) });
+        return true;
+      },
       addPOS: (input) => {
         const state = get();
         const createdAt = new Date().toISOString();
@@ -1627,6 +1658,7 @@ export const useHospiStore = create<HospiState>()(
           created_by: createdBy,
           created_at: new Date().toISOString(),
           payload: {
+            sites: state.sites,
             posList: state.posList,
             warehouses: state.warehouses,
             products: state.products,
@@ -1652,6 +1684,7 @@ export const useHospiStore = create<HospiState>()(
           created_at: new Date().toISOString(),
         };
         set({
+          sites: snapshot.payload.sites || state.sites,
           posList: snapshot.payload.posList,
           warehouses: snapshot.payload.warehouses,
           products: snapshot.payload.products,

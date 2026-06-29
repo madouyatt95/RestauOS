@@ -83,10 +83,14 @@ export default function HospiSettings() {
     importAdminCsv,
     getCustomerAccountBalance,
     settleCustomerAccount,
+    addSite,
+    updateSite,
+    deleteSite,
   } = useHospiStore();
   const { auditLogs } = useBusinessRulesStore();
   const [adminView, setAdminView] = useState<AdminView>('assistant');
-  const [configPanel, setConfigPanel] = useState<'pos' | 'warehouse' | 'product' | 'price' | 'recipe'>('pos');
+  const [configPanel, setConfigPanel] = useState<'site' | 'pos' | 'warehouse' | 'product' | 'price' | 'recipe'>('pos');
+  const [editingSiteId, setEditingSiteId] = useState<string | null>(null);
   const [editingPOSId, setEditingPOSId] = useState<string | null>(null);
   const [editingWarehouseId, setEditingWarehouseId] = useState<string | null>(null);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -98,6 +102,13 @@ export default function HospiSettings() {
   const [showQuickConfig, setShowQuickConfig] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const [configNotice, setConfigNotice] = useState<{ tone: 'success' | 'warning'; message: string } | null>(null);
+  const [newSite, setNewSite] = useState({
+    companyId: companies[0]?.id || 'comp-sartal-demo',
+    name: '',
+    address: '',
+    city: '',
+    country: 'Sénégal',
+  });
   const [newPOS, setNewPOS] = useState({
     siteId: sites[0]?.id || 'site-dakar',
     name: '',
@@ -357,6 +368,61 @@ export default function HospiSettings() {
     if (message) setConfigNotice({ tone: 'success', message });
   };
 
+  const handleSaveSite = () => {
+    if (!newSite.name || !newSite.city) return;
+    const payload = {
+      company_id: newSite.companyId,
+      name: newSite.name,
+      address: newSite.address,
+      city: newSite.city,
+      country: newSite.country,
+    };
+    if (editingSiteId) {
+      const before = sites.find(site => site.id === editingSiteId);
+      updateSite(editingSiteId, payload);
+      createConfigDraft({
+        title: `Modification site ${payload.name}`,
+        module: 'Site',
+        change_type: 'site',
+        before_value: before ? `${before.name} / ${before.city}` : 'Ancien site',
+        after_value: `${payload.name} / ${payload.city}`,
+        created_by: 'Admin',
+        status: 'tested',
+      });
+      setEditingSiteId(null);
+    } else {
+      addSite(payload);
+    }
+    setConfigNotice({ tone: 'success', message: editingSiteId ? 'Site modifié.' : 'Site créé.' });
+    setNewSite(prev => ({ ...prev, name: '', address: '', city: '' }));
+  };
+
+  const startEditSite = (siteId: string) => {
+    const site = sites.find(item => item.id === siteId);
+    if (!site) return;
+    openQuickConfig('site');
+    setEditingSiteId(site.id);
+    setNewSite({
+      companyId: site.company_id,
+      name: site.name,
+      address: site.address,
+      city: site.city,
+      country: site.country,
+    });
+  };
+
+  const handleDeleteSite = (siteId: string) => {
+    const site = sites.find(item => item.id === siteId);
+    if (!site) return;
+    const deleted = deleteSite(siteId);
+    setConfigNotice({
+      tone: deleted ? 'success' : 'warning',
+      message: deleted
+        ? `${site.name} supprimé.`
+        : `${site.name} ne peut pas être supprimé : il contient encore des POS, dépôts ou chambres.`,
+    });
+  };
+
   const handleCreatePOS = () => {
     if (!newPOS.name || !newPOS.warehouseId) return;
     const payload = {
@@ -558,10 +624,12 @@ export default function HospiSettings() {
   };
 
   const cancelEdit = () => {
+    setEditingSiteId(null);
     setEditingPOSId(null);
     setEditingWarehouseId(null);
     setEditingProductId(null);
     setEditingPriceId(null);
+    setNewSite(prev => ({ ...prev, name: '', address: '', city: '' }));
     setNewPOS(prev => ({ ...prev, name: '', printers: '', terminals: '' }));
     setNewWarehouse(prev => ({ ...prev, name: '' }));
     resetProductForm();
@@ -642,6 +710,22 @@ export default function HospiSettings() {
       productId: price.product_id,
       salePrice: String(price.sale_price),
       taxRate: String(price.tax_rate),
+    });
+  };
+
+  const startPriceForPair = (posId: string, productId: string) => {
+    const price = posProductPrices.find(item => item.pos_id === posId && item.product_id === productId);
+    if (price) {
+      startEditPrice(price.id);
+      return;
+    }
+    openQuickConfig('price');
+    setEditingPriceId(null);
+    setPriceForm({
+      posId,
+      productId,
+      salePrice: '',
+      taxRate: '18',
     });
   };
 
@@ -778,7 +862,8 @@ export default function HospiSettings() {
                   key={step.title}
                   type="button"
                   onClick={() => {
-                    if (step.title === 'Entreprise' || step.title === 'Sites') openAdminView('architecture');
+                    if (step.title === 'Entreprise') openAdminView('architecture');
+                    if (step.title === 'Sites') openQuickConfig('site');
                     if (step.title === 'Modules métier') openAdminView('modules');
                     if (step.title === 'POS') openQuickConfig('pos');
                     if (step.title === 'Dépôts') openQuickConfig('warehouse');
@@ -811,14 +896,24 @@ export default function HospiSettings() {
 
         {adminView === 'architecture' && (
           <div className="space-y-3">
+            <button type="button" onClick={() => openQuickConfig('site')} className="w-full h-11 rounded-2xl bg-orange/10 text-orange text-xs font-black">
+              + Ajouter un site
+            </button>
             {sites.map(site => {
               const sitePOS = posList.filter(pos => pos.site_id === site.id);
               const siteWarehouses = warehouses.filter(warehouse => warehouse.site_id === site.id);
               return (
                 <div key={site.id} className="glass-card-lg p-5">
                   <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">{companies[0]?.name}</p>
-                  <h3 className="text-white font-black text-base mt-1">{site.name}</h3>
-                  <p className="text-text-secondary text-xs mt-1">{site.city} • {sitePOS.length} POS • {siteWarehouses.length} dépôt(s)</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-white font-black text-base mt-1">{site.name}</h3>
+                      <p className="text-text-secondary text-xs mt-1">{site.city} • {sitePOS.length} POS • {siteWarehouses.length} dépôt(s)</p>
+                    </div>
+                    <button type="button" onClick={() => startEditSite(site.id)} className="h-9 px-3 rounded-xl bg-blue/10 text-blue text-xs font-black">
+                      Modifier
+                    </button>
+                  </div>
                   <div className="mt-4 space-y-3">
                     {sitePOS.map(pos => {
                       const warehouse = warehouses.find(item => item.id === pos.default_warehouse_id);
@@ -1266,18 +1361,9 @@ export default function HospiSettings() {
                     {priceMatrixPOS.map(pos => {
                       const price = posProductPrices.find(item => item.pos_id === pos.id && item.product_id === product.id);
                       return (
-                        <button key={pos.id} type="button" onClick={() => {
-                          if (price) {
-                            upsertPOSProductPrice({ ...price, sale_price: price.sale_price + 100 });
-                            createConfigDraft({ title: `Ajustement ${product.name} - ${pos.name}`, module: 'Matrice prix', change_type: 'price', before_value: `${price.sale_price} F`, after_value: `${price.sale_price + 100} F`, created_by: 'Admin', status: 'tested' });
-                            setConfigNotice({ tone: 'success', message: `Prix ${product.name} augmenté de 100 F pour ${pos.name}.` });
-                          } else {
-                            upsertPOSProductPrice({ pos_id: pos.id, product_id: product.id, sale_price: 1000, tax_rate: 18, is_available: true });
-                            setConfigNotice({ tone: 'success', message: `${product.name} ajouté à ${pos.name}.` });
-                          }
-                        }} className={`rounded-xl p-3 text-left ${price ? 'bg-green/10 text-green' : 'bg-white/5 text-text-tertiary'}`}>
+                        <button key={pos.id} type="button" onClick={() => startPriceForPair(pos.id, product.id)} className={`rounded-xl p-3 text-left ${price ? 'bg-green/10 text-green' : 'bg-white/5 text-text-tertiary'}`}>
                           <p className="font-black text-xs">{price ? `${fmt(price.sale_price)} F` : 'Non vendu'}</p>
-                          <p className="text-[10px] opacity-80">{price ? `TVA ${price.tax_rate}%` : 'Ajouter'}</p>
+                          <p className="text-[10px] opacity-80">{price ? `TVA ${price.tax_rate}% • Éditer` : 'Ajouter un prix'}</p>
                         </button>
                       );
                     })}
@@ -1305,14 +1391,22 @@ export default function HospiSettings() {
                       const persisted = getPermissionMode(role, action);
                       const open = persisted ? persisted === 'allow' : role === 'Direction' || role === 'Manager' || (action === 'Vendre' && role === 'Serveur') || (action === 'Encaisser' && role === 'Caissier') || (action.includes('inventaire') && role === 'Chef cuisine');
                       const manager = persisted ? persisted === 'manager' : ['Annuler', 'Remise', 'Corriger inventaire'].includes(action) && !['Direction', 'Manager'].includes(role);
+                      const mode = open ? 'allow' : manager ? 'manager' : 'deny';
                       return (
-                        <button key={`${role}-${action}`} type="button" onClick={() => {
-                          const next = open ? 'manager' : manager ? 'deny' : 'allow';
-                          setPermissionPolicy(role, action, next);
-                          setConfigNotice({ tone: 'success', message: `${role} / ${action} : ${next}` });
-                        }} className={`rounded-xl p-3 text-center text-[10px] font-black ${open ? 'bg-green/10 text-green' : manager ? 'bg-orange/10 text-orange' : 'bg-red/10 text-red'}`}>
-                          {open ? 'Oui' : manager ? 'Manager' : 'Non'}
-                        </button>
+                        <select
+                          key={`${role}-${action}`}
+                          value={mode}
+                          onChange={event => {
+                            const next = event.target.value as 'allow' | 'manager' | 'deny';
+                            setPermissionPolicy(role, action, next);
+                            setConfigNotice({ tone: 'success', message: `${role} / ${action} : ${next === 'allow' ? 'autorisé' : next === 'manager' ? 'validation manager' : 'bloqué'}` });
+                          }}
+                          className={`rounded-xl p-3 text-center text-[10px] font-black outline-none border border-white/10 ${mode === 'allow' ? 'bg-green/10 text-green' : mode === 'manager' ? 'bg-orange/10 text-orange' : 'bg-red/10 text-red'}`}
+                        >
+                          <option value="allow">Autorisé</option>
+                          <option value="manager">Manager</option>
+                          <option value="deny">Bloqué</option>
+                        </select>
                       );
                     })}
                   </div>
@@ -1560,6 +1654,7 @@ export default function HospiSettings() {
         </div>
         <div className="grid grid-cols-4 gap-2 mb-4">
           {[
+            ['site', 'Site'],
             ['pos', 'POS'],
             ['warehouse', 'Dépôt'],
             ['product', 'Produit'],
@@ -1580,6 +1675,31 @@ export default function HospiSettings() {
               : 'border-orange/30 bg-orange/10 text-orange'
           }`}>
             {configNotice.message}
+          </div>
+        )}
+
+        {configPanel === 'site' && (
+          <div className="space-y-3">
+            <input value={newSite.name} onChange={e => setNewSite(p => ({ ...p, name: e.target.value }))} placeholder="Nom du site"
+              className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+            <input value={newSite.address} onChange={e => setNewSite(p => ({ ...p, address: e.target.value }))} placeholder="Adresse"
+              className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+            <div className="grid grid-cols-2 gap-3">
+              <input value={newSite.city} onChange={e => setNewSite(p => ({ ...p, city: e.target.value }))} placeholder="Ville"
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+              <input value={newSite.country} onChange={e => setNewSite(p => ({ ...p, country: e.target.value }))} placeholder="Pays"
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <button type="button" onClick={handleSaveSite} className="py-3 rounded-2xl bg-orange text-white font-black text-sm">
+                {editingSiteId ? 'Enregistrer le site' : 'Créer le site'}
+              </button>
+              {editingSiteId && (
+                <button type="button" onClick={cancelEdit} className="w-12 rounded-2xl bg-white/10 text-white flex items-center justify-center">
+                  <X size={16} />
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -1750,20 +1870,54 @@ export default function HospiSettings() {
               {['kg', 'g', 'L', 'ml', 'unité', 'bouteille', 'portion'].map(unit => <option key={unit} value={unit}>{unit}</option>)}
             </select>
             <button type="button" onClick={handleAddRecipeLine} className="w-full py-3 rounded-2xl bg-orange text-white font-black text-sm">Ajouter à la recette</button>
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+              <p className="text-white font-black text-xs mb-3">Ingrédients déjà ajoutés</p>
+              <div className="space-y-2">
+                {(() => {
+                  const recipe = recipes.find(item => item.product_id === recipeForm.productId);
+                  const items = recipe ? recipeItems.filter(item => item.recipe_id === recipe.id) : [];
+                  if (!items.length) return <p className="text-text-tertiary text-xs">Aucun ingrédient pour cette recette.</p>;
+                  return items.map(item => {
+                    const ingredient = products.find(product => product.id === item.ingredient_product_id);
+                    return (
+                      <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl bg-black/20 px-3 py-2">
+                        <span className="text-text-secondary text-xs truncate">{ingredient?.name || 'Ingrédient'}</span>
+                        <span className="text-white font-black text-xs">{item.quantity} {item.unit}</span>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
           </div>
         )}
       </section>
 
       <section className="mb-5">
         <h3 className="text-white font-black text-sm mb-3 flex items-center gap-2"><Building2 size={16} className="text-orange" /> Sites</h3>
+        <button type="button" onClick={() => openQuickConfig('site')} className="w-full h-11 rounded-2xl bg-orange/10 text-orange text-xs font-black mb-3">
+          + Ajouter un site
+        </button>
         <div className="space-y-3">
           {sites.map(site => {
             const siteWarehouses = warehouses.filter(warehouse => warehouse.site_id === site.id);
             const sitePOS = posList.filter(pos => pos.site_id === site.id);
             return (
               <div key={site.id} className="glass-card p-4">
-                <p className="text-white font-black text-sm">{site.name}</p>
-                <p className="text-text-tertiary text-[10px]">{site.city} • {site.address}</p>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-white font-black text-sm">{site.name}</p>
+                    <p className="text-text-tertiary text-[10px]">{site.city} • {site.address}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button type="button" onClick={() => startEditSite(site.id)} className="w-8 h-8 rounded-xl bg-white/5 text-blue flex items-center justify-center">
+                      <Edit2 size={14} />
+                    </button>
+                    <button type="button" onClick={() => handleDeleteSite(site.id)} className="w-8 h-8 rounded-xl bg-red/10 text-red flex items-center justify-center">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-2 mt-3">
                   <div className="rounded-xl bg-white/5 p-3">
                     <p className="text-text-tertiary text-[9px] font-black uppercase">POS</p>

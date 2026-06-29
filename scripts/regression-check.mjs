@@ -18,8 +18,9 @@ const state = {
   taxProfiles: [{ id: 'tax-restaurant', name: 'Restaurant', rate: 18 }],
   approvals: [{ id: 'approval-1', status: 'pending' }],
   snapshots: [],
+  sites: [{ id: 'site-dakar', name: 'Site Dakar' }],
   posList: [{ id: 'pos-restaurant-jardin', name: 'Restaurant Le Jardin', type: 'restaurant', default_warehouse_id: 'wh-restaurant' }],
-  warehouses: [{ id: 'wh-restaurant', name: 'Dépôt Restaurant', type: 'restaurant' }],
+  warehouses: [{ id: 'wh-restaurant', name: 'Dépôt Restaurant', type: 'restaurant', site_id: 'site-dakar' }],
 };
 
 function recordSale(productId, quantity) {
@@ -114,6 +115,19 @@ function recordSensitiveAudit(managerApprovalRequired) {
   if (managerApprovalRequired) state.approvals.unshift({ id: `approval-${state.approvals.length + 1}`, status: 'pending' });
 }
 
+function addSite(name) {
+  const site = { id: `site-${state.sites.length + 1}`, name };
+  state.sites.push(site);
+  return site;
+}
+
+function deleteSite(siteId) {
+  const hasLinks = state.posList.some(pos => pos.site_id === siteId) || state.warehouses.some(warehouse => warehouse.site_id === siteId);
+  if (hasLinks) return false;
+  state.sites = state.sites.filter(site => site.id !== siteId);
+  return true;
+}
+
 recordSale('prod-coca-33', 5);
 assert.equal(state.stockLevels.find(item => item.warehouse_id === 'wh-restaurant').quantity, 5, 'POS sale decrements restaurant warehouse');
 assert.equal(state.lots[0].quantity, 0, 'FIFO consumes earliest expiring lot first');
@@ -156,4 +170,9 @@ assert.equal(badImport.errors.length, 1, 'CSV import reports invalid rows');
 recordSensitiveAudit(true);
 assert.equal(state.approvals[0].status, 'pending', 'sensitive audit creates approval request');
 
-console.log('Regression checks passed: POS stock, FIFO lots, PMS folio, partial supplier receipt, admin config workflows, permissions, imports, publication guard.');
+const saly = addSite('Site Saly');
+assert.equal(state.sites.some(site => site.id === saly.id), true, 'admin can create a site');
+assert.equal(deleteSite('site-dakar'), false, 'admin cannot delete a site that still has linked operations');
+assert.equal(deleteSite(saly.id), true, 'admin can delete an unused site');
+
+console.log('Regression checks passed: POS stock, FIFO lots, PMS folio, partial supplier receipt, admin config workflows, permissions, imports, publication guard, site admin.');
