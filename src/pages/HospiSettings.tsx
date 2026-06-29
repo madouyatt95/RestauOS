@@ -33,11 +33,14 @@ export default function HospiSettings() {
     addWarehouse,
     addProduct,
     upsertPOSProductPrice,
+    upsertRecipe,
+    addRecipeItem,
+    recordProduction,
     getCustomerAccountBalance,
     settleCustomerAccount,
   } = useHospiStore();
   const { auditLogs } = useBusinessRulesStore();
-  const [configPanel, setConfigPanel] = useState<'pos' | 'warehouse' | 'product' | 'price'>('pos');
+  const [configPanel, setConfigPanel] = useState<'pos' | 'warehouse' | 'product' | 'price' | 'recipe'>('pos');
   const [newPOS, setNewPOS] = useState({
     siteId: sites[0]?.id || 'site-dakar',
     name: '',
@@ -73,6 +76,17 @@ export default function HospiSettings() {
     productId: products[0]?.id || '',
     salePrice: '',
     taxRate: '18',
+  });
+  const [recipeForm, setRecipeForm] = useState({
+    productId: products.find(product => !product.is_stockable)?.id || products[0]?.id || '',
+    ingredientId: products.find(product => product.is_stockable)?.id || '',
+    quantity: '',
+    unit: 'kg',
+  });
+  const [productionForm, setProductionForm] = useState({
+    productId: products[0]?.id || '',
+    warehouseId: warehouses[0]?.id || '',
+    quantity: '',
   });
 
   const handleCreatePOS = () => {
@@ -137,6 +151,25 @@ export default function HospiSettings() {
     setPriceForm(prev => ({ ...prev, salePrice: '' }));
   };
 
+  const handleAddRecipeLine = () => {
+    if (!recipeForm.productId || !recipeForm.ingredientId || !recipeForm.quantity) return;
+    const product = products.find(item => item.id === recipeForm.productId);
+    const recipe = upsertRecipe(recipeForm.productId, product ? `Recette ${product.name}` : undefined);
+    addRecipeItem({
+      recipe_id: recipe.id,
+      ingredient_product_id: recipeForm.ingredientId,
+      quantity: Number(recipeForm.quantity),
+      unit: recipeForm.unit,
+    });
+    setRecipeForm(prev => ({ ...prev, quantity: '' }));
+  };
+
+  const handleRecordProduction = () => {
+    if (!productionForm.productId || !productionForm.warehouseId || !productionForm.quantity) return;
+    recordProduction(productionForm.productId, productionForm.warehouseId, Number(productionForm.quantity), 'Admin');
+    setProductionForm(prev => ({ ...prev, quantity: '' }));
+  };
+
   return (
     <div className="page-content pt-14 pb-28">
       <div className="mb-6">
@@ -183,6 +216,7 @@ export default function HospiSettings() {
             ['warehouse', 'Dépôt'],
             ['product', 'Produit'],
             ['price', 'Prix POS'],
+            ['recipe', 'Recette'],
           ].map(([key, label]) => (
             <button key={key} type="button" onClick={() => setConfigPanel(key as any)}
               className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${configPanel === key ? 'bg-orange text-white' : 'bg-white/5 text-text-secondary'}`}>
@@ -297,6 +331,31 @@ export default function HospiSettings() {
             <button type="button" onClick={handleSavePrice} className="w-full py-3 rounded-2xl bg-violet text-white font-black text-sm">Enregistrer le prix POS</button>
           </div>
         )}
+
+        {configPanel === 'recipe' && (
+          <div className="space-y-3">
+            <select value={recipeForm.productId} onChange={e => setRecipeForm(p => ({ ...p, productId: e.target.value }))}
+              className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
+              {products.filter(product => !product.is_stockable).map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
+            </select>
+            <div className="grid grid-cols-2 gap-3">
+              <select value={recipeForm.ingredientId} onChange={e => {
+                const ingredient = products.find(product => product.id === e.target.value);
+                setRecipeForm(p => ({ ...p, ingredientId: e.target.value, unit: ingredient?.unit || p.unit }));
+              }}
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
+                {products.filter(product => product.is_stockable).map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
+              </select>
+              <input type="number" value={recipeForm.quantity} onChange={e => setRecipeForm(p => ({ ...p, quantity: e.target.value }))} placeholder="Quantité"
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+            </div>
+            <select value={recipeForm.unit} onChange={e => setRecipeForm(p => ({ ...p, unit: e.target.value }))}
+              className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
+              {['kg', 'g', 'L', 'ml', 'unité', 'bouteille', 'portion'].map(unit => <option key={unit} value={unit}>{unit}</option>)}
+            </select>
+            <button type="button" onClick={handleAddRecipeLine} className="w-full py-3 rounded-2xl bg-orange text-white font-black text-sm">Ajouter à la recette</button>
+          </div>
+        )}
       </section>
 
       <section className="mb-5">
@@ -383,6 +442,24 @@ export default function HospiSettings() {
 
       <section className="mb-5">
         <h3 className="text-white font-black text-sm mb-3 flex items-center gap-2"><ChefHat size={16} className="text-orange" /> Recettes & production</h3>
+        <div className="glass-card p-4 mb-3">
+          <p className="text-white font-black text-sm mb-3">Déclarer une production</p>
+          <div className="space-y-3">
+            <select value={productionForm.productId} onChange={e => setProductionForm(p => ({ ...p, productId: e.target.value }))}
+              className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
+              {products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
+            </select>
+            <div className="grid grid-cols-2 gap-3">
+              <select value={productionForm.warehouseId} onChange={e => setProductionForm(p => ({ ...p, warehouseId: e.target.value }))}
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
+                {warehouses.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+              </select>
+              <input type="number" value={productionForm.quantity} onChange={e => setProductionForm(p => ({ ...p, quantity: e.target.value }))} placeholder="Quantité produite"
+                className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
+            </div>
+            <button type="button" onClick={handleRecordProduction} className="w-full py-3 rounded-2xl bg-green text-white font-black text-sm">Enregistrer la production</button>
+          </div>
+        </div>
         <div className="space-y-3">
           {recipes.map(recipe => {
             const product = products.find(item => item.id === recipe.product_id);

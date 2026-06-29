@@ -658,6 +658,8 @@ interface HospiState {
   addWarehouse: (input: Omit<Warehouse, 'id' | 'created_at'>) => Warehouse;
   addProduct: (input: Omit<HospiProduct, 'id' | 'created_at'> & { initial_warehouse_id?: string; initial_quantity?: number; alert_threshold?: number }) => HospiProduct;
   upsertPOSProductPrice: (input: Omit<POSProductPrice, 'id' | 'created_at'>) => POSProductPrice;
+  upsertRecipe: (productId: string, name?: string) => Recipe;
+  addRecipeItem: (input: Omit<RecipeItem, 'id'>) => RecipeItem;
   getActivePOS: () => POS | undefined;
   getActiveWarehouse: () => Warehouse | undefined;
   getProductsForPOS: (posId?: string) => POSProduct[];
@@ -788,6 +790,29 @@ export const useHospiStore = create<HospiState>()(
         };
         set({ posProductPrices: [...state.posProductPrices, price] });
         return price;
+      },
+      upsertRecipe: (productId, name) => {
+        const state = get();
+        const existing = state.recipes.find(recipe => recipe.product_id === productId);
+        if (existing) return existing;
+        const product = state.products.find(item => item.id === productId);
+        const recipe: Recipe = {
+          id: `recipe-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          product_id: productId,
+          name: name || `Recette ${product?.name || productId}`,
+          created_at: new Date().toISOString(),
+        };
+        set({ recipes: [...state.recipes, recipe] });
+        return recipe;
+      },
+      addRecipeItem: (input) => {
+        const state = get();
+        const item: RecipeItem = {
+          ...input,
+          id: `recipe-line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        };
+        set({ recipeItems: [...state.recipeItems, item] });
+        return item;
       },
       getActivePOS: () => get().posList.find(pos => pos.id === get().activePOSId),
       getActiveWarehouse: () => {
