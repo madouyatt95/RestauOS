@@ -463,19 +463,20 @@ export default function Commandes() {
                 key={t.id}
                 drag={designMode}
                 dragMomentum={false}
-                onDragEnd={(e: any) => {
+                onDragEnd={(event: any, info: any) => {
                   const rect = canvasRef.current?.getBoundingClientRect();
                   if (rect) {
-                    const x = ((e.clientX - rect.left) / rect.width) * 100;
-                    const y = ((e.clientY - rect.top) / rect.height) * 100;
+                    const point = info?.point || event;
+                    const x = ((point.x - rect.left) / rect.width) * 100;
+                    const y = ((point.y - rect.top) / rect.height) * 100;
                     updateTablePosition(t.id, x, y);
                   }
                 }}
                 onClick={() => handleTableClick(t)}
                 className="absolute"
-                style={{ left: `${t.x}%`, top: `${t.y}%`, transform: 'translate(-50%, -50%)', zIndex: isEditing ? 50 : 10 }}
+                style={{ left: `${t.x}%`, top: `${t.y}%`, zIndex: isEditing ? 50 : 10 }}
               >
-                <div className="relative" style={{ width: `${dims.w + 24}px`, height: `${dims.h + 24}px` }}>
+                <div className="relative -translate-x-1/2 -translate-y-1/2" style={{ width: `${dims.w + 24}px`, height: `${dims.h + 24}px` }}>
                   <Chairs count={t.capacity} shape={vShape} />
                   {/* Ready badge */}
                   {hasReadyOrder && (
@@ -483,35 +484,34 @@ export default function Commandes() {
                       ✓
                     </div>
                   )}
-                  <motion.div 
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className={`absolute transition-all duration-300 border-2 flex items-center justify-center ${
-                      vShape === 'round' ? 'rounded-full' : 'rounded-xl'
-                    } ${
-                    hasReadyOrder ? 'bg-[#1a1c22] border-green text-green shadow-[0_0_25px_rgba(34,197,94,0.4)] animate-pulse' :
-                    t.status === 'libre' ? 'bg-[#1a1c22] border-green/40 text-green shadow-[0_0_15px_rgba(34,197,94,0.05)]' :
-                    t.status === 'occupee' ? 'bg-[#1a1c22] border-red/50 text-red shadow-[0_0_20px_rgba(239,68,68,0.2)]' :
-                    'bg-[#1a1c22] border-blue/50 text-blue shadow-[0_0_20px_rgba(59,130,246,0.2)]'
-                  } ${isSelected || isEditing ? 'border-white ring-4 ring-white/10' : ''}`}
-                  style={{ 
-                    width: `${dims.w}px`, 
-                    height: `${dims.h}px`,
-                    left: '50%',
-                    top: '50%',
-                    transform: 'translate(-50%, -50%)',
-                  }}>
-                    <div className="flex flex-col items-center">
-                      <span className="font-black text-sm">{t.number}</span>
-                      {hasReadyOrder ? (
-                        <span className="text-[7px] font-black uppercase text-green">PRÊT</span>
-                      ) : hasPrepOrder ? (
-                        <span className="text-[7px] font-black uppercase text-blue">EN CUISINE</span>
-                      ) : (
-                        <span className="text-[8px] opacity-60 font-bold">{t.capacity}p</span>
-                      )}
-                    </div>
-                  </motion.div>
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                    <motion.div
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className={`transition-all duration-300 border-2 flex items-center justify-center ${
+                        vShape === 'round' ? 'rounded-full' : 'rounded-xl'
+                      } ${
+                      hasReadyOrder ? 'bg-[#1a1c22] border-green text-green shadow-[0_0_25px_rgba(34,197,94,0.4)] animate-pulse' :
+                      t.status === 'libre' ? 'bg-[#1a1c22] border-green/40 text-green shadow-[0_0_15px_rgba(34,197,94,0.05)]' :
+                      t.status === 'occupee' ? 'bg-[#1a1c22] border-red/50 text-red shadow-[0_0_20px_rgba(239,68,68,0.2)]' :
+                      'bg-[#1a1c22] border-blue/50 text-blue shadow-[0_0_20px_rgba(59,130,246,0.2)]'
+                    } ${isSelected || isEditing ? 'border-white ring-4 ring-white/10' : ''}`}
+                    style={{
+                      width: `${dims.w}px`,
+                      height: `${dims.h}px`,
+                    }}>
+                      <div className="flex flex-col items-center">
+                        <span className="font-black text-sm">{t.number}</span>
+                        {hasReadyOrder ? (
+                          <span className="text-[7px] font-black uppercase text-green">PRÊT</span>
+                        ) : hasPrepOrder ? (
+                          <span className="text-[7px] font-black uppercase text-blue">EN CUISINE</span>
+                        ) : (
+                          <span className="text-[8px] opacity-60 font-bold">{t.capacity}p</span>
+                        )}
+                      </div>
+                    </motion.div>
+                  </div>
                   {/* VIP Badge */}
                   {(() => {
                     const tableRes = reservations.find(r => r.tableId === t.id && r.status === 'confirmed');

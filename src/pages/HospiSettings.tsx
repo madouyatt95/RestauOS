@@ -737,15 +737,19 @@ export default function HospiSettings() {
                     <p className="text-text-tertiary text-[10px] uppercase tracking-widest">{warehouse.type}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => startEditWarehouse(warehouse.id)} className="w-8 h-8 rounded-xl bg-white/5 text-blue flex items-center justify-center">
+                    <button type="button" title="Modifier le dépôt" aria-label={`Modifier ${warehouse.name}`} onClick={() => startEditWarehouse(warehouse.id)} className="h-8 px-3 rounded-xl bg-white/5 text-blue flex items-center justify-center gap-1.5 text-[10px] font-black">
                       <Edit2 size={14} />
+                      Modifier
                     </button>
                     <button
                       type="button"
+                      title="Supprimer le dépôt"
+                      aria-label={`Supprimer ${warehouse.name}`}
                       onClick={() => deleteWarehouse(warehouse.id)}
-                      className="w-8 h-8 rounded-xl bg-red/10 text-red flex items-center justify-center"
+                      className="h-8 px-3 rounded-xl bg-red/10 text-red flex items-center justify-center gap-1.5 text-[10px] font-black"
                     >
                       <Trash2 size={14} />
+                      Supprimer
                     </button>
                   </div>
                 </div>

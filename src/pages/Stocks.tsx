@@ -4,11 +4,13 @@ import { useStockStore } from '../stores/stockStore';
 import { useHospiStore } from '../stores/hospiStore';
 import { useAuthStore } from '../stores/authStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
-import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package, Settings } from 'lucide-react';
 
 export default function Stocks() {
   const { items, movements, addMovement, addItem } = useStockStore();
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const {
     sites,
     posList,
@@ -26,7 +28,7 @@ export default function Stocks() {
     receivePurchaseOrder
   } = useHospiStore();
   const { canPerform, requiresManagerApproval, recordAudit } = useBusinessRulesStore();
-  const [tab, setTab] = useState<'inventaire' | 'entrees' | 'sorties' | 'depots' | 'pertes'>('inventaire');
+  const [tab, setTab] = useState<'inventaire' | 'entrees' | 'sorties' | 'depots' | 'pertes'>('depots');
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [showMove, setShowMove] = useState<{ type: 'entree' | 'sortie'; itemId: string } | null>(null);
@@ -184,8 +186,8 @@ export default function Stocks() {
     <div className="page-content pt-14 pb-28">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl font-black text-white">Stocks multi-dépôts</h1>
-          <p className="text-text-tertiary text-xs mt-1">Site, dépôts, inventaires, transferts, pertes et réceptions</p>
+          <h1 className="text-xl font-black text-white">Stocks & dépôts</h1>
+          <p className="text-text-tertiary text-xs mt-1">Voir les quantités, recevoir, transférer et corriger le stock.</p>
         </div>
         <div className="flex gap-2">
           <button className="w-9 h-9 glass-card flex items-center justify-center rounded-full">
@@ -195,10 +197,16 @@ export default function Stocks() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-5">
-        {([['inventaire', 'Inventaire'], ['depots', 'Dépôts'], ['pertes', 'Pertes'], ['entrees', 'Entrées'], ['sorties', 'Sorties']] as const).map(([key, label]) => (
+      <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-none">
+        {([
+          ['depots', 'Stock par dépôt'],
+          ['pertes', 'Pertes'],
+          ['entrees', 'Entrées'],
+          ['sorties', 'Sorties'],
+          ['inventaire', 'Ancien inventaire'],
+        ] as const).map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${tab === key
+            className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${tab === key
               ? 'bg-orange text-white shadow-[0_4px_16px_rgba(255,138,0,0.3)]'
               : 'glass-card text-text-secondary'}`}>
             {label}
@@ -209,7 +217,7 @@ export default function Stocks() {
       {/* Search */}
       <div className="relative mb-4">
         <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary" />
-        <input type="text" placeholder="Rechercher un article..."
+        <input type="text" placeholder="Rechercher un produit ou un article..."
           value={search} onChange={e => setSearch(e.target.value)}
           className="w-full pl-11 pr-4 py-3 glass-card text-sm text-white placeholder-text-tertiary bg-transparent border-none" />
       </div>
@@ -221,24 +229,38 @@ export default function Stocks() {
             <h2 className="text-white font-black text-base">{selectedSite?.name || 'Site principal'}</h2>
             <p className="text-text-secondary text-xs mt-1">{siteWarehouses.length} dépôts • {lowHospiStocks.length} alerte(s)</p>
           </div>
-          <select value={selectedSiteId} onChange={e => setSelectedSiteId(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-white/10 border border-white/10 text-white text-xs font-bold outline-none">
-            {sites.map(site => <option key={site.id} value={site.id} className="bg-[#111827]">{site.name}</option>)}
-          </select>
+          <div className="flex items-center gap-2">
+            <select value={selectedSiteId} onChange={e => setSelectedSiteId(e.target.value)}
+              className="px-3 py-2 rounded-xl bg-white/10 border border-white/10 text-white text-xs font-bold outline-none">
+              {sites.map(site => <option key={site.id} value={site.id} className="bg-[#111827]">{site.name}</option>)}
+            </select>
+            <button onClick={() => navigate('/settings')} className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-text-secondary flex items-center justify-center" title="Modifier ou supprimer un dépôt">
+              <Settings size={16} />
+            </button>
+          </div>
         </div>
       </div>
 
       {tab === 'depots' ? (
         <div className="space-y-4">
+          <div className="glass-card p-4">
+            <p className="text-white font-black text-sm mb-2">Que voulez-vous faire ?</p>
+            <div className="grid grid-cols-2 gap-2 text-[11px] text-text-secondary">
+              <div className="rounded-xl bg-white/5 p-3">Voir les quantités disponibles dans chaque dépôt.</div>
+              <div className="rounded-xl bg-white/5 p-3">Réceptionner une commande fournisseur vers un dépôt.</div>
+              <div className="rounded-xl bg-white/5 p-3">Déplacer un produit d’un dépôt vers un autre.</div>
+              <div className="rounded-xl bg-white/5 p-3">Corriger un inventaire ou déclarer une perte.</div>
+            </div>
+          </div>
           <div className="grid grid-cols-3 gap-3">
             <button onClick={() => setShowTransfer(true)} className="py-3 rounded-2xl bg-blue/10 border border-blue/20 text-blue font-black text-[10px] uppercase tracking-widest">
-              Transfert dépôt
+              Transférer
             </button>
             <button onClick={() => setShowAdjustment(true)} className="py-3 rounded-2xl bg-orange/10 border border-orange/20 text-orange font-black text-[10px] uppercase tracking-widest">
-              Ajustement inventaire
+              Corriger
             </button>
             <button onClick={() => setShowLoss(true)} className="py-3 rounded-2xl bg-red/10 border border-red/20 text-red font-black text-[10px] uppercase tracking-widest">
-              Déclarer perte
+              Perte
             </button>
           </div>
 
@@ -291,17 +313,21 @@ export default function Stocks() {
           {siteWarehouses.map(warehouse => {
             const linkedPOS = posList.filter(pos => pos.default_warehouse_id === warehouse.id);
             const levels = stockLevels.filter(level => level.warehouse_id === warehouse.id);
+            const lowLevels = levels.filter(level => level.quantity <= level.alert_threshold);
             return (
               <motion.div key={warehouse.id} layout className="glass-card p-4">
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <h3 className="text-white font-black text-sm">{warehouse.name}</h3>
-                    <p className="text-text-tertiary text-[10px] uppercase tracking-widest mt-1">{warehouse.type}</p>
+                    <p className="text-text-tertiary text-[10px] uppercase tracking-widest mt-1">{levels.length} référence(s) suivie(s)</p>
                   </div>
-                  <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-blue/10 text-blue">
-                    {linkedPOS.length ? linkedPOS.map(pos => pos.name).join(', ') : 'Aucun POS'}
+                  <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${lowLevels.length ? 'bg-orange/10 text-orange' : 'bg-green/10 text-green'}`}>
+                    {lowLevels.length ? `${lowLevels.length} alerte(s)` : 'Stock OK'}
                   </span>
                 </div>
+                <p className="text-text-secondary text-xs mb-3">
+                  Utilisé par : <span className="text-white font-bold">{linkedPOS.length ? linkedPOS.map(pos => pos.name).join(', ') : 'Aucun point de vente lié'}</span>
+                </p>
                 <div className="space-y-2">
                   {levels.map(level => {
                     const product = products.find(item => item.id === level.product_id);
@@ -310,7 +336,7 @@ export default function Stocks() {
                       <div key={level.id} className="flex items-center justify-between rounded-xl bg-white/5 px-3 py-2">
                         <div>
                           <p className="text-white font-bold text-xs">{product?.name || level.product_id}</p>
-                          <p className="text-text-tertiary text-[10px]">Seuil : {level.alert_threshold} {level.unit}</p>
+                          <p className="text-text-tertiary text-[10px]">{isLow ? 'À réapprovisionner' : `Seuil : ${level.alert_threshold} ${level.unit}`}</p>
                         </div>
                         <span className={`font-black text-sm ${isLow ? 'text-orange' : 'text-green'}`}>
                           {level.quantity} {level.unit}

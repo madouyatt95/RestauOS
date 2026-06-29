@@ -627,6 +627,126 @@ const purchaseOrderLines: PurchaseOrderLine[] = [
   { id: 'po-line-riz', purchase_order_id: 'po-demo-central', product_id: 'ing-riz-brise', quantity_ordered: 50, quantity_received: 0, unit_cost: 600 },
 ];
 
+const demoWarehouses: Warehouse[] = [
+  { id: 'wh-spa', site_id: 'site-dakar', name: 'Dépôt Spa & Bien-être', type: 'boutique', is_active: true, created_at: now },
+  { id: 'wh-boutique', site_id: 'site-dakar', name: 'Dépôt Boutique Hôtel', type: 'boutique', is_active: true, created_at: now },
+  { id: 'wh-casino-cage', site_id: 'site-dakar', name: 'Cage Casino', type: 'casino', is_active: true, created_at: now },
+  { id: 'wh-cave-premium', site_id: 'site-dakar', name: 'Cave Premium', type: 'bar', is_active: true, created_at: now },
+  { id: 'wh-minibar', site_id: 'site-dakar', name: 'Dépôt Mini-bar', type: 'central', is_active: true, created_at: now },
+  { id: 'wh-housekeeping', site_id: 'site-dakar', name: 'Dépôt Housekeeping', type: 'other', is_active: true, created_at: now },
+];
+
+const demoPOS: POS[] = [
+  { id: 'pos-casino-floor', site_id: 'site-dakar', name: 'Casino Floor', type: 'casino', default_warehouse_id: 'wh-casino-cage', is_active: true, payment_methods: ['especes', 'carte', 'jetons'], printer_names: ['Caisse Casino'], terminal_names: ['TPE Casino 1'], tax_profile: 'Jeux / TVA spécifique', created_at: now },
+  { id: 'pos-spa-wellness', site_id: 'site-dakar', name: 'Spa Bien-être', type: 'spa', default_warehouse_id: 'wh-spa', is_active: true, payment_methods: ['especes', 'wave', 'carte', 'room_charge'], printer_names: ['Spa'], terminal_names: ['TPE Spa'], tax_profile: 'TVA 18%', created_at: now },
+  { id: 'pos-boutique-hotel', site_id: 'site-dakar', name: 'Boutique Hôtel', type: 'boutique', default_warehouse_id: 'wh-boutique', is_active: true, payment_methods: ['especes', 'wave', 'orange_money', 'carte', 'room_charge'], printer_names: ['Boutique'], terminal_names: ['TPE Boutique'], tax_profile: 'TVA 18%', created_at: now },
+  { id: 'pos-minibar', site_id: 'site-dakar', name: 'Mini-bar Hôtel', type: 'room_service', default_warehouse_id: 'wh-minibar', is_active: true, payment_methods: ['room_charge'], printer_names: ['Réception'], terminal_names: ['PMS'], tax_profile: 'TVA 18%', created_at: now },
+];
+
+const demoProducts: HospiProduct[] = [
+  { id: 'prod-massage-60', company_id: 'comp-sartal-demo', name: 'Massage relaxant 60 min', sku: 'SPA-MASS60', category_id: 'spa', unit: 'prestation', is_stockable: false, is_active: true, created_at: now },
+  { id: 'prod-hammam', company_id: 'comp-sartal-demo', name: 'Hammam traditionnel', sku: 'SPA-HAMMAM', category_id: 'spa', unit: 'prestation', is_stockable: false, is_active: true, created_at: now },
+  { id: 'prod-soin-visage', company_id: 'comp-sartal-demo', name: 'Soin visage premium', sku: 'SPA-VISAGE', category_id: 'spa', unit: 'prestation', is_stockable: false, is_active: true, created_at: now },
+  { id: 'prod-huile-massage', company_id: 'comp-sartal-demo', name: 'Huile de massage', sku: 'SPA-HUILE', category_id: 'consommable_spa', unit: 'flacon', is_stockable: true, is_active: true, primary_warehouse_id: 'wh-spa', fallback_policy: 'block_sale', average_purchase_price: 4500, created_at: now },
+  { id: 'prod-peignoir', company_id: 'comp-sartal-demo', name: 'Peignoir hôtel', sku: 'BOUT-PEIGNOIR', category_id: 'boutique', unit: 'unité', is_stockable: true, is_active: true, primary_warehouse_id: 'wh-boutique', fallback_policy: 'block_sale', average_purchase_price: 9000, created_at: now },
+  { id: 'prod-casquette', company_id: 'comp-sartal-demo', name: 'Casquette resort', sku: 'BOUT-CAP', category_id: 'boutique', unit: 'unité', is_stockable: true, is_active: true, primary_warehouse_id: 'wh-boutique', fallback_policy: 'block_sale', average_purchase_price: 2500, created_at: now },
+  { id: 'prod-carte-souvenir', company_id: 'comp-sartal-demo', name: 'Carte souvenir Dakar', sku: 'BOUT-CARTE', category_id: 'boutique', unit: 'unité', is_stockable: true, is_active: true, primary_warehouse_id: 'wh-boutique', fallback_policy: 'block_sale', average_purchase_price: 400, created_at: now },
+  { id: 'prod-champagne', company_id: 'comp-sartal-demo', name: 'Champagne Brut 75 cl', sku: 'BAR-CHAMP', category_id: 'boissons_premium', unit: 'bouteille', is_stockable: true, is_active: true, primary_warehouse_id: 'wh-cave-premium', secondary_warehouse_id: 'wh-nightclub', fallback_policy: 'use_secondary', average_purchase_price: 18000, created_at: now },
+  { id: 'prod-whisky', company_id: 'comp-sartal-demo', name: 'Whisky Premium 70 cl', sku: 'BAR-WHISKY', category_id: 'boissons_premium', unit: 'bouteille', is_stockable: true, is_active: true, primary_warehouse_id: 'wh-cave-premium', secondary_warehouse_id: 'wh-bar-casino', fallback_policy: 'use_secondary', average_purchase_price: 14500, created_at: now },
+  { id: 'prod-eau-minibar', company_id: 'comp-sartal-demo', name: 'Eau mini-bar 50 cl', sku: 'MINI-EAU', category_id: 'minibar', unit: 'bouteille', is_stockable: true, is_active: true, primary_warehouse_id: 'wh-minibar', fallback_policy: 'block_sale', average_purchase_price: 250, created_at: now },
+  { id: 'prod-snack-minibar', company_id: 'comp-sartal-demo', name: 'Snack mini-bar', sku: 'MINI-SNACK', category_id: 'minibar', unit: 'unité', is_stockable: true, is_active: true, primary_warehouse_id: 'wh-minibar', fallback_policy: 'block_sale', average_purchase_price: 700, created_at: now },
+  { id: 'prod-jetons-vip', company_id: 'comp-sartal-demo', name: 'Pack jetons VIP', sku: 'CAS-JETVIP', category_id: 'casino', unit: 'pack', is_stockable: false, is_active: true, created_at: now },
+  { id: 'prod-service-casino', company_id: 'comp-sartal-demo', name: 'Service table casino', sku: 'CAS-SERVICE', category_id: 'casino', unit: 'prestation', is_stockable: false, is_active: true, created_at: now },
+];
+
+const demoPrices: POSProductPrice[] = [
+  { id: 'price-massage-spa', pos_id: 'pos-spa-wellness', product_id: 'prod-massage-60', sale_price: 45000, tax_rate: 18, is_available: true, created_at: now },
+  { id: 'price-hammam-spa', pos_id: 'pos-spa-wellness', product_id: 'prod-hammam', sale_price: 30000, tax_rate: 18, is_available: true, created_at: now },
+  { id: 'price-soin-spa', pos_id: 'pos-spa-wellness', product_id: 'prod-soin-visage', sale_price: 55000, tax_rate: 18, is_available: true, created_at: now },
+  { id: 'price-peignoir-boutique', pos_id: 'pos-boutique-hotel', product_id: 'prod-peignoir', sale_price: 18000, tax_rate: 18, is_available: true, created_at: now },
+  { id: 'price-casquette-boutique', pos_id: 'pos-boutique-hotel', product_id: 'prod-casquette', sale_price: 7500, tax_rate: 18, is_available: true, created_at: now },
+  { id: 'price-carte-boutique', pos_id: 'pos-boutique-hotel', product_id: 'prod-carte-souvenir', sale_price: 1500, tax_rate: 18, is_available: true, created_at: now },
+  { id: 'price-champagne-night', pos_id: 'pos-nightclub', product_id: 'prod-champagne', sale_price: 60000, tax_rate: 18, is_available: true, created_at: now },
+  { id: 'price-champagne-casino', pos_id: 'pos-casino-floor', product_id: 'prod-champagne', sale_price: 65000, tax_rate: 18, is_available: true, created_at: now },
+  { id: 'price-whisky-bar', pos_id: 'pos-bar-machines', product_id: 'prod-whisky', sale_price: 45000, tax_rate: 18, is_available: true, created_at: now },
+  { id: 'price-whisky-casino', pos_id: 'pos-casino-floor', product_id: 'prod-whisky', sale_price: 50000, tax_rate: 18, is_available: true, created_at: now },
+  { id: 'price-eau-minibar', pos_id: 'pos-minibar', product_id: 'prod-eau-minibar', sale_price: 1200, tax_rate: 18, is_available: true, created_at: now },
+  { id: 'price-snack-minibar', pos_id: 'pos-minibar', product_id: 'prod-snack-minibar', sale_price: 2500, tax_rate: 18, is_available: true, created_at: now },
+  { id: 'price-jetons-casino', pos_id: 'pos-casino-floor', product_id: 'prod-jetons-vip', sale_price: 100000, tax_rate: 0, is_available: true, created_at: now },
+  { id: 'price-service-casino', pos_id: 'pos-casino-floor', product_id: 'prod-service-casino', sale_price: 25000, tax_rate: 18, is_available: true, created_at: now },
+];
+
+const demoStockLevels: StockLevel[] = [
+  { id: 'stock-huile-spa', warehouse_id: 'wh-spa', product_id: 'prod-huile-massage', quantity: 42, unit: 'flacon', alert_threshold: 10, updated_at: now },
+  { id: 'stock-peignoir-boutique', warehouse_id: 'wh-boutique', product_id: 'prod-peignoir', quantity: 28, unit: 'unité', alert_threshold: 6, updated_at: now },
+  { id: 'stock-casquette-boutique', warehouse_id: 'wh-boutique', product_id: 'prod-casquette', quantity: 75, unit: 'unité', alert_threshold: 15, updated_at: now },
+  { id: 'stock-carte-boutique', warehouse_id: 'wh-boutique', product_id: 'prod-carte-souvenir', quantity: 180, unit: 'unité', alert_threshold: 30, updated_at: now },
+  { id: 'stock-champagne-cave', warehouse_id: 'wh-cave-premium', product_id: 'prod-champagne', quantity: 34, unit: 'bouteille', alert_threshold: 8, updated_at: now },
+  { id: 'stock-champagne-night', warehouse_id: 'wh-nightclub', product_id: 'prod-champagne', quantity: 12, unit: 'bouteille', alert_threshold: 5, updated_at: now },
+  { id: 'stock-whisky-cave', warehouse_id: 'wh-cave-premium', product_id: 'prod-whisky', quantity: 26, unit: 'bouteille', alert_threshold: 6, updated_at: now },
+  { id: 'stock-whisky-bar', warehouse_id: 'wh-bar-casino', product_id: 'prod-whisky', quantity: 10, unit: 'bouteille', alert_threshold: 4, updated_at: now },
+  { id: 'stock-eau-minibar', warehouse_id: 'wh-minibar', product_id: 'prod-eau-minibar', quantity: 240, unit: 'bouteille', alert_threshold: 50, updated_at: now },
+  { id: 'stock-snack-minibar', warehouse_id: 'wh-minibar', product_id: 'prod-snack-minibar', quantity: 160, unit: 'unité', alert_threshold: 40, updated_at: now },
+];
+
+const demoRooms: Room[] = [
+  { id: 'room-103', site_id: 'site-dakar', room_number: '103', room_type: 'Standard', status: 'cleaning', created_at: now },
+  { id: 'room-104', site_id: 'site-dakar', room_number: '104', room_type: 'Standard', status: 'available', created_at: now },
+  { id: 'room-105', site_id: 'site-dakar', room_number: '105', room_type: 'Suite', status: 'occupied', created_at: now },
+  { id: 'room-201', site_id: 'site-dakar', room_number: '201', room_type: 'Deluxe', status: 'occupied', created_at: now },
+  { id: 'room-202', site_id: 'site-dakar', room_number: '202', room_type: 'Deluxe', status: 'available', created_at: now },
+  { id: 'room-203', site_id: 'site-dakar', room_number: '203', room_type: 'Suite', status: 'maintenance', created_at: now },
+  { id: 'room-301', site_id: 'site-dakar', room_number: '301', room_type: 'Villa', status: 'occupied', created_at: now },
+  { id: 'room-302', site_id: 'site-dakar', room_number: '302', room_type: 'Villa', status: 'available', created_at: now },
+];
+
+const demoGuests: HotelGuest[] = [
+  { id: 'guest-jean-dupont', company_id: 'comp-sartal-demo', first_name: 'Jean', last_name: 'Dupont', phone: '+33 6 11 22 33 44', email: 'jean.dupont@example.com', created_at: now },
+  { id: 'guest-aicha-diallo', company_id: 'comp-sartal-demo', first_name: 'Aicha', last_name: 'Diallo', phone: '+221 77 444 55 66', email: 'aicha.diallo@example.com', created_at: now },
+  { id: 'guest-corporate-lee', company_id: 'comp-sartal-demo', first_name: 'Daniel', last_name: 'Lee', phone: '+44 7700 900123', email: 'daniel.lee@example.com', created_at: now },
+];
+
+const demoStays: Stay[] = [
+  { id: 'stay-105-active', room_id: 'room-105', guest_id: 'guest-jean-dupont', check_in_date: new Date(Date.now() - 86400000 * 2).toISOString(), check_out_date: new Date(Date.now() + 86400000 * 3).toISOString(), status: 'checked_in', created_at: now },
+  { id: 'stay-201-active', room_id: 'room-201', guest_id: 'guest-aicha-diallo', check_in_date: new Date(Date.now() - 86400000).toISOString(), check_out_date: new Date(Date.now() + 86400000 * 1).toISOString(), status: 'checked_in', created_at: now },
+  { id: 'stay-301-active', room_id: 'room-301', guest_id: 'guest-corporate-lee', check_in_date: new Date(Date.now() - 86400000 * 3).toISOString(), check_out_date: new Date(Date.now() + 86400000 * 5).toISOString(), status: 'checked_in', created_at: now },
+];
+
+const demoFolios: Folio[] = [
+  { id: 'folio-105-open', stay_id: 'stay-105-active', guest_id: 'guest-jean-dupont', room_id: 'room-105', status: 'open', total_amount: 83000, created_at: now },
+  { id: 'folio-201-open', stay_id: 'stay-201-active', guest_id: 'guest-aicha-diallo', room_id: 'room-201', status: 'open', total_amount: 47500, created_at: now },
+  { id: 'folio-301-open', stay_id: 'stay-301-active', guest_id: 'guest-corporate-lee', room_id: 'room-301', status: 'open', total_amount: 165000, created_at: now },
+];
+
+const demoFolioLines: FolioLine[] = [
+  { id: 'folio-line-105-spa', folio_id: 'folio-105-open', source_type: 'room_service', source_id: 'pos-spa-wellness', description: 'Massage relaxant 60 min', amount: 45000, created_at: now },
+  { id: 'folio-line-105-bar', folio_id: 'folio-105-open', source_type: 'pos_order', source_id: 'ord-demo-bar-105', description: 'Whisky Premium - Bar Casino', amount: 38000, created_at: now },
+  { id: 'folio-line-201-minibar', folio_id: 'folio-201-open', source_type: 'room_service', source_id: 'pos-minibar', description: 'Mini-bar chambre 201', amount: 7500, created_at: now },
+  { id: 'folio-line-201-boutique', folio_id: 'folio-201-open', source_type: 'pos_order', source_id: 'ord-demo-boutique-201', description: 'Boutique Hôtel', amount: 40000, created_at: now },
+  { id: 'folio-line-301-casino', folio_id: 'folio-301-open', source_type: 'pos_order', source_id: 'ord-demo-casino-301', description: 'Pack jetons VIP', amount: 100000, created_at: now },
+  { id: 'folio-line-301-champagne', folio_id: 'folio-301-open', source_type: 'pos_order', source_id: 'ord-demo-night-301', description: 'Champagne Night Club', amount: 65000, created_at: now },
+];
+
+const demoCustomerAccounts: CustomerAccount[] = [
+  { id: 'account-guest-jean', company_id: 'comp-sartal-demo', display_name: 'Jean Dupont', type: 'vip', phone: '+33 6 11 22 33 44', email: 'jean.dupont@example.com', hotel_guest_id: 'guest-jean-dupont', credit_limit: 500000, balance: 83000, is_active: true, created_at: now },
+  { id: 'account-guest-aicha', company_id: 'comp-sartal-demo', display_name: 'Aicha Diallo', type: 'guest', phone: '+221 77 444 55 66', email: 'aicha.diallo@example.com', hotel_guest_id: 'guest-aicha-diallo', credit_limit: 250000, balance: 47500, is_active: true, created_at: now },
+  { id: 'account-guest-lee', company_id: 'comp-sartal-demo', display_name: 'Daniel Lee', type: 'corporate', phone: '+44 7700 900123', email: 'daniel.lee@example.com', hotel_guest_id: 'guest-corporate-lee', credit_limit: 1200000, balance: 165000, is_active: true, created_at: now },
+];
+
+const demoCustomerLedgerEntries: CustomerLedgerEntry[] = [
+  { id: 'ledger-jean-folio', account_id: 'account-guest-jean', source_type: 'folio', source_id: 'folio-105-open', description: 'Consommations Spa et Bar Casino', debit: 83000, credit: 0, created_at: now },
+  { id: 'ledger-aicha-folio', account_id: 'account-guest-aicha', source_type: 'folio', source_id: 'folio-201-open', description: 'Mini-bar et Boutique Hôtel', debit: 47500, credit: 0, created_at: now },
+  { id: 'ledger-lee-folio', account_id: 'account-guest-lee', source_type: 'folio', source_id: 'folio-301-open', description: 'Casino et Night Club', debit: 165000, credit: 0, created_at: now },
+];
+
+const mergeById = <T extends { id: string }>(seeded: T[], persisted?: T[]) => {
+  const merged = [...(persisted || [])];
+  seeded.forEach(item => {
+    if (!merged.some(existing => existing.id === item.id)) merged.push(item);
+  });
+  return merged;
+};
+
 interface HospiState {
   companies: Company[];
   sites: Site[];
@@ -697,19 +817,19 @@ export const useHospiStore = create<HospiState>()(
     (set, get) => ({
       companies,
       sites,
-      posList,
-      warehouses,
-      products,
-      posProductPrices,
-      stockLevels,
+      posList: [...posList, ...demoPOS],
+      warehouses: [...warehouses, ...demoWarehouses],
+      products: [...products, ...demoProducts],
+      posProductPrices: [...posProductPrices, ...demoPrices],
+      stockLevels: [...stockLevels, ...demoStockLevels],
       stockMovements: [],
-      rooms,
-      guests,
-      stays,
-      folios,
-      folioLines: [],
-      customerAccounts,
-      customerLedgerEntries,
+      rooms: [...rooms, ...demoRooms],
+      guests: [...guests, ...demoGuests],
+      stays: [...stays, ...demoStays],
+      folios: [...folios, ...demoFolios],
+      folioLines: demoFolioLines,
+      customerAccounts: [...customerAccounts, ...demoCustomerAccounts],
+      customerLedgerEntries: [...customerLedgerEntries, ...demoCustomerLedgerEntries],
       cashRegisters,
       cashSessions: [],
       recipes,
@@ -1501,6 +1621,39 @@ export const useHospiStore = create<HospiState>()(
         return line;
       },
     }),
-    { name: 'sartal-hospi' }
+    {
+      name: 'sartal-hospi',
+      merge: (persisted, current) => {
+        const saved = persisted as Partial<HospiState> | undefined;
+        if (!saved) return current;
+        return {
+          ...current,
+          ...saved,
+          companies: mergeById(current.companies, saved.companies),
+          sites: mergeById(current.sites, saved.sites),
+          posList: mergeById(current.posList, saved.posList),
+          warehouses: mergeById(current.warehouses, saved.warehouses),
+          products: mergeById(current.products, saved.products),
+          posProductPrices: mergeById(current.posProductPrices, saved.posProductPrices),
+          stockLevels: mergeById(current.stockLevels, saved.stockLevels),
+          rooms: mergeById(current.rooms, saved.rooms),
+          guests: mergeById(current.guests, saved.guests),
+          stays: mergeById(current.stays, saved.stays),
+          folios: mergeById(current.folios, saved.folios),
+          folioLines: mergeById(current.folioLines, saved.folioLines),
+          customerAccounts: mergeById(current.customerAccounts, saved.customerAccounts),
+          customerLedgerEntries: mergeById(current.customerLedgerEntries, saved.customerLedgerEntries),
+          cashRegisters: mergeById(current.cashRegisters, saved.cashRegisters),
+          suppliers: mergeById(current.suppliers, saved.suppliers),
+          purchaseOrders: mergeById(current.purchaseOrders, saved.purchaseOrders),
+          purchaseOrderLines: mergeById(current.purchaseOrderLines, saved.purchaseOrderLines),
+          supplierReceipts: mergeById(current.supplierReceipts, saved.supplierReceipts),
+          recipes: mergeById(current.recipes, saved.recipes),
+          recipeItems: mergeById(current.recipeItems, saved.recipeItems),
+          productionBatches: mergeById(current.productionBatches, saved.productionBatches),
+          stockMovements: mergeById(current.stockMovements, saved.stockMovements),
+        };
+      },
+    }
   )
 );

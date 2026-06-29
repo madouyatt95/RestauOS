@@ -13,6 +13,11 @@ export interface UserProfile {
 export const DEMO_USERS: UserProfile[] = [
   { id: 'u1', name: 'Cheikh Fall', role: 'Gérant', avatar: '/images/avatar_gerant.png' },
   { id: 'u2', name: 'Admin Systèmes', role: 'Admin' },
+  { id: 'u8', name: 'Ndeye Diagne - Direction Hôtel', role: 'Gérant' },
+  { id: 'u9', name: 'Moussa Kane - Réception PMS', role: 'Caissier' },
+  { id: 'u10', name: 'Aly Sarr - Manager Casino', role: 'Gérant' },
+  { id: 'u11', name: 'Rama Ba - Responsable Spa', role: 'Gérant' },
+  { id: 'u12', name: 'Khady Sow - Boutique', role: 'Caissier' },
   { id: 'u3', name: 'Ibrahima Ba', role: 'Caissier', employeeId: 'e3' },
   { id: 'u4', name: 'Awa Fall', role: 'Serveur', employeeId: 'e2' },
   { id: 'u7', name: 'Fatou Sarr', role: 'Serveur', employeeId: 'e6' },
