@@ -654,7 +654,13 @@ export default function HospiSettings() {
               <div className="flex items-start justify-between gap-3 mb-2">
                 <div>
                   <p className="text-white font-black text-sm">
-                    {log.action === 'discount' ? 'Remise' : log.action === 'cancel_order' ? 'Annulation ticket' : log.action}
+                    {log.action === 'discount' ? 'Remise' :
+                      log.action === 'cancel_order' ? 'Annulation ticket' :
+                      log.action === 'stock_transfer' ? 'Transfert stock' :
+                      log.action === 'inventory_adjustment' ? 'Inventaire' :
+                      log.action === 'stock_loss' ? 'Perte stock' :
+                      log.action === 'cash_close' ? 'Clôture caisse' :
+                      log.action}
                   </p>
                   <p className="text-text-tertiary text-[10px]">{log.actorName} • {log.actorRole}</p>
                 </div>

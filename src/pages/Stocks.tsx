@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useStockStore } from '../stores/stockStore';
 import { useHospiStore } from '../stores/hospiStore';
 import { useAuthStore } from '../stores/authStore';
+import { useBusinessRulesStore } from '../stores/businessRulesStore';
 import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package } from 'lucide-react';
 
 export default function Stocks() {
@@ -24,6 +25,7 @@ export default function Stocks() {
     recordLoss,
     receivePurchaseOrder
   } = useHospiStore();
+  const { canPerform, requiresManagerApproval, recordAudit } = useBusinessRulesStore();
   const [tab, setTab] = useState<'inventaire' | 'entrees' | 'sorties' | 'depots' | 'pertes'>('inventaire');
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
@@ -82,40 +84,88 @@ export default function Stocks() {
 
   const handleTransfer = () => {
     if (!transferForm.productId || !transferForm.fromWarehouseId || !transferForm.toWarehouseId || !transferForm.quantity) return;
-    transferStock(
+    const quantity = Number(transferForm.quantity);
+    const needsApproval = requiresManagerApproval(user, 'stock_transfer', quantity);
+    if (!canPerform(user, 'stock_transfer', quantity) && needsApproval) return;
+    const movements = transferStock(
       transferForm.productId,
       transferForm.fromWarehouseId,
       transferForm.toWarehouseId,
-      Number(transferForm.quantity),
+      quantity,
       transferForm.reason || 'Transfert inter-dépôts',
       user?.name || 'Système'
     );
+    if (movements.length > 0 && user) {
+      recordAudit({
+        action: 'stock_transfer',
+        actorId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        targetType: 'stock',
+        targetId: movements[0].reference_id,
+        amount: quantity,
+        reason: transferForm.reason || 'Transfert inter-dépôts',
+        managerApprovalRequired: needsApproval,
+      });
+    }
     setShowTransfer(false);
     setTransferForm(prev => ({ ...prev, quantity: '' }));
   };
 
   const handleAdjustment = () => {
     if (!adjustForm.productId || !adjustForm.warehouseId || !adjustForm.countedQuantity) return;
-    adjustInventory(
+    const countedQuantity = Number(adjustForm.countedQuantity);
+    const needsApproval = requiresManagerApproval(user, 'inventory_adjustment', countedQuantity);
+    if (!canPerform(user, 'inventory_adjustment', countedQuantity) && needsApproval) return;
+    const movement = adjustInventory(
       adjustForm.productId,
       adjustForm.warehouseId,
-      Number(adjustForm.countedQuantity),
+      countedQuantity,
       adjustForm.reason || 'Inventaire physique',
       user?.name || 'Système'
     );
+    if (movement && user) {
+      recordAudit({
+        action: 'inventory_adjustment',
+        actorId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        targetType: 'stock',
+        targetId: movement.id,
+        amount: countedQuantity,
+        reason: adjustForm.reason || 'Inventaire physique',
+        managerApprovalRequired: needsApproval,
+      });
+    }
     setShowAdjustment(false);
     setAdjustForm(prev => ({ ...prev, countedQuantity: '' }));
   };
 
   const handleLoss = () => {
     if (!lossForm.productId || !lossForm.warehouseId || !lossForm.quantity) return;
-    recordLoss(
+    const quantity = Number(lossForm.quantity);
+    const needsApproval = requiresManagerApproval(user, 'stock_loss', quantity);
+    if (!canPerform(user, 'stock_loss', quantity) && needsApproval) return;
+    const movement = recordLoss(
       lossForm.productId,
       lossForm.warehouseId,
-      Number(lossForm.quantity),
+      quantity,
       lossForm.reason || 'Perte déclarée',
       user?.name || 'Système'
     );
+    if (movement && user) {
+      recordAudit({
+        action: 'stock_loss',
+        actorId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        targetType: 'stock',
+        targetId: movement.id,
+        amount: quantity,
+        reason: lossForm.reason || 'Perte déclarée',
+        managerApprovalRequired: needsApproval,
+      });
+    }
     setShowLoss(false);
     setLossForm(prev => ({ ...prev, quantity: '' }));
   };

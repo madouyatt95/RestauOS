@@ -166,6 +166,17 @@ export default function Caisse() {
     if (Number.isNaN(counted)) return;
     const closed = closeCashSession(openSession.id, user.name, counted, cashSummary.expectedCash);
     if (!closed) return;
+    recordAudit({
+      action: 'cash_close',
+      actorId: user.id,
+      actorName: user.name,
+      actorRole: user.role,
+      targetType: 'cash_session',
+      targetId: openSession.id,
+      amount: closed.difference || 0,
+      reason: `Clôture Z ${activePOS?.name || 'POS'} - espèces comptées ${fmt(counted)} F`,
+      managerApprovalRequired: requiresManagerApproval(user, 'cash_close'),
+    });
     addNotification({
       type: 'payment',
       title: 'Clôture Z',

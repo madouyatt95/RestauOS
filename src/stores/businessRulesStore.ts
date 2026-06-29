@@ -2,7 +2,15 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { UserProfile } from './authStore';
 
-export type SensitiveAction = 'discount' | 'cancel_order' | 'staff_meal' | 'void_payment';
+export type SensitiveAction =
+  | 'discount'
+  | 'cancel_order'
+  | 'staff_meal'
+  | 'void_payment'
+  | 'stock_transfer'
+  | 'inventory_adjustment'
+  | 'stock_loss'
+  | 'cash_close';
 
 export interface AuditLogEntry {
   id: string;
@@ -10,7 +18,7 @@ export interface AuditLogEntry {
   actorId: string;
   actorName: string;
   actorRole: string;
-  targetType: 'order' | 'payment' | 'stock' | 'staff';
+  targetType: 'order' | 'payment' | 'stock' | 'staff' | 'cash_session';
   targetId: string;
   amount?: number;
   reason: string;
@@ -41,12 +49,16 @@ export const useBusinessRulesStore = create<BusinessRulesState>()(
         if (!user) return false;
         if (MANAGER_ROLES.includes(user.role)) return true;
         if (action === 'discount') return amount <= (DISCOUNT_LIMIT_BY_ROLE[user.role] || 0);
+        if (action === 'stock_loss') return ['Chef cuisine', 'Caissier'].includes(user.role) && amount <= 5000;
+        if (action === 'inventory_adjustment') return user.role === 'Chef cuisine' && amount <= 10000;
         return false;
       },
       requiresManagerApproval: (user, action, amount = 0) => {
         if (!user) return true;
         if (MANAGER_ROLES.includes(user.role)) return false;
         if (action === 'discount') return amount > (DISCOUNT_LIMIT_BY_ROLE[user.role] || 0);
+        if (action === 'stock_loss') return !(['Chef cuisine', 'Caissier'].includes(user.role) && amount <= 5000);
+        if (action === 'inventory_adjustment') return !(user.role === 'Chef cuisine' && amount <= 10000);
         return true;
       },
       recordAudit: (entry) => set((state) => ({
