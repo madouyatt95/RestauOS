@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat, Truck, Users, CreditCard, Plus, Edit2, Trash2, X, Search, Network, Upload, PlayCircle, AlertTriangle, CheckCircle2, KeyRound, Settings2, Boxes, Landmark, Sparkles, History, Copy, Table2, GitCompare, Globe2, PlugZap, RotateCcw, Percent, UserCheck, Layers, PackageCheck } from 'lucide-react';
 import { useHospiStore, type POSType, type WarehouseType } from '../stores/hospiStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
@@ -94,6 +94,8 @@ export default function HospiSettings() {
   const [settingsSearch, setSettingsSearch] = useState('');
   const [settingsSiteId, setSettingsSiteId] = useState('all');
   const [productFilter, setProductFilter] = useState<'all' | 'active' | 'inactive' | 'stockable' | 'recipes'>('all');
+  const [importKind, setImportKind] = useState<'products' | 'prices'>('products');
+  const importFileInputRef = useRef<HTMLInputElement>(null);
   const [configNotice, setConfigNotice] = useState<{ tone: 'success' | 'warning'; message: string } | null>(null);
   const [newPOS, setNewPOS] = useState({
     siteId: sites[0]?.id || 'site-dakar',
@@ -304,8 +306,8 @@ export default function HospiSettings() {
 
   const priceMatrixProducts = products.slice(0, 6);
   const priceMatrixPOS = posList.slice(0, 5);
-  const permissionActions = ['Vendre', 'Encaisser', 'Annuler', 'Remise', 'Transférer stock', 'Corriger inventaire', 'Clôturer caisse'];
-  const permissionRoles = ['Direction', 'Manager', 'Caissier', 'Serveur', 'Chef cuisine'];
+  const permissionActions = ['Admin Hospi', 'Modules métiers', 'Dashboard holding', 'Vendre', 'Encaisser', 'PMS hôtel', 'Stock', 'Cuisine', 'Rapports', 'Personnel', 'Factures', 'Catalogue', 'Annuler', 'Remise', 'Transférer stock', 'Corriger inventaire', 'Clôturer caisse'];
+  const permissionRoles = ['Admin', 'Gérant', 'Direction', 'Manager', 'Caissier', 'Serveur', 'Chef cuisine'];
 
   const impactRows = [
     { title: 'Produit Coca-Cola 33 cl', detail: `${posProductPrices.filter(price => price.product_id === 'prod-coca-33').length} POS, ${stockLevels.filter(level => level.product_id === 'prod-coca-33').length} dépôt(s), FIFO actif` },
@@ -404,6 +406,93 @@ export default function HospiSettings() {
     setConfigNotice({
       tone: deleted ? 'success' : 'warning',
       message: deleted ? `${warehouse.name} supprimé.` : `${warehouse.name} n'a pas pu être supprimé.`,
+    });
+  };
+
+  const handleDeletePOS = (posId: string) => {
+    const pos = posList.find(item => item.id === posId);
+    if (!pos) return;
+    const prices = posProductPrices.filter(price => price.pos_id === posId);
+    const supplierOrders = purchaseOrders.filter(order => order.warehouse_id === pos.default_warehouse_id);
+    if (prices.length || supplierOrders.length) {
+      createApprovalRequest({
+        title: `Suppression POS ${pos.name}`,
+        detail: `${prices.length} prix POS et ${supplierOrders.length} commande(s) fournisseur sont encore liés. Valider avant retrait.`,
+        module: 'Admin Hospi',
+        requested_by: 'Admin',
+      });
+      setConfigNotice({
+        tone: 'warning',
+        message: `${pos.name} est connecté au terrain. Une demande d'approbation a été créée au lieu de le supprimer.`,
+      });
+      return;
+    }
+    const deleted = deletePOS(posId);
+    if (deleted) {
+      createConfigDraft({
+        title: `Suppression ${pos.name}`,
+        module: 'POS',
+        change_type: 'pos',
+        before_value: pos.name,
+        after_value: 'Supprimé',
+        created_by: 'Admin',
+        status: 'published',
+      });
+    }
+    setConfigNotice({ tone: deleted ? 'success' : 'warning', message: deleted ? `${pos.name} supprimé.` : `${pos.name} n'a pas pu être supprimé.` });
+  };
+
+  const handleDeleteProduct = (productId: string) => {
+    const product = products.find(item => item.id === productId);
+    if (!product) return;
+    const totalStock = stockLevels.filter(level => level.product_id === productId).reduce((sum, level) => sum + level.quantity, 0);
+    const linkedPrices = posProductPrices.filter(price => price.product_id === productId);
+    const linkedRecipes = recipes.filter(recipe => recipe.product_id === productId).length
+      + recipeItems.filter(item => item.ingredient_product_id === productId).length;
+    if (totalStock > 0 || linkedPrices.length || linkedRecipes) {
+      createApprovalRequest({
+        title: `Retrait produit ${product.name}`,
+        detail: `${fmt(totalStock)} ${product.unit} en stock, ${linkedPrices.length} tarif(s), ${linkedRecipes} recette(s) liée(s). Le produit sera désactivé après validation.`,
+        module: 'Catalogue',
+        requested_by: 'Admin',
+      });
+      setConfigNotice({
+        tone: 'warning',
+        message: `${product.name} est utilisé. Demande d'approbation créée, sans suppression immédiate.`,
+      });
+      return;
+    }
+    const deleted = deleteProduct(productId);
+    setConfigNotice({ tone: deleted ? 'success' : 'warning', message: deleted ? `${product.name} supprimé.` : `${product.name} n'a pas pu être supprimé.` });
+  };
+
+  const handleDeletePrice = (priceId: string) => {
+    const price = posProductPrices.find(item => item.id === priceId);
+    if (!price) return;
+    const pos = posList.find(item => item.id === price.pos_id);
+    const product = products.find(item => item.id === price.product_id);
+    const deleted = deletePOSProductPrice(priceId);
+    if (deleted) {
+      createConfigDraft({
+        title: `Retrait tarif ${product?.name || 'produit'}`,
+        module: 'Prix POS',
+        change_type: 'price',
+        before_value: `${pos?.name || 'POS'} • ${fmt(price.sale_price)} F`,
+        after_value: 'Tarif supprimé',
+        created_by: 'Admin',
+        status: 'published',
+      });
+    }
+    setConfigNotice({ tone: deleted ? 'success' : 'warning', message: deleted ? 'Tarif supprimé.' : 'Tarif introuvable.' });
+  };
+
+  const handleImportFile = async (file: File | null) => {
+    if (!file) return;
+    const csv = await file.text();
+    const report = importAdminCsv(importKind, csv, 'Admin');
+    setConfigNotice({
+      tone: report.errors.length ? 'warning' : 'success',
+      message: `Import ${importKind === 'products' ? 'produits' : 'prix'} : ${report.imported} ligne(s), ${report.errors.length} erreur(s).`,
     });
   };
 
@@ -845,7 +934,40 @@ export default function HospiSettings() {
                 </div>
               ))}
             </div>
+            <input
+              ref={importFileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={event => {
+                handleImportFile(event.target.files?.[0] || null);
+                event.target.value = '';
+              }}
+            />
             <div className="grid grid-cols-2 gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => setImportKind('products')}
+                className={`h-10 rounded-xl text-xs font-black ${importKind === 'products' ? 'bg-blue text-white' : 'bg-white/5 text-text-secondary'}`}
+              >
+                Produits
+              </button>
+              <button
+                type="button"
+                onClick={() => setImportKind('prices')}
+                className={`h-10 rounded-xl text-xs font-black ${importKind === 'prices' ? 'bg-green text-white' : 'bg-white/5 text-text-secondary'}`}
+              >
+                Prix par POS
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => importFileInputRef.current?.click()}
+              className="w-full h-11 rounded-xl bg-violet/15 text-violet text-xs font-black mt-2 flex items-center justify-center gap-2"
+            >
+              <Upload size={15} /> Choisir un fichier CSV
+            </button>
+            <div className="grid grid-cols-2 gap-2 mt-2">
               <button
                 type="button"
                 onClick={() => {
@@ -854,7 +976,7 @@ export default function HospiSettings() {
                 }}
                 className="h-11 rounded-xl bg-blue/10 text-blue text-xs font-black"
               >
-                Importer produits CSV
+                Exemple produits
               </button>
               <button
                 type="button"
@@ -864,7 +986,7 @@ export default function HospiSettings() {
                 }}
                 className="h-11 rounded-xl bg-green/10 text-green text-xs font-black"
               >
-                Importer prix CSV
+                Exemple prix
               </button>
             </div>
             {importReports.length > 0 && (
@@ -948,9 +1070,10 @@ export default function HospiSettings() {
                     <button type="button" onClick={() => setConfigNotice({ tone: 'success', message: `${row.title} : ${row.before_value} → ${row.after_value}` })} className="h-9 rounded-xl bg-white/5 text-white text-[10px] font-black">Prévisualiser</button>
                     <button type="button" onClick={() => { testConfigDraft(row.id); setConfigNotice({ tone: 'success', message: `${row.title} testé.` }); }} className="h-9 rounded-xl bg-white/5 text-white text-[10px] font-black">Tester</button>
                     <button type="button" onClick={() => {
+                      createConfigSnapshot(`Avant publication ${row.title}`, 'Admin');
                       const published = publishConfigDraft(row.id, 'Admin');
                       setConfigNotice(published
-                        ? { tone: 'success', message: `${row.title} publié et historisé.` }
+                        ? { tone: 'success', message: `${row.title} publié, historisé et sauvegardé.` }
                         : { tone: 'warning', message: `Publication bloquée : ${criticalConfigAlerts[0]?.title || 'santé système à corriger'}.` });
                     }} className="h-9 rounded-xl bg-green/10 text-green text-[10px] font-black">Publier</button>
                   </div>
@@ -1544,7 +1667,7 @@ export default function HospiSettings() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => deletePOS(pos.id)}
+                      onClick={() => handleDeletePOS(pos.id)}
                       className="w-8 h-8 rounded-xl bg-red/10 text-red flex items-center justify-center"
                     >
                       <Trash2 size={14} />
@@ -1563,7 +1686,7 @@ export default function HospiSettings() {
                           <button type="button" onClick={() => startEditPrice(price.id)} className="w-7 h-7 rounded-lg bg-white/5 text-blue flex items-center justify-center">
                             <Edit2 size={12} />
                           </button>
-                          <button type="button" onClick={() => deletePOSProductPrice(price.id)} className="w-7 h-7 rounded-lg bg-red/10 text-red flex items-center justify-center">
+                          <button type="button" onClick={() => handleDeletePrice(price.id)} className="w-7 h-7 rounded-lg bg-red/10 text-red flex items-center justify-center">
                             <Trash2 size={12} />
                           </button>
                         </div>
@@ -1597,7 +1720,7 @@ export default function HospiSettings() {
                     <button type="button" onClick={() => startEditProduct(product.id)} className="w-8 h-8 rounded-xl bg-white/5 text-blue flex items-center justify-center">
                       <Edit2 size={14} />
                     </button>
-                    <button type="button" onClick={() => deleteProduct(product.id)} className="w-8 h-8 rounded-xl bg-red/10 text-red flex items-center justify-center">
+                    <button type="button" onClick={() => handleDeleteProduct(product.id)} className="w-8 h-8 rounded-xl bg-red/10 text-red flex items-center justify-center">
                       <Trash2 size={14} />
                     </button>
                   </div>

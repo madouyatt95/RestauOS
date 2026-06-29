@@ -690,10 +690,14 @@ const configHistoryEntries: ConfigHistoryEntry[] = [
 ];
 
 const permissionPolicies: PermissionPolicy[] = [
+  { id: 'perm-admin-all', role: 'Admin', action: 'Tout gérer', mode: 'allow', updated_at: now },
+  { id: 'perm-gerant-all', role: 'Gérant', action: 'Tout gérer', mode: 'allow', updated_at: now },
   { id: 'perm-direction-all', role: 'Direction', action: 'Tout gérer', mode: 'allow', updated_at: now },
   { id: 'perm-manager-discount', role: 'Manager', action: 'Remise', mode: 'allow', updated_at: now },
   { id: 'perm-serveur-discount', role: 'Serveur', action: 'Remise', mode: 'manager', updated_at: now },
   { id: 'perm-caissier-cash', role: 'Caissier', action: 'Encaisser', mode: 'allow', updated_at: now },
+  { id: 'perm-caissier-pms', role: 'Caissier', action: 'PMS hôtel', mode: 'allow', updated_at: now },
+  { id: 'perm-chef-stock', role: 'Chef cuisine', action: 'Stock', mode: 'allow', updated_at: now },
   { id: 'perm-chef-inventory', role: 'Chef cuisine', action: 'Corriger inventaire', mode: 'manager', updated_at: now },
 ];
 
@@ -1571,7 +1575,11 @@ export const useHospiStore = create<HospiState>()(
         });
         return policy;
       },
-      getPermissionMode: (role, action) => get().permissionPolicies.find(item => item.role === role && item.action === action)?.mode,
+      getPermissionMode: (role, action) => {
+        const policies = get().permissionPolicies;
+        return policies.find(item => item.role === role && item.action === action)?.mode
+          || policies.find(item => item.role === role && item.action === 'Tout gérer')?.mode;
+      },
       upsertTaxProfile: (input) => {
         const state = get();
         const updatedAt = new Date().toISOString();
