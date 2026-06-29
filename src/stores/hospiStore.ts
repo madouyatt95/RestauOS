@@ -298,6 +298,88 @@ export interface StockPolicy {
   reserve_before_preparation: boolean;
 }
 
+export type ConfigDraftStatus = 'draft' | 'tested' | 'published' | 'cancelled';
+export type PermissionMode = 'allow' | 'manager' | 'deny';
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+
+export interface ConfigDraft {
+  id: string;
+  title: string;
+  module: string;
+  change_type: 'price' | 'pos' | 'warehouse' | 'product' | 'pack' | 'permission' | 'tax' | 'backup';
+  before_value: string;
+  after_value: string;
+  status: ConfigDraftStatus;
+  created_by: string;
+  created_at: string;
+  tested_at?: string;
+  published_at?: string;
+}
+
+export interface ConfigHistoryEntry {
+  id: string;
+  title: string;
+  module: string;
+  before_value: string;
+  after_value: string;
+  actor: string;
+  created_at: string;
+}
+
+export interface PermissionPolicy {
+  id: string;
+  role: string;
+  action: string;
+  mode: PermissionMode;
+  updated_at: string;
+}
+
+export interface TaxProfile {
+  id: string;
+  name: string;
+  module: string;
+  rate: number;
+  detail: string;
+  is_active: boolean;
+  updated_at: string;
+}
+
+export interface ApprovalRequest {
+  id: string;
+  title: string;
+  detail: string;
+  module: string;
+  status: ApprovalStatus;
+  requested_by: string;
+  resolved_by?: string;
+  created_at: string;
+  resolved_at?: string;
+}
+
+export interface ConfigSnapshot {
+  id: string;
+  name: string;
+  summary: string;
+  created_by: string;
+  created_at: string;
+  payload: {
+    posList: POS[];
+    warehouses: Warehouse[];
+    products: HospiProduct[];
+    posProductPrices: POSProductPrice[];
+    taxProfiles: TaxProfile[];
+    permissionPolicies: PermissionPolicy[];
+  };
+}
+
+export interface AdminEnvironment {
+  id: string;
+  name: string;
+  status: 'active' | 'ready' | 'protected';
+  detail: string;
+  updated_at: string;
+}
+
 export type PurchaseOrderStatus = 'draft' | 'ordered' | 'partially_received' | 'received' | 'cancelled';
 
 export interface Supplier {
@@ -588,6 +670,42 @@ const stockPolicy: StockPolicy = {
   reserve_before_preparation: true,
 };
 
+const configDrafts: ConfigDraft[] = [
+  { id: 'draft-price-coca-night', title: 'Prix Coca Night Club', module: 'Prix POS', change_type: 'price', before_value: '2500 F', after_value: '2800 F', status: 'draft', created_by: 'Admin', created_at: now },
+  { id: 'draft-rooftop-pos', title: 'Nouveau POS Rooftop', module: 'POS', change_type: 'pos', before_value: 'Aucun', after_value: 'POS Rooftop Bar', status: 'tested', created_by: 'Direction', tested_at: now, created_at: now },
+];
+
+const configHistoryEntries: ConfigHistoryEntry[] = [
+  { id: 'hist-roomcharge-spa', title: 'Room charge Spa', module: 'PMS', before_value: 'Inactif', after_value: 'Actif', actor: 'Manager Hôtel', created_at: now },
+  { id: 'hist-depot-night', title: 'Dépôt Night Club', module: 'Stock', before_value: 'Casino', after_value: 'Dépôt Night Club', actor: 'Direction', created_at: now },
+];
+
+const permissionPolicies: PermissionPolicy[] = [
+  { id: 'perm-direction-all', role: 'Direction', action: 'Tout gérer', mode: 'allow', updated_at: now },
+  { id: 'perm-manager-discount', role: 'Manager', action: 'Remise', mode: 'allow', updated_at: now },
+  { id: 'perm-serveur-discount', role: 'Serveur', action: 'Remise', mode: 'manager', updated_at: now },
+  { id: 'perm-caissier-cash', role: 'Caissier', action: 'Encaisser', mode: 'allow', updated_at: now },
+  { id: 'perm-chef-inventory', role: 'Chef cuisine', action: 'Corriger inventaire', mode: 'manager', updated_at: now },
+];
+
+const taxProfiles: TaxProfile[] = [
+  { id: 'tax-restaurant', name: 'Restaurant', module: 'Restaurant', rate: 18, detail: 'Plats, boissons et room service restaurant.', is_active: true, updated_at: now },
+  { id: 'tax-hotel', name: 'Hébergement', module: 'Hôtel', rate: 18, detail: 'Chambres, nuitées, forfaits et folios.', is_active: true, updated_at: now },
+  { id: 'tax-premium-bar', name: 'Alcool premium', module: 'Bar', rate: 18, detail: 'Bar, nightclub, cave premium.', is_active: true, updated_at: now },
+  { id: 'tax-casino', name: 'Casino', module: 'Casino', rate: 0, detail: 'Jeux, services casino et audit renforcé.', is_active: true, updated_at: now },
+];
+
+const approvalRequests: ApprovalRequest[] = [
+  { id: 'approval-discount-demo', title: 'Remise forte restaurant', detail: 'Remise supérieure au seuil serveur.', module: 'POS', status: 'pending', requested_by: 'Awa Fall', created_at: now },
+  { id: 'approval-stock-demo', title: 'Correction inventaire cave', detail: 'Écart stock Champagne à valider.', module: 'Stock', status: 'pending', requested_by: 'Responsable Stock', created_at: now },
+];
+
+const adminEnvironments: AdminEnvironment[] = [
+  { id: 'env-demo', name: 'Démo', status: 'active', detail: 'Données riches pour présentation et formation.', updated_at: now },
+  { id: 'env-training', name: 'Formation', status: 'ready', detail: 'Même configuration, ventes et stocks sans impact réel.', updated_at: now },
+  { id: 'env-production', name: 'Production', status: 'protected', detail: 'Publication contrôlée, audit obligatoire, sauvegarde avant changement.', updated_at: now },
+];
+
 const rooms: Room[] = [
   { id: 'room-101', site_id: 'site-dakar', room_number: '101', room_type: 'Deluxe', status: 'occupied', created_at: now },
   { id: 'room-102', site_id: 'site-dakar', room_number: '102', room_type: 'Standard', status: 'available', created_at: now },
@@ -862,6 +980,13 @@ interface HospiState {
   stockReservations: StockReservation[];
   internalConsumptions: InternalConsumption[];
   stockPolicy: StockPolicy;
+  configDrafts: ConfigDraft[];
+  configHistoryEntries: ConfigHistoryEntry[];
+  permissionPolicies: PermissionPolicy[];
+  taxProfiles: TaxProfile[];
+  approvalRequests: ApprovalRequest[];
+  configSnapshots: ConfigSnapshot[];
+  adminEnvironments: AdminEnvironment[];
   suppliers: Supplier[];
   purchaseOrders: PurchaseOrder[];
   purchaseOrderLines: PurchaseOrderLine[];
@@ -889,6 +1014,17 @@ interface HospiState {
   getStockLevel: (productId: string, warehouseId: string) => StockLevel | undefined;
   getRecipeForProduct: (productId: string) => { recipe: Recipe; items: RecipeItem[] } | undefined;
   recordSale: (orderId: string, lines: SaleLineInput[], createdBy?: string, posId?: string) => StockMovement[];
+  createConfigDraft: (input: Omit<ConfigDraft, 'id' | 'status' | 'created_at'> & { status?: ConfigDraftStatus }) => ConfigDraft;
+  testConfigDraft: (draftId: string) => ConfigDraft | null;
+  publishConfigDraft: (draftId: string, actor: string) => ConfigDraft | null;
+  duplicatePOSConfig: (posId: string, name: string) => POS | null;
+  createBusinessPack: (type: POSType, siteId: string, label: string) => { pos: POS; warehouse: Warehouse } | null;
+  setPermissionPolicy: (role: string, action: string, mode: PermissionMode) => PermissionPolicy;
+  upsertTaxProfile: (input: Omit<TaxProfile, 'id' | 'updated_at'> & { id?: string }) => TaxProfile;
+  createApprovalRequest: (input: Omit<ApprovalRequest, 'id' | 'status' | 'created_at'>) => ApprovalRequest;
+  resolveApprovalRequest: (approvalId: string, status: Exclude<ApprovalStatus, 'pending'>, actor: string) => ApprovalRequest | null;
+  createConfigSnapshot: (name: string, createdBy: string) => ConfigSnapshot;
+  restoreConfigSnapshot: (snapshotId: string, actor: string) => boolean;
   recordProduction: (productId: string, warehouseId: string, quantity: number, createdBy: string) => ProductionBatch | null;
   reserveStock: (productId: string, warehouseId: string, quantity: number, sourceLabel: string) => StockReservation | null;
   recordInternalConsumption: (productId: string, warehouseId: string, quantity: number, reason: InternalConsumption['reason'], createdBy: string) => StockMovement | null;
@@ -953,6 +1089,13 @@ export const useHospiStore = create<HospiState>()(
       stockReservations,
       internalConsumptions,
       stockPolicy,
+      configDrafts,
+      configHistoryEntries,
+      permissionPolicies,
+      taxProfiles,
+      approvalRequests,
+      configSnapshots: [],
+      adminEnvironments,
       suppliers,
       purchaseOrders,
       purchaseOrderLines,
@@ -1279,6 +1422,208 @@ export const useHospiStore = create<HospiState>()(
         }
 
         return movements;
+      },
+      createConfigDraft: (input) => {
+        const state = get();
+        const draft: ConfigDraft = {
+          ...input,
+          id: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          status: input.status || 'draft',
+          created_at: new Date().toISOString(),
+        };
+        set({ configDrafts: [draft, ...state.configDrafts] });
+        return draft;
+      },
+      testConfigDraft: (draftId) => {
+        const state = get();
+        const draft = state.configDrafts.find(item => item.id === draftId);
+        if (!draft) return null;
+        const updated: ConfigDraft = { ...draft, status: 'tested', tested_at: new Date().toISOString() };
+        set({ configDrafts: state.configDrafts.map(item => item.id === draftId ? updated : item) });
+        return updated;
+      },
+      publishConfigDraft: (draftId, actor) => {
+        const state = get();
+        const draft = state.configDrafts.find(item => item.id === draftId);
+        if (!draft) return null;
+        const publishedAt = new Date().toISOString();
+        const updated: ConfigDraft = { ...draft, status: 'published', published_at: publishedAt };
+        const history: ConfigHistoryEntry = {
+          id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          title: draft.title,
+          module: draft.module,
+          before_value: draft.before_value,
+          after_value: draft.after_value,
+          actor,
+          created_at: publishedAt,
+        };
+        set({
+          configDrafts: state.configDrafts.map(item => item.id === draftId ? updated : item),
+          configHistoryEntries: [history, ...state.configHistoryEntries],
+        });
+        return updated;
+      },
+      duplicatePOSConfig: (posId, name) => {
+        const state = get();
+        const source = state.posList.find(item => item.id === posId);
+        if (!source) return null;
+        const pos = get().addPOS({
+          site_id: source.site_id,
+          name,
+          type: source.type,
+          default_warehouse_id: source.default_warehouse_id,
+          is_active: false,
+          payment_methods: [...source.payment_methods],
+          printer_names: [...(source.printer_names || [])],
+          terminal_names: [...(source.terminal_names || [])],
+          tax_profile: source.tax_profile,
+        });
+        const prices = state.posProductPrices.filter(price => price.pos_id === posId);
+        prices.forEach(price => get().upsertPOSProductPrice({
+          pos_id: pos.id,
+          product_id: price.product_id,
+          sale_price: price.sale_price,
+          tax_rate: price.tax_rate,
+          is_available: price.is_available,
+        }));
+        get().createConfigDraft({
+          title: `Duplication ${source.name}`,
+          module: 'POS',
+          change_type: 'pos',
+          before_value: source.name,
+          after_value: pos.name,
+          created_by: 'Admin',
+          status: 'tested',
+        });
+        return pos;
+      },
+      createBusinessPack: (type, siteId, label) => {
+        const state = get();
+        const site = state.sites.find(item => item.id === siteId);
+        if (!site) return null;
+        const warehouse = get().addWarehouse({
+          site_id: siteId,
+          name: `Dépôt ${label}`,
+          type: type === 'room_service' ? 'central' : type === 'spa' || type === 'boutique' ? 'boutique' : type === 'restaurant' ? 'restaurant' : type === 'bar' ? 'bar' : type === 'casino' || type === 'nightclub' ? 'casino' : 'other',
+          is_active: true,
+        });
+        const pos = get().addPOS({
+          site_id: siteId,
+          name: label,
+          type,
+          default_warehouse_id: warehouse.id,
+          is_active: true,
+          payment_methods: type === 'room_service' ? ['room_charge', 'carte'] : ['especes', 'carte', 'wave'],
+          printer_names: [`Imprimante ${label}`],
+          terminal_names: [`TPE ${label}`],
+          tax_profile: type === 'casino' ? 'Jeux / TVA spécifique' : 'TVA 18%',
+        });
+        get().createConfigDraft({
+          title: `Pack ${label}`,
+          module: 'Pack métier',
+          change_type: 'pack',
+          before_value: 'Aucun',
+          after_value: `${pos.name} + ${warehouse.name}`,
+          created_by: 'Admin',
+          status: 'published',
+        });
+        return { pos, warehouse };
+      },
+      setPermissionPolicy: (role, action, mode) => {
+        const state = get();
+        const existing = state.permissionPolicies.find(item => item.role === role && item.action === action);
+        const updatedAt = new Date().toISOString();
+        const policy: PermissionPolicy = existing
+          ? { ...existing, mode, updated_at: updatedAt }
+          : { id: `perm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, role, action, mode, updated_at: updatedAt };
+        set({
+          permissionPolicies: existing
+            ? state.permissionPolicies.map(item => item.id === existing.id ? policy : item)
+            : [policy, ...state.permissionPolicies],
+        });
+        return policy;
+      },
+      upsertTaxProfile: (input) => {
+        const state = get();
+        const updatedAt = new Date().toISOString();
+        const existing = input.id ? state.taxProfiles.find(item => item.id === input.id) : state.taxProfiles.find(item => item.name === input.name);
+        const profile: TaxProfile = existing
+          ? { ...existing, ...input, updated_at: updatedAt }
+          : { ...input, id: `tax-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, updated_at: updatedAt };
+        set({
+          taxProfiles: existing
+            ? state.taxProfiles.map(item => item.id === existing.id ? profile : item)
+            : [profile, ...state.taxProfiles],
+        });
+        return profile;
+      },
+      createApprovalRequest: (input) => {
+        const state = get();
+        const approval: ApprovalRequest = {
+          ...input,
+          id: `approval-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          status: 'pending',
+          created_at: new Date().toISOString(),
+        };
+        set({ approvalRequests: [approval, ...state.approvalRequests] });
+        return approval;
+      },
+      resolveApprovalRequest: (approvalId, status, actor) => {
+        const state = get();
+        const approval = state.approvalRequests.find(item => item.id === approvalId);
+        if (!approval) return null;
+        const updated: ApprovalRequest = {
+          ...approval,
+          status,
+          resolved_by: actor,
+          resolved_at: new Date().toISOString(),
+        };
+        set({ approvalRequests: state.approvalRequests.map(item => item.id === approvalId ? updated : item) });
+        return updated;
+      },
+      createConfigSnapshot: (name, createdBy) => {
+        const state = get();
+        const snapshot: ConfigSnapshot = {
+          id: `snapshot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          name,
+          summary: `${state.posList.length} POS, ${state.warehouses.length} dépôts, ${state.products.length} produits`,
+          created_by: createdBy,
+          created_at: new Date().toISOString(),
+          payload: {
+            posList: state.posList,
+            warehouses: state.warehouses,
+            products: state.products,
+            posProductPrices: state.posProductPrices,
+            taxProfiles: state.taxProfiles,
+            permissionPolicies: state.permissionPolicies,
+          },
+        };
+        set({ configSnapshots: [snapshot, ...state.configSnapshots] });
+        return snapshot;
+      },
+      restoreConfigSnapshot: (snapshotId, actor) => {
+        const state = get();
+        const snapshot = state.configSnapshots.find(item => item.id === snapshotId);
+        if (!snapshot) return false;
+        const history: ConfigHistoryEntry = {
+          id: `hist-restore-${Date.now()}`,
+          title: `Restauration ${snapshot.name}`,
+          module: 'Sauvegarde',
+          before_value: `${state.posList.length} POS`,
+          after_value: snapshot.summary,
+          actor,
+          created_at: new Date().toISOString(),
+        };
+        set({
+          posList: snapshot.payload.posList,
+          warehouses: snapshot.payload.warehouses,
+          products: snapshot.payload.products,
+          posProductPrices: snapshot.payload.posProductPrices,
+          taxProfiles: snapshot.payload.taxProfiles,
+          permissionPolicies: snapshot.payload.permissionPolicies,
+          configHistoryEntries: [history, ...state.configHistoryEntries],
+        });
+        return true;
       },
       recordProduction: (productId, warehouseId, quantity, createdBy) => {
         const state = get();
@@ -1984,6 +2329,13 @@ export const useHospiStore = create<HospiState>()(
           stockReservations: mergeById(current.stockReservations, saved.stockReservations),
           internalConsumptions: mergeById(current.internalConsumptions, saved.internalConsumptions),
           stockPolicy: { ...current.stockPolicy, ...saved.stockPolicy },
+          configDrafts: mergeById(current.configDrafts, saved.configDrafts),
+          configHistoryEntries: mergeById(current.configHistoryEntries, saved.configHistoryEntries),
+          permissionPolicies: mergeById(current.permissionPolicies, saved.permissionPolicies),
+          taxProfiles: mergeById(current.taxProfiles, saved.taxProfiles),
+          approvalRequests: mergeById(current.approvalRequests, saved.approvalRequests),
+          configSnapshots: mergeById(current.configSnapshots, saved.configSnapshots),
+          adminEnvironments: mergeById(current.adminEnvironments, saved.adminEnvironments),
           stockMovements: mergeById(current.stockMovements, saved.stockMovements),
         };
       },

@@ -35,6 +35,13 @@ export default function HospiSettings() {
     stockReservations,
     internalConsumptions,
     stockPolicy,
+    configDrafts,
+    configHistoryEntries,
+    permissionPolicies,
+    taxProfiles,
+    approvalRequests,
+    configSnapshots,
+    adminEnvironments,
     suppliers,
     purchaseOrders,
     purchaseOrderLines,
@@ -60,6 +67,17 @@ export default function HospiSettings() {
     upsertRecipe,
     addRecipeItem,
     recordProduction,
+    createConfigDraft,
+    testConfigDraft,
+    publishConfigDraft,
+    duplicatePOSConfig,
+    createBusinessPack,
+    setPermissionPolicy,
+    upsertTaxProfile,
+    createApprovalRequest,
+    resolveApprovalRequest,
+    createConfigSnapshot,
+    restoreConfigSnapshot,
     getCustomerAccountBalance,
     settleCustomerAccount,
   } = useHospiStore();
@@ -264,18 +282,6 @@ export default function HospiSettings() {
     { label: 'Caisse / rapport Z', value: simulationPOS ? 'Relié au POS' : 'Non relié' },
   ];
 
-  const draftRows = [
-    { title: 'Prix Coca Night Club', status: 'Brouillon', detail: '2500 F → 2800 F, simulation requise avant publication' },
-    { title: 'Nouveau POS Rooftop', status: 'À tester', detail: 'Dépôt Bar Casino, TVA 18%, paiement carte et room charge' },
-    { title: 'Seuil mini-bar', status: 'Prêt', detail: 'Eau mini-bar : seuil 50 bouteilles confirmé' },
-  ];
-
-  const configHistoryRows = [
-    { title: 'Prix Coca Restaurant', before: '1500 F', after: '1500 F', actor: 'Admin', module: 'Prix POS' },
-    { title: 'Dépôt Night Club', before: 'Casino', after: 'Dépôt Night Club', actor: 'Direction', module: 'Stock' },
-    { title: 'Room charge Spa', before: 'Inactif', after: 'Actif', actor: 'Manager Hôtel', module: 'PMS' },
-  ];
-
   const duplicateRows = [
     { title: 'Dupliquer un POS', detail: 'Copier dépôt, paiements, imprimantes, taxes et prix vers un nouveau point de vente.', action: 'Dupliquer POS' },
     { title: 'Dupliquer un site', detail: 'Créer Saly depuis Dakar avec catalogue commun et prix locaux.', action: 'Créer copie' },
@@ -311,27 +317,7 @@ export default function HospiSettings() {
     { title: 'API fournisseurs', status: 'Prévu', detail: 'Commandes et réceptions fournisseurs automatisables.' },
   ];
 
-  const taxRows = [
-    { title: 'Restaurant', value: 'TVA 18%', detail: 'Plats, boissons, room service restaurant.' },
-    { title: 'Hébergement', value: 'Taxe séjour + TVA', detail: 'Chambres, nuitées, forfaits et folios.' },
-    { title: 'Alcool / premium', value: 'TVA dédiée', detail: 'Bar, nightclub, cave premium.' },
-    { title: 'Casino', value: 'Fiscalité spécifique', detail: 'Jeux, services casino et audit renforcé.' },
-    { title: 'Corporate', value: 'Exonération possible', detail: 'Clients entreprise, conventions et facturation.' },
-  ];
-
-  const approvalRows = [
-    { title: 'Remise forte', detail: 'Au-delà du seuil rôle, validation manager obligatoire.', count: auditLogs.filter(log => log.action === 'discount' && log.managerApprovalRequired).length },
-    { title: 'Annulation ticket', detail: 'Ticket annulé, motif et responsable requis.', count: auditLogs.filter(log => log.action === 'cancel_order').length },
-    { title: 'Correction stock', detail: 'Écart inventaire important, validation direction.', count: auditLogs.filter(log => log.action === 'inventory_adjustment').length },
-    { title: 'Perte importante', detail: 'Casse, péremption, offert VIP ou direction.', count: auditLogs.filter(log => log.action === 'stock_loss').length },
-    { title: 'Écart caisse', detail: 'Clôture Z avec différence attendue/réelle.', count: auditLogs.filter(log => log.action === 'cash_close').length },
-  ];
-
-  const environmentRows = [
-    { title: 'Démo', status: 'Actif', detail: 'Données riches pour présentation et formation.' },
-    { title: 'Formation', status: 'Prêt', detail: 'Même configuration, ventes et stocks sans impact réel.' },
-    { title: 'Production', status: 'Protégé', detail: 'Publication contrôlée, audit obligatoire, sauvegarde avant changement.' },
-  ];
+  const getPermissionMode = (role: string, action: string) => permissionPolicies.find(item => item.role === role && item.action === action)?.mode;
 
   const handleCreatePOS = () => {
     if (!newPOS.name || !newPOS.warehouseId) return;
@@ -347,7 +333,17 @@ export default function HospiSettings() {
       tax_profile: newPOS.taxProfile,
     };
     if (editingPOSId) {
+      const before = posList.find(pos => pos.id === editingPOSId);
       updatePOS(editingPOSId, payload);
+      createConfigDraft({
+        title: `Modification ${payload.name}`,
+        module: 'POS',
+        change_type: 'pos',
+        before_value: before ? `${before.name} / ${before.tax_profile || ''}` : 'Ancien POS',
+        after_value: `${payload.name} / ${payload.tax_profile}`,
+        created_by: 'Admin',
+        status: 'tested',
+      });
       setEditingPOSId(null);
     } else {
       addPOS(payload);
@@ -365,7 +361,17 @@ export default function HospiSettings() {
       is_active: true,
     };
     if (editingWarehouseId) {
+      const before = warehouses.find(warehouse => warehouse.id === editingWarehouseId);
       updateWarehouse(editingWarehouseId, payload);
+      createConfigDraft({
+        title: `Modification ${payload.name}`,
+        module: 'Dépôt',
+        change_type: 'warehouse',
+        before_value: before ? before.name : 'Ancien dépôt',
+        after_value: payload.name,
+        created_by: 'Admin',
+        status: 'tested',
+      });
       setEditingWarehouseId(null);
     } else {
       addWarehouse(payload);
@@ -455,7 +461,17 @@ export default function HospiSettings() {
       expires_at: newProduct.expiresAt ? new Date(newProduct.expiresAt).toISOString() : undefined,
     };
     if (editingProductId) {
+      const before = products.find(product => product.id === editingProductId);
       updateProduct(editingProductId, payload);
+      createConfigDraft({
+        title: `Modification ${payload.name}`,
+        module: 'Produit',
+        change_type: 'product',
+        before_value: before ? `${before.name} / ${before.average_purchase_price || 0} F` : 'Ancien produit',
+        after_value: `${payload.name} / ${payload.average_purchase_price || 0} F`,
+        created_by: 'Admin',
+        status: 'tested',
+      });
       setEditingProductId(null);
     } else {
       addProduct({
@@ -522,6 +538,18 @@ export default function HospiSettings() {
       sale_price: Number(priceForm.salePrice),
       tax_rate: Number(priceForm.taxRate) || 0,
       is_available: true,
+    });
+    const pos = posList.find(item => item.id === priceForm.posId);
+    const product = products.find(item => item.id === priceForm.productId);
+    const before = editingPriceId ? posProductPrices.find(price => price.id === editingPriceId) : undefined;
+    createConfigDraft({
+      title: `Prix ${product?.name || 'produit'} - ${pos?.name || 'POS'}`,
+      module: 'Prix POS',
+      change_type: 'price',
+      before_value: before ? `${before.sale_price} F` : 'Non vendu',
+      after_value: `${Number(priceForm.salePrice)} F`,
+      created_by: 'Admin',
+      status: 'tested',
     });
     setEditingPriceId(null);
     setConfigNotice({ tone: 'success', message: editingPriceId ? 'Prix POS modifié.' : 'Prix POS créé.' });
@@ -868,22 +896,21 @@ export default function HospiSettings() {
             <h3 className="text-white font-black text-base mb-1">Mode brouillon / publication</h3>
             <p className="text-text-secondary text-xs mb-4">Préparer, tester puis publier une configuration sans casser le service.</p>
             <div className="space-y-2">
-              {draftRows.map(row => (
-                <div key={row.title} className="rounded-2xl bg-white/5 border border-white/10 p-4">
+              {configDrafts.map(row => (
+                <div key={row.id} className="rounded-2xl bg-white/5 border border-white/10 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-white font-black text-sm">{row.title}</p>
                     <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-orange/10 text-orange">{row.status}</span>
                   </div>
-                  <p className="text-text-secondary text-xs mt-1">{row.detail}</p>
+                  <p className="text-text-secondary text-xs mt-1">{row.module} • {row.before_value} → {row.after_value}</p>
                   <div className="grid grid-cols-3 gap-2 mt-3">
-                    {['Prévisualiser', 'Tester', 'Publier'].map(action => (
-                      <button key={action} type="button" onClick={() => setConfigNotice({ tone: 'success', message: `${action} : ${row.title}` })} className="h-9 rounded-xl bg-white/5 text-white text-[10px] font-black">
-                        {action}
-                      </button>
-                    ))}
+                    <button type="button" onClick={() => setConfigNotice({ tone: 'success', message: `${row.title} : ${row.before_value} → ${row.after_value}` })} className="h-9 rounded-xl bg-white/5 text-white text-[10px] font-black">Prévisualiser</button>
+                    <button type="button" onClick={() => { testConfigDraft(row.id); setConfigNotice({ tone: 'success', message: `${row.title} testé.` }); }} className="h-9 rounded-xl bg-white/5 text-white text-[10px] font-black">Tester</button>
+                    <button type="button" onClick={() => { publishConfigDraft(row.id, 'Admin'); setConfigNotice({ tone: 'success', message: `${row.title} publié et historisé.` }); }} className="h-9 rounded-xl bg-green/10 text-green text-[10px] font-black">Publier</button>
                   </div>
                 </div>
               ))}
+              {configDrafts.length === 0 && <p className="text-text-tertiary text-sm text-center py-6">Aucun brouillon.</p>}
             </div>
           </div>
         )}
@@ -893,14 +920,14 @@ export default function HospiSettings() {
             <h3 className="text-white font-black text-base mb-1">Historique de configuration</h3>
             <p className="text-text-secondary text-xs mb-4">Ancienne valeur, nouvelle valeur, auteur et module impacté.</p>
             <div className="space-y-2">
-              {configHistoryRows.map(row => (
-                <div key={row.title} className="rounded-2xl bg-white/5 border border-white/10 p-4">
+              {configHistoryEntries.map(row => (
+                <div key={row.id} className="rounded-2xl bg-white/5 border border-white/10 p-4">
                   <p className="text-white font-black text-sm">{row.title}</p>
                   <p className="text-text-tertiary text-[10px] mt-1">{row.module} • {row.actor}</p>
                   <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center mt-3">
-                    <span className="rounded-xl bg-red/10 text-red text-xs font-black px-3 py-2">{row.before}</span>
+                    <span className="rounded-xl bg-red/10 text-red text-xs font-black px-3 py-2">{row.before_value}</span>
                     <span className="text-text-tertiary text-xs">→</span>
-                    <span className="rounded-xl bg-green/10 text-green text-xs font-black px-3 py-2">{row.after}</span>
+                    <span className="rounded-xl bg-green/10 text-green text-xs font-black px-3 py-2">{row.after_value}</span>
                   </div>
                 </div>
               ))}
@@ -915,7 +942,11 @@ export default function HospiSettings() {
                 <Copy size={18} className="text-blue mb-3" />
                 <p className="text-white font-black text-sm">{row.title}</p>
                 <p className="text-text-secondary text-xs mt-1 min-h-[44px]">{row.detail}</p>
-                <button type="button" onClick={() => setConfigNotice({ tone: 'success', message: `${row.action} préparé en brouillon.` })} className="mt-3 w-full h-10 rounded-xl bg-blue/10 text-blue text-xs font-black">
+                <button type="button" onClick={() => {
+                  if (row.title === 'Dupliquer un POS') duplicatePOSConfig(posList[0]?.id || '', `${posList[0]?.name || 'POS'} copie`);
+                  else createConfigDraft({ title: row.title, module: 'Duplication', change_type: 'pos', before_value: 'Original', after_value: row.action, created_by: 'Admin' });
+                  setConfigNotice({ tone: 'success', message: `${row.action} préparé en brouillon.` });
+                }} className="mt-3 w-full h-10 rounded-xl bg-blue/10 text-blue text-xs font-black">
                   {row.action}
                 </button>
               </div>
@@ -930,7 +961,11 @@ export default function HospiSettings() {
                 <PackageCheck size={18} className="text-green mb-3" />
                 <p className="text-white font-black text-sm">{row.title}</p>
                 <p className="text-text-secondary text-xs mt-1 min-h-[54px]">{row.detail}</p>
-                <button type="button" onClick={() => setConfigNotice({ tone: 'success', message: `Pack ${row.title} ajouté aux brouillons.` })} className="mt-3 w-full h-10 rounded-xl bg-green/10 text-green text-xs font-black">
+                <button type="button" onClick={() => {
+                  const type = row.title.includes('Hôtel') ? 'room_service' : row.title.includes('Spa') ? 'spa' : row.title.includes('Boutique') ? 'boutique' : row.title.includes('Casino') ? 'casino' : row.title.includes('Bar') ? 'bar' : 'restaurant';
+                  createBusinessPack(type as POSType, sites[0]?.id || 'site-dakar', row.title);
+                  setConfigNotice({ tone: 'success', message: `Pack ${row.title} créé avec POS et dépôt.` });
+                }} className="mt-3 w-full h-10 rounded-xl bg-green/10 text-green text-xs font-black">
                   Préparer le pack
                 </button>
               </div>
@@ -954,7 +989,16 @@ export default function HospiSettings() {
                     {priceMatrixPOS.map(pos => {
                       const price = posProductPrices.find(item => item.pos_id === pos.id && item.product_id === product.id);
                       return (
-                        <button key={pos.id} type="button" onClick={() => price ? startEditPrice(price.id) : setConfigPanel('price')} className={`rounded-xl p-3 text-left ${price ? 'bg-green/10 text-green' : 'bg-white/5 text-text-tertiary'}`}>
+                        <button key={pos.id} type="button" onClick={() => {
+                          if (price) {
+                            upsertPOSProductPrice({ ...price, sale_price: price.sale_price + 100 });
+                            createConfigDraft({ title: `Ajustement ${product.name} - ${pos.name}`, module: 'Matrice prix', change_type: 'price', before_value: `${price.sale_price} F`, after_value: `${price.sale_price + 100} F`, created_by: 'Admin', status: 'tested' });
+                            setConfigNotice({ tone: 'success', message: `Prix ${product.name} augmenté de 100 F pour ${pos.name}.` });
+                          } else {
+                            upsertPOSProductPrice({ pos_id: pos.id, product_id: product.id, sale_price: 1000, tax_rate: 18, is_available: true });
+                            setConfigNotice({ tone: 'success', message: `${product.name} ajouté à ${pos.name}.` });
+                          }
+                        }} className={`rounded-xl p-3 text-left ${price ? 'bg-green/10 text-green' : 'bg-white/5 text-text-tertiary'}`}>
                           <p className="font-black text-xs">{price ? `${fmt(price.sale_price)} F` : 'Non vendu'}</p>
                           <p className="text-[10px] opacity-80">{price ? `TVA ${price.tax_rate}%` : 'Ajouter'}</p>
                         </button>
@@ -981,12 +1025,17 @@ export default function HospiSettings() {
                   <div key={action} className="grid grid-cols-6 gap-2">
                     <div className="rounded-xl bg-white/5 p-3 text-white text-xs font-black">{action}</div>
                     {permissionRoles.map(role => {
-                      const open = role === 'Direction' || role === 'Manager' || (action === 'Vendre' && role === 'Serveur') || (action === 'Encaisser' && role === 'Caissier') || (action.includes('inventaire') && role === 'Chef cuisine');
-                      const manager = ['Annuler', 'Remise', 'Corriger inventaire'].includes(action) && !['Direction', 'Manager'].includes(role);
+                      const persisted = getPermissionMode(role, action);
+                      const open = persisted ? persisted === 'allow' : role === 'Direction' || role === 'Manager' || (action === 'Vendre' && role === 'Serveur') || (action === 'Encaisser' && role === 'Caissier') || (action.includes('inventaire') && role === 'Chef cuisine');
+                      const manager = persisted ? persisted === 'manager' : ['Annuler', 'Remise', 'Corriger inventaire'].includes(action) && !['Direction', 'Manager'].includes(role);
                       return (
-                        <div key={`${role}-${action}`} className={`rounded-xl p-3 text-center text-[10px] font-black ${open ? 'bg-green/10 text-green' : manager ? 'bg-orange/10 text-orange' : 'bg-red/10 text-red'}`}>
+                        <button key={`${role}-${action}`} type="button" onClick={() => {
+                          const next = open ? 'manager' : manager ? 'deny' : 'allow';
+                          setPermissionPolicy(role, action, next);
+                          setConfigNotice({ tone: 'success', message: `${role} / ${action} : ${next}` });
+                        }} className={`rounded-xl p-3 text-center text-[10px] font-black ${open ? 'bg-green/10 text-green' : manager ? 'bg-orange/10 text-orange' : 'bg-red/10 text-red'}`}>
                           {open ? 'Oui' : manager ? 'Manager' : 'Non'}
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -1052,11 +1101,35 @@ export default function HospiSettings() {
             <p className="text-text-secondary text-xs mb-4">Exporter, restaurer et sécuriser la configuration avant publication.</p>
             <div className="grid grid-cols-2 gap-3">
               {['Sauvegarder maintenant', 'Exporter config', 'Importer config', 'Restaurer version'].map(action => (
-                <button key={action} type="button" onClick={() => setConfigNotice({ tone: 'success', message: `${action} préparé.` })} className="h-20 rounded-2xl bg-white/5 border border-white/10 text-white text-xs font-black">
+                <button key={action} type="button" onClick={() => {
+                  if (action === 'Sauvegarder maintenant' || action === 'Exporter config') {
+                    const snapshot = createConfigSnapshot(`Snapshot ${new Date().toLocaleString('fr-FR')}`, 'Admin');
+                    setConfigNotice({ tone: 'success', message: `${snapshot.name} créé : ${snapshot.summary}` });
+                  } else if (action === 'Restaurer version' && configSnapshots[0]) {
+                    restoreConfigSnapshot(configSnapshots[0].id, 'Admin');
+                    setConfigNotice({ tone: 'success', message: `${configSnapshots[0].name} restauré.` });
+                  } else {
+                    createConfigDraft({ title: 'Import configuration', module: 'Sauvegarde', change_type: 'backup', before_value: 'Configuration actuelle', after_value: 'Fichier importé', created_by: 'Admin' });
+                    setConfigNotice({ tone: 'success', message: `${action} préparé en brouillon.` });
+                  }
+                }} className="h-20 rounded-2xl bg-white/5 border border-white/10 text-white text-xs font-black">
                   {action}
                 </button>
               ))}
             </div>
+            {configSnapshots.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {configSnapshots.slice(0, 3).map(snapshot => (
+                  <div key={snapshot.id} className="rounded-xl bg-white/5 px-3 py-2 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-white font-bold text-xs">{snapshot.name}</p>
+                      <p className="text-text-tertiary text-[10px]">{snapshot.summary}</p>
+                    </div>
+                    <span className="text-green font-black text-[10px]">{snapshot.created_by}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1065,12 +1138,13 @@ export default function HospiSettings() {
             <h3 className="text-white font-black text-base mb-1">Gestion des taxes avancée</h3>
             <p className="text-text-secondary text-xs mb-4">Profils fiscaux par métier, site, client et famille produit.</p>
             <div className="space-y-2">
-              {taxRows.map(row => (
-                <div key={row.title} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-start justify-between gap-3">
-                  <div><p className="text-white font-black text-sm">{row.title}</p><p className="text-text-secondary text-xs mt-1">{row.detail}</p></div>
-                  <span className="text-orange font-black text-xs">{row.value}</span>
+              {taxProfiles.map(row => (
+                <div key={row.id} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-start justify-between gap-3">
+                  <div><p className="text-white font-black text-sm">{row.name}</p><p className="text-text-secondary text-xs mt-1">{row.detail}</p></div>
+                  <button type="button" onClick={() => { upsertTaxProfile({ ...row, rate: row.rate + 1 }); setConfigNotice({ tone: 'success', message: `${row.name} passé à ${row.rate + 1}%` }); }} className="text-orange font-black text-xs">{row.rate}%</button>
                 </div>
               ))}
+              <button type="button" onClick={() => { upsertTaxProfile({ name: 'Corporate exonéré', module: 'Corporate', rate: 0, detail: 'Profil client entreprise avec exonération contrôlée.', is_active: true }); setConfigNotice({ tone: 'success', message: 'Profil fiscal corporate ajouté.' }); }} className="w-full h-11 rounded-xl bg-orange/10 text-orange text-xs font-black">Ajouter profil fiscal</button>
             </div>
           </div>
         )}
@@ -1080,19 +1154,20 @@ export default function HospiSettings() {
             <h3 className="text-white font-black text-base mb-1">Centre de validation manager</h3>
             <p className="text-text-secondary text-xs mb-4">Toutes les actions sensibles à approuver ou refuser.</p>
             <div className="space-y-2">
-              {approvalRows.map(row => (
-                <div key={row.title} className="rounded-2xl bg-white/5 border border-white/10 p-4">
+              {approvalRequests.map(row => (
+                <div key={row.id} className="rounded-2xl bg-white/5 border border-white/10 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-white font-black text-sm">{row.title}</p>
-                    <span className="text-orange font-black text-sm">{row.count}</span>
+                    <span className="text-orange font-black text-sm">{row.status}</span>
                   </div>
                   <p className="text-text-secondary text-xs mt-1">{row.detail}</p>
                   <div className="grid grid-cols-2 gap-2 mt-3">
-                    <button type="button" className="h-9 rounded-xl bg-green/10 text-green text-[10px] font-black">Approuver</button>
-                    <button type="button" className="h-9 rounded-xl bg-red/10 text-red text-[10px] font-black">Refuser</button>
+                    <button type="button" onClick={() => resolveApprovalRequest(row.id, 'approved', 'Admin')} className="h-9 rounded-xl bg-green/10 text-green text-[10px] font-black">Approuver</button>
+                    <button type="button" onClick={() => resolveApprovalRequest(row.id, 'rejected', 'Admin')} className="h-9 rounded-xl bg-red/10 text-red text-[10px] font-black">Refuser</button>
                   </div>
                 </div>
               ))}
+              <button type="button" onClick={() => { createApprovalRequest({ title: 'Validation test', detail: 'Demande sensible créée depuis Admin.', module: 'Admin', requested_by: 'Admin' }); setConfigNotice({ tone: 'success', message: 'Demande de validation créée.' }); }} className="w-full h-11 rounded-xl bg-orange/10 text-orange text-xs font-black">Créer demande</button>
             </div>
           </div>
         )}
@@ -1102,9 +1177,9 @@ export default function HospiSettings() {
             <h3 className="text-white font-black text-base mb-1">Environnements</h3>
             <p className="text-text-secondary text-xs mb-4">Séparer démo, formation et production pour tester sans risque.</p>
             <div className="space-y-2">
-              {environmentRows.map(row => (
-                <div key={row.title} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-start justify-between gap-3">
-                  <div><p className="text-white font-black text-sm">{row.title}</p><p className="text-text-secondary text-xs mt-1">{row.detail}</p></div>
+              {adminEnvironments.map(row => (
+                <div key={row.id} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-start justify-between gap-3">
+                  <div><p className="text-white font-black text-sm">{row.name}</p><p className="text-text-secondary text-xs mt-1">{row.detail}</p></div>
                   <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-green/10 text-green">{row.status}</span>
                 </div>
               ))}
