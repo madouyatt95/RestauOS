@@ -5,7 +5,8 @@ import { useReviewStore } from '../stores/reviewStore';
 import { useWasteStore } from '../stores/wasteStore';
 import { useHospiStore } from '../stores/hospiStore';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, ShoppingBag, DollarSign, Award, Download, Star, Users, Trash2, Clock, Flame, Sun, Moon, Building2, BedDouble, Warehouse, Store } from 'lucide-react';
+import { TrendingUp, ShoppingBag, DollarSign, Award, Download, Star, Users, Trash2, Clock, Flame, Sun, Moon, Building2, BedDouble, Warehouse, Store, ReceiptText, LockKeyhole, UnlockKeyhole } from 'lucide-react';
+import { buildCashSessionTicket, summarizeCashSession } from '../services/cashSession';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 const DONUT_COLORS = ['#FF8A00', '#8B5CF6', '#3B82F6'];
@@ -13,10 +14,10 @@ const HEAT_COLORS = ['#1a1a2e', '#2d1f4e', '#4c1d95', '#7c3aed', '#a78bfa', '#FF
 
 export default function Rapports() {
   const { orders, getCAByDay, getOrderCount, getTypeDistribution, getTopProducts } = useOrderStore();
-  const { sites, posList, warehouses, products, stockLevels, stockMovements, folios, folioLines, rooms, guests, stays } = useHospiStore();
+  const { sites, posList, warehouses, products, stockLevels, stockMovements, folios, folioLines, rooms, guests, stays, cashSessions, getRegisterForPOS } = useHospiStore();
   const { reviews, getAverage } = useReviewStore();
   const { getWeekTotal } = useWasteStore();
-  const [activeTab, setActiveTab] = useState<'ca' | 'hospi' | 'analytics' | 'avis'>('ca');
+  const [activeTab, setActiveTab] = useState<'ca' | 'hospi' | 'caisse' | 'analytics' | 'avis'>('ca');
 
   const caByDay = getCAByDay();
   const weekCA = caByDay.reduce((s, d) => s + d.ca, 0);
@@ -63,12 +64,42 @@ export default function Rapports() {
   const totalRoomCharge = folioLines.reduce((sum, line) => sum + line.amount, 0);
   const openFolioTotal = folios.filter(folio => folio.status === 'open').reduce((sum, folio) => sum + folio.total_amount, 0);
   const lowHospiStocks = stockLevels.filter(level => level.quantity <= level.alert_threshold);
+  const cashReports = cashSessions.map(session => {
+    const pos = posList.find(item => item.id === session.pos_id);
+    const register = getRegisterForPOS(session.pos_id);
+    const summary = summarizeCashSession(session, orders);
+    return { session, pos, register, summary };
+  }).sort((a, b) => new Date(b.session.closed_at || b.session.opened_at).getTime() - new Date(a.session.closed_at || a.session.opened_at).getTime());
+  const openCashReports = cashReports.filter(report => report.session.status === 'open');
+  const closedCashReports = cashReports.filter(report => report.session.status === 'closed');
+  const cashTotals = cashReports.reduce((totals, report) => ({
+    sales: totals.sales + report.summary.grossSales,
+    expectedCash: totals.expectedCash + report.summary.expectedCash,
+    roomCharge: totals.roomCharge + report.summary.roomChargeTotal,
+    tickets: totals.tickets + report.summary.orderCount,
+  }), { sales: 0, expectedCash: 0, roomCharge: 0, tickets: 0 });
 
   const handleExport = () => {
     const text = `Rapport RestauOS\n\nCA: ${fmt(weekCA)} FCFA\nCommandes: ${totalOrders}\nPanier moyen: ${fmt(panierMoyen)} FCFA\nNote moyenne: ${avgRating.toFixed(1)}/5\n\nTop Produits:\n${topProducts.map((p, i) => `${i + 1}. ${p.name} — ${fmt(p.revenue)} FCFA`).join('\n')}`;
     const blob = new Blob([text], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = 'rapport-restauos.txt'; a.click();
+  };
+
+  const handleExportCashSession = (report: typeof cashReports[number]) => {
+    const ticket = buildCashSessionTicket({
+      session: report.session,
+      summary: report.summary,
+      posName: report.pos?.name || 'POS',
+      registerName: report.register?.name || 'Caisse',
+    });
+    const blob = new Blob([ticket], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ticket-z-${report.session.id}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -85,6 +116,7 @@ export default function Rapports() {
         {[
           { id: 'ca', label: 'Chiffres', icon: TrendingUp },
           { id: 'hospi', label: 'Hospi', icon: Building2 },
+          { id: 'caisse', label: 'Caisses', icon: ReceiptText },
           { id: 'analytics', label: 'Analytics', icon: Flame },
           { id: 'avis', label: 'Avis', icon: Star },
         ].map(tab => (
@@ -321,6 +353,106 @@ export default function Rapports() {
                 );
               })}
               {stockMovements.length === 0 && <p className="text-text-tertiary text-xs text-center py-6">Aucune vente Hospi enregistrée pour le moment.</p>}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ─── CAISSE TAB ─── */}
+      {activeTab === 'caisse' && (
+        <>
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="glass-card-lg p-5 mb-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-11 h-11 rounded-2xl bg-orange/10 text-orange flex items-center justify-center">
+                <ReceiptText size={22} />
+              </div>
+              <div>
+                <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Rapports X/Z</p>
+                <h2 className="text-white font-black text-lg">Contrôle des caisses par POS</h2>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-white/5 p-4">
+                <p className="text-text-tertiary text-[9px] font-black uppercase">Ventes sessions</p>
+                <p className="text-white font-black text-xl">{fmt(cashTotals.sales)} F</p>
+              </div>
+              <div className="rounded-2xl bg-white/5 p-4">
+                <p className="text-text-tertiary text-[9px] font-black uppercase">Espèces attendues</p>
+                <p className="text-green font-black text-xl">{fmt(cashTotals.expectedCash)} F</p>
+              </div>
+              <div className="rounded-2xl bg-white/5 p-4">
+                <p className="text-text-tertiary text-[9px] font-black uppercase">Imputé chambre</p>
+                <p className="text-cyan-300 font-black text-xl">{fmt(cashTotals.roomCharge)} F</p>
+              </div>
+              <div className="rounded-2xl bg-white/5 p-4">
+                <p className="text-text-tertiary text-[9px] font-black uppercase">Tickets</p>
+                <p className="text-white font-black text-xl">{cashTotals.tickets}</p>
+              </div>
+            </div>
+          </motion.div>
+
+          <div className="glass-card-lg p-5 mb-5">
+            <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2"><UnlockKeyhole size={16} className="text-green" /> Rapports X ouverts</h3>
+            <div className="space-y-3">
+              {openCashReports.map(report => (
+                <div key={report.session.id} className="rounded-2xl bg-white/5 p-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <p className="text-white font-black text-sm">{report.pos?.name || 'POS'}</p>
+                      <p className="text-text-tertiary text-[10px]">{report.register?.name || 'Caisse'} • ouverte par {report.session.opened_by}</p>
+                    </div>
+                    <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-green/10 text-green">Ouverte</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-xl bg-black/10 p-3">
+                      <p className="text-text-tertiary text-[9px] font-black uppercase">CA</p>
+                      <p className="text-white font-black text-sm">{fmt(report.summary.grossSales)} F</p>
+                    </div>
+                    <div className="rounded-xl bg-black/10 p-3">
+                      <p className="text-text-tertiary text-[9px] font-black uppercase">Espèces attendues</p>
+                      <p className="text-green font-black text-sm">{fmt(report.summary.expectedCash)} F</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {openCashReports.length === 0 && <p className="text-text-tertiary text-xs text-center py-6">Aucune caisse ouverte.</p>}
+            </div>
+          </div>
+
+          <div className="glass-card-lg p-5">
+            <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2"><LockKeyhole size={16} className="text-red" /> Clôtures Z</h3>
+            <div className="space-y-3">
+              {closedCashReports.map(report => (
+                <div key={report.session.id} className="rounded-2xl bg-white/5 p-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <p className="text-white font-black text-sm">{report.pos?.name || 'POS'}</p>
+                      <p className="text-text-tertiary text-[10px]">
+                        {report.session.closed_at ? new Date(report.session.closed_at).toLocaleString('fr-FR') : 'Clôturée'} • {report.session.closed_by || '-'}
+                      </p>
+                    </div>
+                    <button onClick={() => handleExportCashSession(report)} className="w-9 h-9 rounded-xl bg-white/5 text-orange flex items-center justify-center">
+                      <Download size={16} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <div className="rounded-xl bg-black/10 p-3">
+                      <p className="text-text-tertiary text-[9px] font-black uppercase">CA</p>
+                      <p className="text-white font-black text-sm">{fmt(report.summary.grossSales)} F</p>
+                    </div>
+                    <div className="rounded-xl bg-black/10 p-3">
+                      <p className="text-text-tertiary text-[9px] font-black uppercase">Écart</p>
+                      <p className={`${(report.session.difference || 0) === 0 ? 'text-green' : 'text-orange'} font-black text-sm`}>{fmt(report.session.difference || 0)} F</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-[10px]">
+                    <span className="rounded-xl bg-white/5 px-3 py-2 text-text-secondary">Espèces {fmt(report.summary.byMethod.especes)} F</span>
+                    <span className="rounded-xl bg-white/5 px-3 py-2 text-text-secondary">Carte {fmt(report.summary.byMethod.carte)} F</span>
+                    <span className="rounded-xl bg-white/5 px-3 py-2 text-text-secondary">Chambre {fmt(report.summary.byMethod.room_charge)} F</span>
+                  </div>
+                </div>
+              ))}
+              {closedCashReports.length === 0 && <p className="text-text-tertiary text-xs text-center py-6">Aucune clôture Z pour le moment.</p>}
             </div>
           </div>
         </>

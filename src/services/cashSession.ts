@@ -61,7 +61,7 @@ export function buildCashSessionTicket(params: {
   const diff = session.difference ?? ((session.closing_cash_count ?? 0) - summary.expectedCash);
 
   return [
-    'SARTAL OS HOSPI',
+    'RESTAUOS HOSPITALITY ERP',
     'TICKET DE CLOTURE Z',
     '',
     `POS: ${posName}`,
