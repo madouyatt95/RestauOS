@@ -306,7 +306,7 @@ export interface ConfigDraft {
   id: string;
   title: string;
   module: string;
-  change_type: 'price' | 'pos' | 'warehouse' | 'product' | 'pack' | 'permission' | 'tax' | 'backup';
+  change_type: 'price' | 'pos' | 'warehouse' | 'product' | 'pack' | 'permission' | 'tax' | 'backup' | 'connector';
   before_value: string;
   after_value: string;
   status: ConfigDraftStatus;

@@ -325,6 +325,37 @@ export default function HospiSettings() {
 
   const getPermissionMode = (role: string, action: string) => permissionPolicies.find(item => item.role === role && item.action === action)?.mode;
 
+  const openQuickConfig = (panel: typeof configPanel) => {
+    setConfigPanel(panel);
+    window.requestAnimationFrame(() => {
+      document.getElementById('quick-config')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  const configureBusinessModule = (type: POSType, label: string) => {
+    const existing = posList.find(pos => pos.type === type);
+    if (existing) {
+      startEditPOS(existing.id);
+      setConfigNotice({ tone: 'success', message: `${existing.name} ouvert en édition.` });
+      return;
+    }
+    setEditingPOSId(null);
+    setNewPOS(prev => ({
+      ...prev,
+      name: label.replace(' / RestauOS', '').replace(' / PMS / Room service', ''),
+      type,
+      warehouseId: warehouses.find(warehouse => warehouse.type === (type === 'bar' ? 'bar' : type === 'casino' || type === 'nightclub' ? 'casino' : type === 'spa' || type === 'boutique' ? 'boutique' : 'restaurant'))?.id || warehouses[0]?.id || '',
+    }));
+    openQuickConfig('pos');
+    setConfigNotice({ tone: 'success', message: `${label} prêt à configurer.` });
+  };
+
+  const openAdminView = (view: AdminView, message?: string) => {
+    setAdminView(view);
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+    if (message) setConfigNotice({ tone: 'success', message });
+  };
+
   const handleCreatePOS = () => {
     if (!newPOS.name || !newPOS.warehouseId) return;
     const payload = {
@@ -499,7 +530,7 @@ export default function HospiSettings() {
   const startEditPOS = (posId: string) => {
     const pos = posList.find(item => item.id === posId);
     if (!pos) return;
-    setConfigPanel('pos');
+    openQuickConfig('pos');
     setEditingPOSId(pos.id);
     setNewPOS({
       siteId: pos.site_id,
@@ -516,7 +547,7 @@ export default function HospiSettings() {
   const startEditWarehouse = (warehouseId: string) => {
     const warehouse = warehouses.find(item => item.id === warehouseId);
     if (!warehouse) return;
-    setConfigPanel('warehouse');
+    openQuickConfig('warehouse');
     setEditingWarehouseId(warehouse.id);
     setNewWarehouse({
       siteId: warehouse.site_id,
@@ -581,7 +612,7 @@ export default function HospiSettings() {
   const startEditProduct = (productId: string) => {
     const product = products.find(item => item.id === productId);
     if (!product) return;
-    setConfigPanel('product');
+    openQuickConfig('product');
     setEditingProductId(product.id);
     setNewProduct({
       name: product.name,
@@ -603,7 +634,7 @@ export default function HospiSettings() {
   const startEditPrice = (priceId: string) => {
     const price = posProductPrices.find(item => item.id === priceId);
     if (!price) return;
-    setConfigPanel('price');
+    openQuickConfig('price');
     setEditingPriceId(price.id);
     setPriceForm({
       posId: price.pos_id,
@@ -814,7 +845,7 @@ export default function HospiSettings() {
                   </div>
                   <p className="text-white font-black text-sm">{module.label}</p>
                   <p className="text-text-secondary text-xs mt-1">{module.posCount} POS • {module.priceCount} tarif(s)</p>
-                  <button type="button" onClick={() => setConfigPanel('pos')} className="mt-3 w-full h-10 rounded-xl bg-white/5 text-white text-xs font-black">
+                  <button type="button" onClick={() => configureBusinessModule(module.type as POSType, module.label)} className="mt-3 w-full h-10 rounded-xl bg-white/5 text-white text-xs font-black">
                     Configurer
                   </button>
                 </div>
@@ -867,6 +898,9 @@ export default function HospiSettings() {
           <div className="glass-card-lg p-5">
             <h3 className="text-white font-black text-base mb-1">Rôles et permissions</h3>
             <p className="text-text-secondary text-xs mb-4">La matrice cible pour bloquer clairement les actions sensibles selon le métier.</p>
+            <button type="button" onClick={() => openAdminView('permissionMatrix', 'Matrice des droits ouverte.')} className="w-full h-11 rounded-xl bg-blue/10 text-blue text-xs font-black mb-4">
+              Ouvrir la matrice configurable
+            </button>
             <div className="space-y-2">
               {roleRows.map(row => (
                 <div key={row.role} className="rounded-2xl bg-white/5 border border-white/10 p-4">
@@ -882,6 +916,14 @@ export default function HospiSettings() {
           <div className="glass-card-lg p-5">
             <h3 className="text-white font-black text-base mb-1">Moteur de règles métier</h3>
             <p className="text-text-secondary text-xs mb-4">Les règles qui contrôlent stock, ventes, remises, annulations, folios et caisse.</p>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <button type="button" onClick={() => openAdminView('permissionMatrix', 'Règles sensibles ouvertes dans la matrice des droits.')} className="h-11 rounded-xl bg-orange/10 text-orange text-xs font-black">
+                Droits sensibles
+              </button>
+              <button type="button" onClick={() => openQuickConfig('product')} className="h-11 rounded-xl bg-green/10 text-green text-xs font-black">
+                Règles produit / stock
+              </button>
+            </div>
             <div className="space-y-2">
               {ruleRows.map(row => (
                 <div key={row.title} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-start justify-between gap-3">
@@ -912,6 +954,14 @@ export default function HospiSettings() {
                 <div key={`${alert.title}-${alert.detail}`} className={`rounded-2xl border p-4 ${alert.level === 'critical' ? 'bg-red/10 border-red/20' : alert.level === 'warning' ? 'bg-orange/10 border-orange/20' : 'bg-blue/10 border-blue/20'}`}>
                   <p className="text-white font-black text-sm">{alert.title}</p>
                   <p className="text-text-secondary text-xs mt-1">{alert.detail}</p>
+                  <div className="grid grid-cols-2 gap-2 mt-3">
+                    <button type="button" onClick={() => openQuickConfig(alert.title.includes('dépôt') || alert.title.includes('Dépôt') ? 'warehouse' : alert.title.includes('catalogue') || alert.title.includes('prix') ? 'price' : 'product')} className="h-9 rounded-xl bg-white/5 text-white text-[10px] font-black">
+                      Corriger
+                    </button>
+                    <button type="button" onClick={() => createApprovalRequest({ title: `Correction ${alert.title}`, detail: alert.detail, module: 'Santé système', requested_by: 'Admin' })} className="h-9 rounded-xl bg-orange/10 text-orange text-[10px] font-black">
+                      Valider plus tard
+                    </button>
+                  </div>
                 </div>
               ))}
               {healthAlerts.length === 0 && <p className="text-text-tertiary text-sm text-center py-6">Configuration saine.</p>}
@@ -1186,12 +1236,12 @@ export default function HospiSettings() {
             <p className="text-text-secondary text-xs mb-4">Lecture rapide : autorisé, validation manager ou bloqué.</p>
             <div className="overflow-x-auto scrollbar-none">
               <div className="min-w-[680px] space-y-2">
-                <div className="grid grid-cols-6 gap-2">
+                <div className="grid gap-2" style={{ gridTemplateColumns: `150px repeat(${permissionRoles.length}, minmax(92px, 1fr))` }}>
                   <div />
                   {permissionRoles.map(role => <div key={role} className="text-text-tertiary text-[10px] font-black uppercase">{role}</div>)}
                 </div>
                 {permissionActions.map(action => (
-                  <div key={action} className="grid grid-cols-6 gap-2">
+                  <div key={action} className="grid gap-2" style={{ gridTemplateColumns: `150px repeat(${permissionRoles.length}, minmax(92px, 1fr))` }}>
                     <div className="rounded-xl bg-white/5 p-3 text-white text-xs font-black">{action}</div>
                     {permissionRoles.map(role => {
                       const persisted = getPermissionMode(role, action);
@@ -1255,9 +1305,29 @@ export default function HospiSettings() {
             <p className="text-text-secondary text-xs mb-4">Préparer les intégrations PMS, comptabilité, TPE, imprimantes et fournisseurs.</p>
             <div className="space-y-2">
               {connectorRows.map(row => (
-                <div key={row.title} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-start justify-between gap-3">
-                  <div><p className="text-white font-black text-sm">{row.title}</p><p className="text-text-secondary text-xs mt-1">{row.detail}</p></div>
-                  <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-blue/10 text-blue">{row.status}</span>
+                <div key={row.title} className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div><p className="text-white font-black text-sm">{row.title}</p><p className="text-text-secondary text-xs mt-1">{row.detail}</p></div>
+                    <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-blue/10 text-blue">{row.status}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mt-3">
+                    <button type="button" onClick={() => {
+                      createConfigDraft({
+                        title: `Connecteur ${row.title}`,
+                        module: 'Connecteurs',
+                        change_type: 'connector',
+                        before_value: row.status,
+                        after_value: 'Configuration à tester',
+                        created_by: 'Admin',
+                      });
+                      setConfigNotice({ tone: 'success', message: `${row.title} préparé en brouillon.` });
+                    }} className="h-9 rounded-xl bg-blue/10 text-blue text-[10px] font-black">
+                      Configurer
+                    </button>
+                    <button type="button" onClick={() => openAdminView('drafts', 'Brouillons de connecteurs ouverts.')} className="h-9 rounded-xl bg-white/5 text-white text-[10px] font-black">
+                      Voir brouillons
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1418,7 +1488,7 @@ export default function HospiSettings() {
         </div>
       </section>
 
-      <section className="glass-card-lg p-5 mb-5">
+      <section id="quick-config" className="glass-card-lg p-5 mb-5 scroll-mt-16">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <h3 className="text-white font-black text-sm flex items-center gap-2"><Plus size={16} className="text-orange" /> Configuration rapide</h3>
