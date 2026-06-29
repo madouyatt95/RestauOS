@@ -4,7 +4,6 @@ import { useStockStore } from '../stores/stockStore';
 import { useHospiStore } from '../stores/hospiStore';
 import { useAuthStore } from '../stores/authStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
-import { useNavigate } from 'react-router-dom';
 import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package, Settings, Warehouse, Truck, Activity, CreditCard, X, Store, ReceiptText, Download, ShieldCheck, ClipboardCheck, Printer, ChefHat, Scale, Boxes, RefreshCcw, Ban, CircleDollarSign, BookmarkCheck, Gift } from 'lucide-react';
 
 const purchaseStatusLabels: Record<string, string> = {
@@ -34,7 +33,6 @@ type StockStatusFilter = 'all' | 'ok' | 'alert' | 'rupture';
 export default function Stocks() {
   const { items, movements, addMovement, addItem } = useStockStore();
   const { user } = useAuthStore();
-  const navigate = useNavigate();
   const {
     sites,
     posList,
@@ -236,18 +234,18 @@ export default function Stocks() {
       }, 0);
   };
   const stockEngineCards = [
-    { title: 'Recettes', value: `${recipeProducts.length} recette(s)`, detail: 'Les plats déstockent leurs ingrédients, pas seulement le plat vendu.', icon: ChefHat, tone: 'orange', action: () => navigate('/settings') },
-    { title: 'Variantes', value: `${productVariants.length} variante(s)`, detail: 'Suppléments, doubles doses et options peuvent changer prix et consommation.', icon: ReceiptText, tone: 'blue', action: () => navigate('/settings') },
-    { title: 'Conversions', value: `${unitConversions.length} règle(s)`, detail: 'Carton, sac, bidon ou kg sont convertis vers l’unité réellement vendue.', icon: Scale, tone: 'green', action: () => navigate('/settings') },
-    { title: 'Préparations', value: `${productionBatches.length || 1} production(s)`, detail: 'Sauces, jus maison et préparations peuvent devenir du stock disponible.', icon: Boxes, tone: 'purple', action: () => navigate('/settings') },
+    { title: 'Recettes', value: `${recipeProducts.length} recette(s)`, detail: 'Les plats déstockent leurs ingrédients, pas seulement le plat vendu.', icon: ChefHat, tone: 'orange', action: () => setStockNotice('Les recettes et marges sont visibles plus bas dans cet onglet.') },
+    { title: 'Variantes', value: `${productVariants.length} variante(s)`, detail: 'Suppléments, doubles doses et options peuvent changer prix et consommation.', icon: ReceiptText, tone: 'blue', action: () => setStockNotice('Les variantes sont suivies dans ce moteur; l’écran complet d’édition sera ajouté ici, pas dans Admin Hospi.') },
+    { title: 'Conversions', value: `${unitConversions.length} règle(s)`, detail: 'Carton, sac, bidon ou kg sont convertis vers l’unité réellement vendue.', icon: Scale, tone: 'green', action: () => setStockNotice('Les conversions fournisseur vers vente sont listées plus bas dans cet onglet.') },
+    { title: 'Préparations', value: `${productionBatches.length || 1} production(s)`, detail: 'Sauces, jus maison et préparations peuvent devenir du stock disponible.', icon: Boxes, tone: 'purple', action: () => setStockNotice('Les productions sont reliées au stock réel; le formulaire de production restera dans Stock.') },
     { title: 'Transferts auto', value: `${autoTransferSuggestions.length} suggestion(s)`, detail: 'Le système repère les dépôts donneurs quand un autre dépôt manque.', icon: RefreshCcw, tone: 'blue', action: () => setShowTransfer(true) },
     { title: 'Réservations', value: `${stockReservations.filter(item => item.status === 'reserved').length} active(s)`, detail: 'Room service, banquet ou préparation peuvent réserver avant consommation.', icon: BookmarkCheck, tone: 'orange', action: () => setTab('mouvements') },
-    { title: 'Stock négatif', value: stockPolicy.allow_negative_stock ? 'Autorisé' : 'Bloqué', detail: 'Paramètre métier pour empêcher une vente impossible sur le terrain.', icon: Ban, tone: stockPolicy.allow_negative_stock ? 'orange' : 'green', action: () => navigate('/settings') },
+    { title: 'Stock négatif', value: stockPolicy.allow_negative_stock ? 'Autorisé' : 'Bloqué', detail: 'Paramètre métier pour empêcher une vente impossible sur le terrain.', icon: Ban, tone: stockPolicy.allow_negative_stock ? 'orange' : 'green', action: () => setStockNotice(stockPolicy.allow_negative_stock ? 'Le stock négatif est autorisé.' : 'Le stock négatif est bloqué : une sortie supérieure au disponible est refusée.') },
     { title: 'Coût réel', value: `${recipeProducts.length} calcul(s)`, detail: 'Les coûts d’achat alimentent coût recette, marge brute et alertes.', icon: CircleDollarSign, tone: 'green', action: () => setTab('pilotage') },
     { title: 'Inventaires tournants', value: `${families.length} famille(s)`, detail: 'Contrôler boissons aujourd’hui, cuisine demain, spa vendredi.', icon: ClipboardCheck, tone: 'purple', action: () => setTab('inventaire-guide') },
     { title: 'Théorique / réel', value: `${theoreticalGaps.length} écart(s)`, detail: 'Compare le stock système, le réservé, le disponible et les seuils.', icon: Activity, tone: 'orange', action: () => setTab('inventaire-guide') },
     { title: 'Conso internes', value: `${internalConsumptions.length} trace(s)`, detail: 'Personnel, offert, VIP, direction, casino, room service et mini-bar sont tracés.', icon: Gift, tone: 'blue', action: () => setTab('pertes') },
-    { title: 'Règles par POS', value: `${posList.length} POS`, detail: 'Prix, TVA, dépôt, caisse, imprimante, rapport Z et serveur restent liés au POS.', icon: Store, tone: 'green', action: () => navigate('/settings') },
+    { title: 'Règles par POS', value: `${posList.length} POS`, detail: 'Prix, TVA, dépôt, caisse, imprimante, rapport Z et serveur restent liés au POS.', icon: Store, tone: 'green', action: () => setTab('depots') },
   ];
   const canManageStock = user?.role === 'Admin' || user?.role === 'Gérant';
   const canTransferStock = canManageStock || canPerform(user, 'stock_transfer', 1);
@@ -644,7 +642,7 @@ export default function Stocks() {
               className="px-3 py-2 rounded-xl bg-white/10 border border-white/10 text-white text-xs font-bold outline-none">
               {sites.map(site => <option key={site.id} value={site.id} className="bg-[#111827]">{site.name}</option>)}
             </select>
-            <button onClick={() => navigate('/settings')} className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-text-secondary flex items-center justify-center" title="Modifier ou supprimer un dépôt">
+            <button onClick={() => setTab('depots')} className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-text-secondary flex items-center justify-center" title="Voir les dépôts">
               <Settings size={16} />
             </button>
           </div>
@@ -1251,7 +1249,7 @@ export default function Stocks() {
                       <button type="button" onClick={() => setSelectedWarehouseId(warehouse.id)} className="text-[10px] font-black text-green bg-green/10 px-2.5 py-1 rounded-full">
                         Détails
                       </button>
-                      <button type="button" onClick={() => navigate('/settings')} className="text-[10px] font-black text-blue bg-blue/10 px-2.5 py-1 rounded-full">
+                      <button type="button" onClick={() => setSelectedWarehouseId(warehouse.id)} className="text-[10px] font-black text-blue bg-blue/10 px-2.5 py-1 rounded-full">
                         Modifier
                       </button>
                     </div>
@@ -1533,7 +1531,7 @@ export default function Stocks() {
                 <button type="button" onClick={() => { setInventoryWarehouseId(selectedWarehouse.id); setSelectedWarehouseId(null); setTab('inventaire-guide'); }} className="py-3 rounded-2xl bg-orange/10 text-orange font-black text-[10px] uppercase tracking-widest">
                   Inventaire
                 </button>
-                <button type="button" onClick={() => navigate('/settings')} className="py-3 rounded-2xl bg-white/5 text-white font-black text-[10px] uppercase tracking-widest">
+                <button type="button" onClick={() => setStockNotice('Les réglages fins du dépôt seront intégrés dans cette fiche Stock pour éviter le renvoi vers Admin Hospi.')} className="py-3 rounded-2xl bg-white/5 text-white font-black text-[10px] uppercase tracking-widest">
                   Régler
                 </button>
               </div>
