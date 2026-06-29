@@ -679,6 +679,9 @@ interface HospiState {
   getOccupiedRoomsWithOpenFolios: () => { room: Room; guest: HotelGuest; stay: Stay; folio: Folio }[];
   getCustomerAccountBalance: (accountId: string) => number;
   settleCustomerAccount: (accountId: string, amount: number, method: PaymentMethod, createdBy: string) => CustomerLedgerEntry | null;
+  updateRoomStatus: (roomId: string, status: RoomStatus) => Room | null;
+  addManualFolioCharge: (folioId: string, description: string, amount: number, createdBy: string) => FolioLine | null;
+  closeFolio: (folioId: string, closedBy: string) => Folio | null;
   chargeOrderToRoom: (roomId: string, orderId: string, description: string, amount: number) => FolioLine | null;
 }
 
@@ -1284,6 +1287,89 @@ export const useHospiStore = create<HospiState>()(
         });
 
         return entry;
+      },
+      updateRoomStatus: (roomId, status) => {
+        const state = get();
+        const room = state.rooms.find(item => item.id === roomId);
+        if (!room) return null;
+
+        const updatedRoom: Room = { ...room, status };
+
+        set({
+          rooms: state.rooms.map(item => item.id === roomId ? updatedRoom : item),
+        });
+
+        return updatedRoom;
+      },
+      addManualFolioCharge: (folioId, description, amount, createdBy) => {
+        const state = get();
+        const trimmedDescription = description.trim();
+        const folio = state.folios.find(item => item.id === folioId && item.status === 'open');
+        if (!folio || !trimmedDescription || amount <= 0) return null;
+
+        const createdAt = new Date().toISOString();
+        const line: FolioLine = {
+          id: `folio-line-manual-${Date.now()}`,
+          folio_id: folio.id,
+          source_type: 'manual_charge',
+          source_id: `manual-${Date.now()}`,
+          description: `${trimmedDescription} · ${createdBy}`,
+          amount,
+          created_at: createdAt,
+        };
+        const account = state.customerAccounts.find(item => item.hotel_guest_id === folio.guest_id && item.is_active);
+        const ledgerEntry: CustomerLedgerEntry | null = account ? {
+          id: `ledger-manual-${Date.now()}`,
+          account_id: account.id,
+          source_type: 'manual_charge',
+          source_id: line.id,
+          description: trimmedDescription,
+          debit: amount,
+          credit: 0,
+          created_at: createdAt,
+        } : null;
+
+        set({
+          folioLines: [line, ...state.folioLines],
+          folios: state.folios.map(item => item.id === folio.id
+            ? { ...item, total_amount: item.total_amount + amount }
+            : item
+          ),
+          customerLedgerEntries: ledgerEntry ? [ledgerEntry, ...state.customerLedgerEntries] : state.customerLedgerEntries,
+          customerAccounts: account ? state.customerAccounts.map(item => item.id === account.id
+            ? { ...item, balance: item.balance + amount }
+            : item
+          ) : state.customerAccounts,
+        });
+
+        return line;
+      },
+      closeFolio: (folioId, closedBy) => {
+        const state = get();
+        const folio = state.folios.find(item => item.id === folioId && item.status === 'open');
+        if (!folio) return null;
+
+        const closedFolio: Folio = { ...folio, status: 'closed' };
+        const account = state.customerAccounts.find(item => item.hotel_guest_id === folio.guest_id && item.is_active);
+        const ledgerEntry: CustomerLedgerEntry | null = account ? {
+          id: `ledger-folio-close-${Date.now()}`,
+          account_id: account.id,
+          source_type: 'folio',
+          source_id: folio.id,
+          description: `Clôture folio par ${closedBy}`,
+          debit: 0,
+          credit: 0,
+          created_at: new Date().toISOString(),
+        } : null;
+
+        set({
+          folios: state.folios.map(item => item.id === folio.id ? closedFolio : item),
+          stays: state.stays.map(item => item.id === folio.stay_id ? { ...item, status: 'checked_out' } : item),
+          rooms: state.rooms.map(item => item.id === folio.room_id ? { ...item, status: 'cleaning' } : item),
+          customerLedgerEntries: ledgerEntry ? [ledgerEntry, ...state.customerLedgerEntries] : state.customerLedgerEntries,
+        });
+
+        return closedFolio;
       },
       chargeOrderToRoom: (roomId, orderId, description, amount) => {
         const state = get();
