@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../stores/orderStore';
@@ -11,6 +11,7 @@ import { useBusinessRulesStore } from '../stores/businessRulesStore';
 import { Check, CreditCard, Smartphone, Banknote, Wallet, Wifi, CloudUpload, ClipboardList, Clock, User, Edit2, Gift, Shield, BedDouble, ReceiptText, LockKeyhole, UnlockKeyhole, Download, Percent, Ban } from 'lucide-react';
 import { syncOrderToERP } from '../services/erpConnector';
 import { buildCashSessionTicket, summarizeCashSession } from '../services/cashSession';
+import { canAccessPOS, getVisiblePOS } from '../utils/accessControl';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
@@ -59,11 +60,17 @@ export default function Caisse() {
   const [discountReason, setDiscountReason] = useState('');
   const [cancelReason, setCancelReason] = useState('');
 
-  const pendingOrders = orders.filter(o => ['en_preparation', 'prete', 'servie', 'non_payee', 'partiellement_payee'].includes(o.status));
+  const visiblePOS = useMemo(() => getVisiblePOS(user, posList).filter(pos => pos.is_active), [posList, user]);
+  const visiblePOSIds = visiblePOS.map(pos => pos.id);
+  const pendingOrders = orders.filter(o =>
+    ['en_preparation', 'prete', 'servie', 'non_payee', 'partiellement_payee'].includes(o.status)
+    && (!o.posId || visiblePOSIds.includes(o.posId))
+  );
   const activeOrder = orders.find(o => o.id === selectedOrder);
   const loyaltyClient = activeOrder?.loyaltyClientId ? clients.find(c => c.id === activeOrder.loyaltyClientId) : null;
   const occupiedRooms = getOccupiedRoomsWithOpenFolios();
-  const activePOS = posList.find(pos => pos.id === (activeOrder?.posId || activePOSId));
+  const requestedPOS = posList.find(pos => pos.id === (activeOrder?.posId || activePOSId));
+  const activePOS = requestedPOS && canAccessPOS(user, requestedPOS) ? requestedPOS : visiblePOS[0];
   const activeWarehouse = activePOS ? warehouses.find(warehouse => warehouse.id === activePOS.default_warehouse_id) : undefined;
   const activeRegister = getRegisterForPOS(activePOS?.id);
   const openSession = getOpenCashSession(activePOS?.id);

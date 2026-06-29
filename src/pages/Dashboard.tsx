@@ -5,13 +5,14 @@ import { useHospiStore } from '../stores/hospiStore';
 import { ShoppingBag, Users, Receipt, ArrowDown, Bell, ChevronRight, ShieldAlert, Store, BedDouble, Dice5, Sparkles, Package } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router-dom';
+import { canAccessModule, getAccessSummary, getVisiblePOS, getVisibleSites } from '../utils/accessControl';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
 export default function Dashboard() {
   const { getCA, getOrderCount, getClientCount, getAvgTicket, getTopProducts, getCAByDay } = useOrderStore();
   const { user } = useAuthStore();
-  const { posList, rooms, folios, warehouses, setActivePOS } = useHospiStore();
+  const { sites, posList, rooms, folios, warehouses, setActivePOS } = useHospiStore();
   const navigate = useNavigate();
 
   const ca = getCA(0);
@@ -22,12 +23,22 @@ export default function Dashboard() {
   const avgTicket = getAvgTicket(0);
   const topProducts = getTopProducts();
   const caByDay = getCAByDay();
-  const occupiedRooms = rooms.filter(room => room.status === 'occupied').length;
-  const openFolios = folios.filter(folio => folio.status === 'open').length;
-  const restaurantPOS = posList.find(pos => pos.type === 'restaurant');
-  const casinoPOS = posList.find(pos => pos.type === 'bar' || pos.type === 'casino');
+  const visibleSites = getVisibleSites(user, sites);
+  const visibleSiteIds = visibleSites.map(site => site.id);
+  const visiblePOS = getVisiblePOS(user, posList);
+  const visibleRooms = rooms.filter(room => visibleSiteIds.includes(room.site_id));
+  const visibleRoomIds = visibleRooms.map(room => room.id);
+  const occupiedRooms = visibleRooms.filter(room => room.status === 'occupied').length;
+  const openFolios = folios.filter(folio => folio.status === 'open' && visibleRoomIds.includes(folio.room_id)).length;
+  const visibleWarehouses = warehouses.filter(warehouse => visibleSiteIds.includes(warehouse.site_id));
+  const restaurantPOS = visiblePOS.find(pos => pos.type === 'restaurant');
+  const casinoPOS = visiblePOS.find(pos => pos.type === 'bar' || pos.type === 'casino');
 
   const openBusinessModule = (module: 'restaurant' | 'hotel' | 'casino' | 'spa' | 'boutique') => {
+    if (!canAccessModule(user, module)) {
+      navigate('/modules');
+      return;
+    }
     if (module === 'hotel') {
       navigate('/pms');
       return;
@@ -35,8 +46,8 @@ export default function Dashboard() {
     const posByModule = {
       restaurant: restaurantPOS,
       casino: casinoPOS,
-      spa: posList.find(pos => pos.type === 'spa'),
-      boutique: posList.find(pos => pos.type === 'boutique'),
+      spa: visiblePOS.find(pos => pos.type === 'spa'),
+      boutique: visiblePOS.find(pos => pos.type === 'boutique'),
     }[module];
     if (posByModule) {
       setActivePOS(posByModule.id);
@@ -55,7 +66,7 @@ export default function Dashboard() {
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-start mb-6">
         <div>
           <h1 className="text-xl font-black text-white">Bonjour, {user?.name.split(' ')[0] || 'Cheikh'} ! 👋</h1>
-          <p className="text-text-secondary text-xs mt-1">{user?.role || 'Gérant'}</p>
+          <p className="text-text-secondary text-xs mt-1">{user?.demoTitle || user?.role || 'Gérant'}</p>
         </div>
         <button className="w-10 h-10 rounded-full glass-card flex items-center justify-center relative" onClick={() => navigate('/plus')}>
           <Bell size={18} className="text-text-secondary" />
@@ -69,7 +80,7 @@ export default function Dashboard() {
           📅 <span className="capitalize">{dateStr}</span>
         </div>
         <div className="glass-card px-3 py-2 text-xs text-text-secondary flex items-center gap-1.5">
-          📍 Tous les points de vente
+          📍 {getAccessSummary(user, sites, posList)}
         </div>
       </div>
 
@@ -94,11 +105,11 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 gap-3">
           {[
             { key: 'restaurant', label: 'Restaurant', sub: `${restaurantPOS?.name || 'RestauOS'} · salle, tables, caisse`, icon: Store, color: '#FF8A00', value: `${orders} commandes` },
-            { key: 'hotel', label: 'Hôtel', sub: `PMS · chambres, folios, réception`, icon: BedDouble, color: '#06B6D4', value: `${occupiedRooms}/${rooms.length} occupées · ${openFolios} folios` },
+            { key: 'hotel', label: 'Hôtel', sub: `PMS · chambres, folios, réception`, icon: BedDouble, color: '#06B6D4', value: `${occupiedRooms}/${visibleRooms.length} occupées · ${openFolios} folios` },
             { key: 'casino', label: 'Casino & Bars', sub: `${casinoPOS?.name || 'POS bar'} · tarifs dédiés`, icon: Dice5, color: '#8B5CF6', value: casinoPOS ? 'POS actif' : 'À configurer' },
             { key: 'spa', label: 'Spa', sub: 'Prestations, planning, forfaits', icon: Sparkles, color: '#22C55E', value: 'Module métier' },
-            { key: 'boutique', label: 'Boutique', sub: 'Ventes comptoir, stock, reçus', icon: Package, color: '#EC4899', value: `${warehouses.length} dépôts` },
-          ].map(item => (
+            { key: 'boutique', label: 'Boutique', sub: 'Ventes comptoir, stock, reçus', icon: Package, color: '#EC4899', value: `${visibleWarehouses.length} dépôts` },
+          ].filter(item => canAccessModule(user, item.key as 'restaurant' | 'hotel' | 'casino' | 'spa' | 'boutique')).map(item => (
             <button
               key={`${item.key}-${item.label}`}
               onClick={() => openBusinessModule(item.key as 'restaurant' | 'hotel' | 'casino' | 'spa' | 'boutique')}

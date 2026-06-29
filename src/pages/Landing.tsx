@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore, DEMO_USERS } from '../stores/authStore';
+import { useHospiStore } from '../stores/hospiStore';
 
 import { ShoppingBag, Package, Users, BarChart3, Heart, Truck, ChefHat, X, ScanLine } from 'lucide-react';
 
@@ -27,6 +28,7 @@ const ONBOARDING_SLIDES = [
 export default function Landing() {
   const navigate = useNavigate();
   const { login } = useAuthStore();
+  const { setActivePOS } = useHospiStore();
 
   const [showLogin, setShowLogin] = useState(false);
   const [showQRInput, setShowQRInput] = useState(false);
@@ -38,11 +40,13 @@ export default function Landing() {
 
   const handleLogin = (user: typeof DEMO_USERS[0]) => {
     login(user);
+    if (user.posIds?.[0]) setActivePOS(user.posIds[0]);
     if (user.role === 'Admin' || user.role === 'Gérant') navigate('/dashboard');
     else if (user.role === 'Chef cuisine') navigate('/cuisine');
     else if (user.role === 'Livreur') navigate('/livraisons');
     else if (user.role === 'Client') navigate('/client');
     else if (user.role === 'Serveur') navigate('/commandes');
+    else if (user.role === 'Caissier' && user.businessModules?.includes('hotel')) navigate('/pms');
     else if (user.role === 'Caissier') navigate('/caisse');
     else navigate('/dashboard');
   };
@@ -235,7 +239,7 @@ export default function Landing() {
                 <X size={20} />
               </button>
               <h3 className="text-white font-bold text-lg mb-2">Comptes de démonstration</h3>
-              <p className="text-text-secondary text-sm mb-6">Sélectionnez un profil pour vous connecter d'un simple clic.</p>
+              <p className="text-text-secondary text-sm mb-6">Chaque profil ouvre uniquement son périmètre : entreprise, site, activité, POS, salarié ou client.</p>
               
               <div className="grid grid-cols-2 gap-3 mb-4">
                 {DEMO_USERS.map((user) => (
@@ -250,7 +254,15 @@ export default function Landing() {
                     )}
                     <div className="text-center">
                       <div className="text-white text-xs font-bold">{user.name}</div>
-                      <div className="text-text-tertiary text-[10px] mt-0.5">{user.role}</div>
+                      <div className="text-orange text-[10px] font-black mt-0.5">{user.demoTitle || user.role}</div>
+                      <div className="text-text-tertiary text-[9px] mt-1">
+                        {user.accessLevel === 'direction' && 'Tout voir'}
+                        {user.accessLevel === 'site_manager' && `${user.siteIds?.length || 0} site(s)`}
+                        {user.accessLevel === 'business_manager' && `${user.businessModules?.join(', ')}`}
+                        {user.accessLevel === 'pos_manager' && `${user.posIds?.length || 0} POS`}
+                        {user.accessLevel === 'staff' && `${user.posIds?.length || 0} affectation(s)`}
+                        {user.accessLevel === 'client' && 'Folio client'}
+                      </div>
                     </div>
                   </button>
                 ))}

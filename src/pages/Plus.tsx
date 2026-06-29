@@ -26,6 +26,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useHospiStore } from '../stores/hospiStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useThemeStore } from '../stores/themeStore';
+import { canAccessRoute, getAccessSummary } from '../utils/accessControl';
 
 const ACCENT_COLORS = ['#FF8A00', '#EF4444', '#8B5CF6', '#3B82F6', '#22C55E', '#EC4899', '#06B6D4', '#F59E0B'];
 
@@ -71,8 +72,10 @@ export default function Plus() {
   };
 
   const profileLinks = [
-    ...(isManager ? [
+    ...(isManager && canAccessRoute(user, '/settings') ? [
       { icon: Settings, label: 'Admin Hospi', description: 'Sites, POS, dépôts, prix, permissions', path: '/settings', color: '#8B5CF6' },
+    ] : []),
+    ...(isManager ? [
       { icon: BarChart3, label: 'Rapports consolidés', description: 'Vue holding, sites, métiers et équipes', path: '/rapports', color: '#22C55E' },
       { icon: Building2, label: 'Modules métiers', description: 'Restaurant, hôtel, casino, spa, boutique', path: '/modules', color: '#06B6D4' },
     ] : []),
@@ -98,9 +101,9 @@ export default function Plus() {
           <div className="flex-1 min-w-0">
             <p className="text-text-tertiary text-[10px] font-black uppercase tracking-[0.18em]">Espace profil</p>
             <h1 className="text-white font-black text-xl leading-tight truncate">{user?.name || 'Utilisateur'}</h1>
-            <p className="text-text-secondary text-sm truncate">{user?.role || 'Profil'} · {selectedSite?.name || company?.name || 'Sártal OS'}</p>
+            <p className="text-text-secondary text-sm truncate">{user?.demoTitle || user?.role || 'Profil'} · {selectedSite?.name || company?.name || 'Sártal OS'}</p>
           </div>
-          {isManager && (
+          {isManager && canAccessRoute(user, '/settings') && (
             <button
               onClick={() => navigate('/settings')}
               className="w-11 h-11 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-white active:scale-95 transition-transform"
@@ -147,6 +150,10 @@ export default function Plus() {
                 <p className="text-text-tertiary text-[10px] font-bold uppercase">Site actif</p>
                 <p className="text-white font-black text-sm mt-1">{selectedSite?.name || 'Tous les sites'}</p>
               </div>
+            </div>
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-4 mt-3">
+              <p className="text-text-tertiary text-[10px] font-bold uppercase">Périmètre du profil</p>
+              <p className="text-white font-black text-sm mt-1">{getAccessSummary(user, sites, posList)}</p>
             </div>
           </div>
 

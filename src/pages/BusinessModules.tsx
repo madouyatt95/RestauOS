@@ -13,7 +13,9 @@ import {
   Store,
   Warehouse,
 } from 'lucide-react';
+import { useAuthStore } from '../stores/authStore';
 import { useHospiStore, type POS } from '../stores/hospiStore';
+import { canAccessModule, canAccessRoute, getVisiblePOS, getVisibleSites } from '../utils/accessControl';
 
 const businessGroups = [
   {
@@ -52,6 +54,7 @@ const businessGroups = [
 
 export default function BusinessModules() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const {
     sites,
     posList,
@@ -62,6 +65,11 @@ export default function BusinessModules() {
     folios,
     setActivePOS,
   } = useHospiStore();
+  const visibleSites = getVisibleSites(user, sites);
+  const visibleSiteIds = visibleSites.map(site => site.id);
+  const visiblePOS = getVisiblePOS(user, posList);
+  const visibleRooms = rooms.filter(room => visibleSiteIds.includes(room.site_id));
+  const visibleRoomIds = visibleRooms.map(room => room.id);
 
   const openPOS = (pos: POS, target: 'sales' | 'cash' | 'stock' | 'settings') => {
     setActivePOS(pos.id);
@@ -71,8 +79,8 @@ export default function BusinessModules() {
     if (target === 'settings') navigate('/settings');
   };
 
-  const occupiedRooms = rooms.filter(room => room.status === 'occupied').length;
-  const openFolios = folios.filter(folio => folio.status === 'open').length;
+  const occupiedRooms = visibleRooms.filter(room => room.status === 'occupied').length;
+  const openFolios = folios.filter(folio => folio.status === 'open' && visibleRoomIds.includes(folio.room_id)).length;
 
   return (
     <div className="page-content pt-14 pb-28">
@@ -82,60 +90,64 @@ export default function BusinessModules() {
           <h1 className="text-white font-black text-2xl">Restaurant, hôtel, casino, spa</h1>
           <p className="text-text-secondary text-xs mt-1">Entrer dans un métier, choisir son point de vente, puis ouvrir ses ventes, sa caisse, son stock ou ses réglages.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => navigate('/settings')}
-          className="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 text-text-secondary flex items-center justify-center"
-          title="Configurer les modules"
-        >
-          <Settings size={18} />
-        </button>
+        {canAccessRoute(user, '/settings') && (
+          <button
+            type="button"
+            onClick={() => navigate('/settings')}
+            className="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 text-text-secondary flex items-center justify-center"
+            title="Configurer les modules"
+          >
+            <Settings size={18} />
+          </button>
+        )}
       </div>
 
-      <motion.section
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="glass-card-lg p-4 mb-5"
-      >
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 text-cyan-300 flex items-center justify-center">
-              <BedDouble size={22} />
-            </div>
-            <div>
-              <h2 className="text-white font-black text-base">Hôtel / PMS</h2>
-              <p className="text-text-secondary text-xs">Chambres, folios, réception, imputations POS.</p>
-            </div>
-          </div>
-          <ChevronRight size={17} className="text-text-tertiary mt-3" />
-        </div>
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <div className="rounded-xl bg-white/5 p-3">
-            <p className="text-text-tertiary text-[9px] font-black uppercase">Chambres</p>
-            <p className="text-white font-black">{occupiedRooms}/{rooms.length}</p>
-          </div>
-          <div className="rounded-xl bg-white/5 p-3">
-            <p className="text-text-tertiary text-[9px] font-black uppercase">Folios ouverts</p>
-            <p className="text-white font-black">{openFolios}</p>
-          </div>
-          <div className="rounded-xl bg-white/5 p-3">
-            <p className="text-text-tertiary text-[9px] font-black uppercase">Sites</p>
-            <p className="text-white font-black">{sites.length}</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => navigate('/pms')}
-          className="w-full h-12 rounded-2xl bg-cyan-500/15 border border-cyan-400/20 text-cyan-200 font-black text-sm"
+      {canAccessModule(user, 'hotel') && (
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card-lg p-4 mb-5"
         >
-          Ouvrir le module hôtel
-        </button>
-      </motion.section>
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 text-cyan-300 flex items-center justify-center">
+                <BedDouble size={22} />
+              </div>
+              <div>
+                <h2 className="text-white font-black text-base">Hôtel / PMS</h2>
+                <p className="text-text-secondary text-xs">Chambres, folios, réception, imputations POS.</p>
+              </div>
+            </div>
+            <ChevronRight size={17} className="text-text-tertiary mt-3" />
+          </div>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="rounded-xl bg-white/5 p-3">
+              <p className="text-text-tertiary text-[9px] font-black uppercase">Chambres</p>
+              <p className="text-white font-black">{occupiedRooms}/{visibleRooms.length}</p>
+            </div>
+            <div className="rounded-xl bg-white/5 p-3">
+              <p className="text-text-tertiary text-[9px] font-black uppercase">Folios ouverts</p>
+              <p className="text-white font-black">{openFolios}</p>
+            </div>
+            <div className="rounded-xl bg-white/5 p-3">
+              <p className="text-text-tertiary text-[9px] font-black uppercase">Sites</p>
+              <p className="text-white font-black">{visibleSites.length}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/pms')}
+            className="w-full h-12 rounded-2xl bg-cyan-500/15 border border-cyan-400/20 text-cyan-200 font-black text-sm"
+          >
+            Ouvrir le module hôtel
+          </button>
+        </motion.section>
+      )}
 
       <div className="space-y-4">
-        {businessGroups.map((group, index) => {
+        {businessGroups.filter(group => canAccessModule(user, group.key === 'bars-casino' ? 'casino' : group.key as any)).map((group, index) => {
           const GroupIcon = group.icon;
-          const groupPOS = posList.filter(pos => group.types.includes(pos.type));
+          const groupPOS = visiblePOS.filter(pos => group.types.includes(pos.type));
           return (
             <motion.section
               key={group.key}
@@ -184,10 +196,12 @@ export default function BusinessModules() {
                           <Warehouse size={15} style={{ color: group.color }} />
                           Stock
                         </button>
-                        <button type="button" onClick={() => openPOS(pos, 'settings')} className="h-12 rounded-xl bg-white/5 text-white flex flex-col items-center justify-center gap-1 text-[10px] font-black">
-                          <Settings size={15} style={{ color: group.color }} />
-                          Régler
-                        </button>
+                        {canAccessRoute(user, '/settings') && (
+                          <button type="button" onClick={() => openPOS(pos, 'settings')} className="h-12 rounded-xl bg-white/5 text-white flex flex-col items-center justify-center gap-1 text-[10px] font-black">
+                            <Settings size={15} style={{ color: group.color }} />
+                            Régler
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -218,9 +232,11 @@ export default function BusinessModules() {
         <div>
           <p className="text-white font-black text-sm">Configuration globale</p>
           <p className="text-text-secondary text-xs mt-1">Les sites, points de vente, dépôts, produits, prix et affectations restent modifiables depuis Admin.</p>
-          <button type="button" onClick={() => navigate('/settings')} className="mt-3 text-blue font-black text-xs">
-            Ouvrir les paramètres
-          </button>
+          {canAccessRoute(user, '/settings') && (
+            <button type="button" onClick={() => navigate('/settings')} className="mt-3 text-blue font-black text-xs">
+              Ouvrir les paramètres
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -38,6 +38,7 @@ export const useStaffStore = create<StaffState>()(
         { id: 'e11', name: 'Aminata Diallo', role: 'Hôtesse', phone: '76 222 55 66', avatar: '💁‍♀️', schedule: '11:00 - 23:00', status: 'present', siteIds: ['site-dakar'], posIds: ['pos-room-service'], businessModules: ['hotel'], accessLevel: 'staff' },
         // Bar & Caisse
         { id: 'e3', name: 'Ibrahima Ba', role: 'Caissier', phone: '76 345 67 89', avatar: '🧑‍💼', schedule: '07:00 - 15:00', status: 'present', siteIds: ['site-dakar'], posIds: ['pos-restaurant-jardin', 'pos-bar-machines'], businessModules: ['restaurant', 'casino'], accessLevel: 'supervisor' },
+        { id: 'e15', name: 'Khady Sow', role: 'Vendeuse Boutique', phone: '77 666 99 00', avatar: '🛍️', schedule: '09:00 - 18:00', status: 'present', siteIds: ['site-dakar'], posIds: ['pos-boutique-hotel'], businessModules: ['boutique'], accessLevel: 'staff' },
         { id: 'e12', name: 'Modou Gueye', role: 'Barman', phone: '77 333 66 77', avatar: '🍸', schedule: '18:00 - 02:00', status: 'present', siteIds: ['site-dakar'], posIds: ['pos-bar-machines', 'pos-nightclub'], businessModules: ['casino'], accessLevel: 'staff' },
         // Plonge
         { id: 'e4', name: 'Fatou Ndiaye', role: 'Plongeuse', phone: '77 456 78 90', avatar: '👩', schedule: 'Jour de repos', status: 'repos', siteIds: ['site-dakar'], posIds: ['pos-restaurant-jardin'], businessModules: ['restaurant'], accessLevel: 'staff' },

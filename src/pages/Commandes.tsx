@@ -10,6 +10,7 @@ import { useHospiStore } from '../stores/hospiStore';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Search, ShoppingCart, X, ChefHat, Calendar, UserPlus, Phone, Plus, Minus, Trash2, Layout, Layers, Map as MapIcon, QrCode, Gift, Wallet, CheckCircle2, Store, Warehouse, CreditCard, Percent } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { canAccessPOS, getVisiblePOS } from '../utils/accessControl';
 
 
 const Chairs = ({ count, shape }: { count: number, shape: 'round' | 'square' | 'rectangle' }) => {
@@ -98,6 +99,7 @@ export default function Commandes() {
   const { clients } = useClientStore();
   const { addNotification } = useNotificationStore();
   const { user } = useAuthStore();
+  const visiblePOS = useMemo(() => getVisiblePOS(user, posList).filter(pos => pos.is_active), [posList, user]);
   const [showLoyaltySearch, setShowLoyaltySearch] = useState(false);
   const [loyaltySearch, setLoyaltySearch] = useState('');
   
@@ -145,9 +147,17 @@ export default function Commandes() {
   const floorTables = tables.filter(t => t.floor === selectedFloor && t.zone === selectedZone);
   const allZones = Array.from(new Set(tables.map(t => t.zone)));
 
-  const activePOS = posList.find(pos => pos.id === activePOSId);
+  useEffect(() => {
+    const selectedPOS = posList.find(pos => pos.id === activePOSId);
+    if (visiblePOS.length > 0 && (!selectedPOS || !canAccessPOS(user, selectedPOS))) {
+      setActivePOS(visiblePOS[0].id);
+    }
+  }, [activePOSId, posList, setActivePOS, user, visiblePOS]);
+
+  const activePOS = visiblePOS.find(pos => pos.id === activePOSId) || visiblePOS[0];
+  const scopedActivePOSId = activePOS?.id || activePOSId;
   const activeWarehouse = warehouses.find(warehouse => warehouse.id === activePOS?.default_warehouse_id);
-  const hospiProducts = getProductsForPOS(activePOSId);
+  const hospiProducts = getProductsForPOS(scopedActivePOSId);
   const productsForActivePOS = PRODUCTS.map(product => {
     const hospiProduct = hospiProducts.find(item => item.product.legacy_product_id === product.id);
     if (!hospiProduct) return product;
@@ -310,13 +320,13 @@ export default function Commandes() {
           return hospiProduct ? [{ productId: hospiProduct.product.id, quantity: item.quantity }] : [];
         });
         if (hospiLines.length > 0) {
-          recordSale(order.id, hospiLines, user?.name, activePOSId);
+          recordSale(order.id, hospiLines, user?.name, scopedActivePOSId);
           useOrderStore.getState().updateOrderHospiContext(order.id, {
-            posId: activePOSId,
+            posId: scopedActivePOSId,
             hospiLines,
           });
         } else {
-          useOrderStore.getState().updateOrderHospiContext(order.id, { posId: activePOSId });
+          useOrderStore.getState().updateOrderHospiContext(order.id, { posId: scopedActivePOSId });
         }
         updateTableStatus(selectedTableId, 'occupee', order.id);
         const res = reservations.find(r => r.tableId === selectedTableId && r.status === 'confirmed');
@@ -333,7 +343,7 @@ export default function Commandes() {
   const todayString = new Date().toISOString().split('T')[0];
   const todayRes = reservations.filter(r => r.date === todayString && (r.status === 'pending' || r.status === 'confirmed'));
   const activePOSRevenue = orders
-    .filter(order => order.posId === activePOSId)
+    .filter(order => order.posId === scopedActivePOSId)
     .reduce((sum, order) => sum + order.total, 0);
 
   if (!selectedTableId) {
@@ -375,7 +385,7 @@ export default function Commandes() {
                 <h2 className="text-white font-black text-sm mt-0.5">{activePOS?.name || 'POS non sélectionné'}</h2>
               </div>
               <select
-                value={activePOSId}
+                value={scopedActivePOSId}
                 onChange={event => setActivePOS(event.target.value)}
                 className="max-w-[155px] bg-[#111827] border border-white/10 rounded-xl px-3 py-2 text-white text-xs font-bold outline-none"
               >
@@ -824,11 +834,11 @@ export default function Commandes() {
           <input type="text" placeholder="Rechercher un plat..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-14 pr-6 text-white focus:border-orange/50 transition-colors" />
         </div>
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {posList.filter(pos => pos.is_active).map(pos => (
+          {visiblePOS.map(pos => (
             <button
               key={pos.id}
               onClick={() => setActivePOS(pos.id)}
-              className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${activePOSId === pos.id ? 'bg-blue text-white shadow-lg shadow-blue/20' : 'bg-white/5 text-text-secondary border border-white/5'}`}
+              className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${scopedActivePOSId === pos.id ? 'bg-blue text-white shadow-lg shadow-blue/20' : 'bg-white/5 text-text-secondary border border-white/5'}`}
             >
               {pos.name}
             </button>

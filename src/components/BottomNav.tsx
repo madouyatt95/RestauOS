@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Home, ShoppingBag, Package, Users, MoreHorizontal, Truck, ChefHat, Calendar, Wallet, Grid2X2, BarChart3, Settings } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { usePlanningStore } from '../stores/planningStore';
+import { canAccessRoute } from '../utils/accessControl';
 
 export default function BottomNav() {
   const { pathname } = useLocation();
@@ -63,6 +64,7 @@ export default function BottomNav() {
         { path: '/client', icon: Home, label: 'Accueil' },
         { path: '/reservations', icon: Calendar, label: 'Réserver' },
         { path: '/wallet', icon: Wallet, label: 'Wallet' },
+        { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
       ];
       break;
     default:
@@ -77,6 +79,8 @@ export default function BottomNav() {
       navItems = navItems.filter(item => item.path === '/personnel' || item.path === '/plus');
     }
   }
+
+  navItems = navItems.filter(item => canAccessRoute(user, item.path));
 
   return (
     <nav className="bottom-nav">

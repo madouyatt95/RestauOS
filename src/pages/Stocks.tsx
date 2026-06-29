@@ -4,6 +4,7 @@ import { useStockStore } from '../stores/stockStore';
 import { useHospiStore } from '../stores/hospiStore';
 import { useAuthStore } from '../stores/authStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
+import { getVisibleSites } from '../utils/accessControl';
 import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package, Settings, Warehouse, Truck, Activity, CreditCard, X, Store, ReceiptText, Download, ShieldCheck, ClipboardCheck, Printer, ChefHat, Scale, Boxes, RefreshCcw, Ban, CircleDollarSign, BookmarkCheck, Gift } from 'lucide-react';
 
 const purchaseStatusLabels: Record<string, string> = {
@@ -64,6 +65,7 @@ export default function Stocks() {
     getPriceForProduct
   } = useHospiStore();
   const { canPerform, requiresManagerApproval, recordAudit } = useBusinessRulesStore();
+  const visibleSites = getVisibleSites(user, sites);
   const [tab, setTab] = useState<StockTab>('pilotage');
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
@@ -73,7 +75,7 @@ export default function Stocks() {
   const [showLoss, setShowLoss] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | null>(null);
-  const [selectedSiteId, setSelectedSiteId] = useState(sites[0]?.id || 'site-dakar');
+  const [selectedSiteId, setSelectedSiteId] = useState(visibleSites[0]?.id || sites[0]?.id || 'site-dakar');
   const [warehouseFilter, setWarehouseFilter] = useState('all');
   const [familyFilter, setFamilyFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<StockStatusFilter>('all');
@@ -107,15 +109,16 @@ export default function Stocks() {
   const filteredMoves = movements.filter(m =>
     tab === 'entrees' ? m.type === 'entree' : tab === 'sorties' ? m.type === 'sortie' : true
   );
-  const siteWarehouses = warehouses.filter(warehouse => warehouse.site_id === selectedSiteId);
-  const selectedSite = sites.find(site => site.id === selectedSiteId) || sites[0];
+  const effectiveSelectedSiteId = visibleSites.some(site => site.id === selectedSiteId) ? selectedSiteId : visibleSites[0]?.id || selectedSiteId;
+  const siteWarehouses = warehouses.filter(warehouse => warehouse.site_id === effectiveSelectedSiteId);
+  const selectedSite = sites.find(site => site.id === effectiveSelectedSiteId) || visibleSites[0] || sites[0];
   const siteStockLevels = stockLevels.filter(level => {
     const warehouse = warehouses.find(item => item.id === level.warehouse_id);
-    return warehouse?.site_id === selectedSiteId;
+    return warehouse?.site_id === effectiveSelectedSiteId;
   });
   const lowHospiStocks = siteStockLevels.filter(level => level.quantity <= level.alert_threshold);
   const pendingPurchaseOrders = purchaseOrders.filter(order => order.status !== 'received' && order.status !== 'cancelled');
-  const siteStockMovements = stockMovements.filter(move => warehouses.find(warehouse => warehouse.id === move.warehouse_id)?.site_id === selectedSiteId);
+  const siteStockMovements = stockMovements.filter(move => warehouses.find(warehouse => warehouse.id === move.warehouse_id)?.site_id === effectiveSelectedSiteId);
   const todayMovements = siteStockMovements.filter(move => new Date(move.created_at).toDateString() === new Date().toDateString());
   const stockValue = siteStockLevels.reduce((sum, level) => {
     const product = products.find(item => item.id === level.product_id);
@@ -638,9 +641,9 @@ export default function Stocks() {
             <p className="text-text-secondary text-xs mt-1">{siteWarehouses.length} dépôts • {lowHospiStocks.length} alerte(s)</p>
           </div>
           <div className="flex items-center gap-2">
-            <select value={selectedSiteId} onChange={e => setSelectedSiteId(e.target.value)}
+            <select value={effectiveSelectedSiteId} onChange={e => setSelectedSiteId(e.target.value)}
               className="px-3 py-2 rounded-xl bg-white/10 border border-white/10 text-white text-xs font-bold outline-none">
-              {sites.map(site => <option key={site.id} value={site.id} className="bg-[#111827]">{site.name}</option>)}
+              {visibleSites.map(site => <option key={site.id} value={site.id} className="bg-[#111827]">{site.name}</option>)}
             </select>
             <button onClick={() => setTab('depots')} className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-text-secondary flex items-center justify-center" title="Voir les dépôts">
               <Settings size={16} />

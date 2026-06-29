@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { BedDouble, CalendarDays, CheckCircle2, Menu, Plus, ReceiptText, SlidersHorizontal, Sparkles, Wrench } from 'lucide-react';
+import { useAuthStore } from '../stores/authStore';
 import { useHospiStore } from '../stores/hospiStore';
 import type { RoomStatus } from '../stores/hospiStore';
+import { getVisibleSites } from '../utils/accessControl';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
@@ -28,12 +30,14 @@ const statusDotClass: Record<RoomStatus, string> = {
 };
 
 export default function PMS() {
+  const { user } = useAuthStore();
   const [selectedFolioId, setSelectedFolioId] = useState('');
   const [chargeDescription, setChargeDescription] = useState('Mini-bar');
   const [chargeAmount, setChargeAmount] = useState('');
   const [roomView, setRoomView] = useState<'plan' | 'list' | 'floors'>('plan');
   const [activeFloor, setActiveFloor] = useState('1er étage');
   const {
+    sites,
     rooms,
     guests,
     stays,
@@ -43,8 +47,12 @@ export default function PMS() {
     addManualFolioCharge,
     closeFolio,
   } = useHospiStore();
+  const visibleSites = getVisibleSites(user, sites);
+  const visibleSiteIds = visibleSites.map(site => site.id);
+  const visibleRooms = rooms.filter(room => visibleSiteIds.includes(room.site_id));
+  const visibleRoomIds = visibleRooms.map(room => room.id);
 
-  const openFolios = folios.filter(folio => folio.status === 'open');
+  const openFolios = folios.filter(folio => folio.status === 'open' && visibleRoomIds.includes(folio.room_id));
   const selectedFolio = openFolios.find(folio => folio.id === selectedFolioId) || openFolios[0];
   const folioOptions = useMemo(() => openFolios.map(folio => {
     const room = rooms.find(item => item.id === folio.room_id);
@@ -77,7 +85,7 @@ export default function PMS() {
     if (selectedFolioId === folioId) setSelectedFolioId('');
   };
 
-  const roomsWithContext = rooms.map(room => {
+  const roomsWithContext = visibleRooms.map(room => {
     const stay = stays.find(item => item.room_id === room.id && item.status === 'checked_in');
     const guest = stay ? guests.find(item => item.id === stay.guest_id) : undefined;
     const folio = stay ? folios.find(item => item.stay_id === stay.id && item.status === 'open') : undefined;

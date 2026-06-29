@@ -4,6 +4,7 @@ import { useStaffStore, type Employee } from '../stores/staffStore';
 import { useAuthStore } from '../stores/authStore';
 import { usePlanningStore, type ShiftType } from '../stores/planningStore';
 import { useHospiStore } from '../stores/hospiStore';
+import { getVisiblePOS, getVisibleSites, isDirection } from '../utils/accessControl';
 import { Phone, ChevronLeft, ChevronRight, Plus, X, Sun, Moon, Clock, Users, RefreshCw, Check, AlertCircle, UserPlus, Trash2, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -61,9 +62,19 @@ export default function Personnel() {
   const [showQREmp, setShowQREmp] = useState<Employee | null>(null);
 
   const isManager = ['Admin', 'Gérant'].includes(user?.role || '');
+  const visibleSiteIds = getVisibleSites(user, sites).map(site => site.id);
+  const visiblePOSIds = getVisiblePOS(user, posList).map(pos => pos.id);
+  const scopedEmployees = employees.filter(emp => {
+    if (isDirection(user)) return true;
+    const empSites = emp.siteIds || [];
+    const empPOS = emp.posIds || [];
+    const siteMatch = empSites.length === 0 || empSites.some(siteId => visibleSiteIds.includes(siteId));
+    const posMatch = visiblePOSIds.length === 0 || empPOS.length === 0 || empPOS.some(posId => visiblePOSIds.includes(posId));
+    return siteMatch && posMatch;
+  });
 
   // Find current user's employee record
-  const currentEmployee = employees.find(e => e.name === user?.name);
+  const currentEmployee = employees.find(e => e.id === user?.employeeId) || employees.find(e => e.name === user?.name);
   const myShifts = currentEmployee ? shifts.filter(s => s.employeeId === currentEmployee.id) : [];
   const weekDates = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
   const todayStr = new Date().toISOString().split('T')[0];
@@ -105,10 +116,10 @@ export default function Personnel() {
   };
 
   const availableRoles = ['Tous', 'Salle', 'Cuisine', 'Livraison', 'Management'];
-  const filteredEmployees = useMemo(() => employees.filter(e => {
+  const filteredEmployees = useMemo(() => scopedEmployees.filter(e => {
     if (roleFilter === 'Tous') return true;
     return ROLE_GROUPS[roleFilter]?.includes(e.role);
-  }), [employees, roleFilter]);
+  }), [scopedEmployees, roleFilter]);
 
   const getShifts = (empId: string, date: string) => {
     return shifts.filter(s => s.employeeId === empId && s.date === date);
@@ -144,7 +155,7 @@ export default function Personnel() {
       <div className="flex items-center justify-between mb-6 px-4">
         <div>
           <h1 className="text-white font-black text-2xl">Personnel</h1>
-          <p className="text-text-secondary text-xs uppercase tracking-widest font-bold">{employees.length} salariés</p>
+          <p className="text-text-secondary text-xs uppercase tracking-widest font-bold">{scopedEmployees.length} salariés visibles</p>
         </div>
         {isManager && (
           <button onClick={() => { setShowAddEmployee(true); setNewEmpName(''); setNewEmpPhone(''); setNewEmpRole('Serveur'); setNewEmpAvatar('🧑‍🍽️'); }}
@@ -306,9 +317,9 @@ export default function Personnel() {
           </div>
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-white/60 font-black text-[10px] uppercase tracking-widest">Équipe du jour</h3>
-            <span className="text-orange font-black text-xs">{employees.filter(e => e.status === 'present').length} / {employees.length}</span>
+            <span className="text-orange font-black text-xs">{scopedEmployees.filter(e => e.status === 'present').length} / {scopedEmployees.length}</span>
           </div>
-          {employees.filter(e => {
+          {scopedEmployees.filter(e => {
             if (presenceFilter === 'Tous') return true;
             return ROLE_GROUPS[presenceFilter]?.includes(e.role);
           }).map(emp => {
@@ -523,7 +534,7 @@ export default function Personnel() {
                 <div>
                   <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-4">2. Avec qui souhaitez-vous échanger ?</p>
                   <div className="grid grid-cols-2 gap-3">
-                    {employees.filter(e => e.id !== currentEmployee.id).map(emp => (
+                    {scopedEmployees.filter(e => e.id !== currentEmployee.id).map(emp => (
                       <button key={emp.id} onClick={() => { setSwapTargetEmp(emp.id); setSwapStep(3); }}
                         className={`p-4 rounded-2xl border flex flex-col items-center gap-2 transition-all active:scale-95 ${swapTargetEmp === emp.id ? 'border-orange bg-orange/10' : 'border-white/10 bg-white/5'}`}>
                         <span className="text-2xl">{emp.avatar}</span>

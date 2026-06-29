@@ -2,6 +2,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useHospiStore, type PermissionMode } from '../stores/hospiStore';
 import { usePlanningStore } from '../stores/planningStore';
+import { canAccessRoute } from '../utils/accessControl';
 
 const routePermissionActions: Array<{ prefix: string; action: string }> = [
   { prefix: '/settings', action: 'Admin Hospi' },
@@ -59,6 +60,21 @@ export default function ProtectedRoute({ children, allowedRoles }: { children: R
   }
 
   const routePermission = getRoutePermission(location.pathname, user.role, getPermissionMode);
+  const scopedAccess = canAccessRoute(user, location.pathname);
+  if (!scopedAccess) {
+    return (
+      <div className="min-h-screen bg-background text-white flex items-center justify-center p-6">
+        <div className="glass-card-lg max-w-sm w-full p-6 text-center">
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-orange">Hors périmètre</p>
+          <h1 className="text-2xl font-black mt-2">Accès non affecté</h1>
+          <p className="text-text-secondary text-sm mt-2">
+            Ce profil n’est pas affecté à ce site, cette activité ou ce point de vente.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (routePermission === 'deny') {
     return (
       <div className="min-h-screen bg-background text-white flex items-center justify-center p-6">
