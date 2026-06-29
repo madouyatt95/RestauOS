@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useMemo, useState } from 'react';
-import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat, Truck, Users, CreditCard, Plus, Edit2, Trash2, X, Search, Network, Upload, PlayCircle, AlertTriangle, CheckCircle2, KeyRound, Settings2, Boxes, Landmark, Sparkles } from 'lucide-react';
+import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat, Truck, Users, CreditCard, Plus, Edit2, Trash2, X, Search, Network, Upload, PlayCircle, AlertTriangle, CheckCircle2, KeyRound, Settings2, Boxes, Landmark, Sparkles, History, Copy, Table2, GitCompare, Globe2, PlugZap, RotateCcw, Percent, UserCheck, Layers, PackageCheck } from 'lucide-react';
 import { useHospiStore, type POSType, type WarehouseType } from '../stores/hospiStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
 
@@ -16,7 +16,7 @@ const warehouseTypeLabels: Record<string, string> = {
   other: 'Autre',
 };
 
-type AdminView = 'assistant' | 'architecture' | 'modules' | 'pos' | 'permissions' | 'rules' | 'health' | 'imports' | 'audit' | 'simulation';
+type AdminView = 'assistant' | 'architecture' | 'modules' | 'pos' | 'permissions' | 'rules' | 'health' | 'imports' | 'audit' | 'simulation' | 'drafts' | 'history' | 'duplicate' | 'packs' | 'priceMatrix' | 'permissionMatrix' | 'impact' | 'multisite' | 'connectors' | 'backup' | 'taxes' | 'approvals' | 'environments';
 
 export default function HospiSettings() {
   const {
@@ -156,6 +156,19 @@ export default function HospiSettings() {
     { key: 'imports', label: 'Imports', icon: Upload },
     { key: 'audit', label: 'Audit', icon: ShieldCheck },
     { key: 'simulation', label: 'Simulation', icon: PlayCircle },
+    { key: 'drafts', label: 'Brouillons', icon: Layers },
+    { key: 'history', label: 'Historique config', icon: History },
+    { key: 'duplicate', label: 'Duplication', icon: Copy },
+    { key: 'packs', label: 'Packs métier', icon: PackageCheck },
+    { key: 'priceMatrix', label: 'Matrice prix', icon: Table2 },
+    { key: 'permissionMatrix', label: 'Matrice droits', icon: KeyRound },
+    { key: 'impact', label: 'Impact', icon: GitCompare },
+    { key: 'multisite', label: 'Multi-site', icon: Globe2 },
+    { key: 'connectors', label: 'Connecteurs', icon: PlugZap },
+    { key: 'backup', label: 'Sauvegarde', icon: RotateCcw },
+    { key: 'taxes', label: 'Taxes', icon: Percent },
+    { key: 'approvals', label: 'Validations', icon: UserCheck },
+    { key: 'environments', label: 'Environnements', icon: Layers },
   ];
 
   const setupSteps = [
@@ -249,6 +262,75 @@ export default function HospiSettings() {
     { label: 'Stock disponible', value: simulationStock ? `${simulationStock.quantity} ${simulationStock.unit}` : 'Aucune ligne stock' },
     { label: 'Imprimante', value: simulationPOS?.printer_names?.[0] || 'Non définie' },
     { label: 'Caisse / rapport Z', value: simulationPOS ? 'Relié au POS' : 'Non relié' },
+  ];
+
+  const draftRows = [
+    { title: 'Prix Coca Night Club', status: 'Brouillon', detail: '2500 F → 2800 F, simulation requise avant publication' },
+    { title: 'Nouveau POS Rooftop', status: 'À tester', detail: 'Dépôt Bar Casino, TVA 18%, paiement carte et room charge' },
+    { title: 'Seuil mini-bar', status: 'Prêt', detail: 'Eau mini-bar : seuil 50 bouteilles confirmé' },
+  ];
+
+  const configHistoryRows = [
+    { title: 'Prix Coca Restaurant', before: '1500 F', after: '1500 F', actor: 'Admin', module: 'Prix POS' },
+    { title: 'Dépôt Night Club', before: 'Casino', after: 'Dépôt Night Club', actor: 'Direction', module: 'Stock' },
+    { title: 'Room charge Spa', before: 'Inactif', after: 'Actif', actor: 'Manager Hôtel', module: 'PMS' },
+  ];
+
+  const duplicateRows = [
+    { title: 'Dupliquer un POS', detail: 'Copier dépôt, paiements, imprimantes, taxes et prix vers un nouveau point de vente.', action: 'Dupliquer POS' },
+    { title: 'Dupliquer un site', detail: 'Créer Saly depuis Dakar avec catalogue commun et prix locaux.', action: 'Créer copie' },
+    { title: 'Dupliquer les prix', detail: 'Copier les tarifs Restaurant vers Room Service puis ajuster.', action: 'Copier tarifs' },
+    { title: 'Dupliquer un rôle', detail: 'Créer Manager Spa à partir de Manager Hôtel.', action: 'Copier droits' },
+  ];
+
+  const packRows = [
+    { title: 'Restaurant complet', detail: 'POS, dépôt, caisse, imprimante cuisine, familles plats/boissons, règles remises.' },
+    { title: 'Bar / Night Club', detail: 'POS bar, cave, prix premium, FIFO boissons, clôture Z dédiée.' },
+    { title: 'Hôtel PMS', detail: 'Chambres, folios, room charge, réception, housekeeping, taxes hébergement.' },
+    { title: 'Spa', detail: 'Prestations, consommables spa, room charge, planning praticiens.' },
+    { title: 'Boutique', detail: 'Catalogue boutique, dépôt dédié, paiements, imputation chambre.' },
+    { title: 'Casino', detail: 'Caisse casino, services table, fiscalité spécifique et audit renforcé.' },
+  ];
+
+  const priceMatrixProducts = products.slice(0, 6);
+  const priceMatrixPOS = posList.slice(0, 5);
+  const permissionActions = ['Vendre', 'Encaisser', 'Annuler', 'Remise', 'Transférer stock', 'Corriger inventaire', 'Clôturer caisse'];
+  const permissionRoles = ['Direction', 'Manager', 'Caissier', 'Serveur', 'Chef cuisine'];
+
+  const impactRows = [
+    { title: 'Produit Coca-Cola 33 cl', detail: `${posProductPrices.filter(price => price.product_id === 'prod-coca-33').length} POS, ${stockLevels.filter(level => level.product_id === 'prod-coca-33').length} dépôt(s), FIFO actif` },
+    { title: 'Dépôt Bar Casino', detail: `${posList.filter(pos => pos.default_warehouse_id === 'wh-bar-casino').length} POS lié(s), ${stockLevels.filter(level => level.warehouse_id === 'wh-bar-casino').length} référence(s)` },
+    { title: 'Recette Thiéboudienne', detail: `${recipeItems.filter(item => item.recipe_id === 'recipe-thieb').length} ingrédient(s), coût calculable avant publication` },
+  ];
+
+  const connectorRows = [
+    { title: 'PMS externe', status: 'Prévu', detail: 'Connexion Opera / Mews / autre PMS pour folios et chambres.' },
+    { title: 'Comptabilité', status: 'Prévu', detail: 'Export ventes, taxes, règlements et comptes clients.' },
+    { title: 'Terminaux de paiement', status: 'Maquette', detail: 'TPE carte, mobile money, rapprochement caisse.' },
+    { title: 'Imprimantes réseau', status: 'Actif local', detail: 'Routage par POS et par préparation.' },
+    { title: 'API fournisseurs', status: 'Prévu', detail: 'Commandes et réceptions fournisseurs automatisables.' },
+  ];
+
+  const taxRows = [
+    { title: 'Restaurant', value: 'TVA 18%', detail: 'Plats, boissons, room service restaurant.' },
+    { title: 'Hébergement', value: 'Taxe séjour + TVA', detail: 'Chambres, nuitées, forfaits et folios.' },
+    { title: 'Alcool / premium', value: 'TVA dédiée', detail: 'Bar, nightclub, cave premium.' },
+    { title: 'Casino', value: 'Fiscalité spécifique', detail: 'Jeux, services casino et audit renforcé.' },
+    { title: 'Corporate', value: 'Exonération possible', detail: 'Clients entreprise, conventions et facturation.' },
+  ];
+
+  const approvalRows = [
+    { title: 'Remise forte', detail: 'Au-delà du seuil rôle, validation manager obligatoire.', count: auditLogs.filter(log => log.action === 'discount' && log.managerApprovalRequired).length },
+    { title: 'Annulation ticket', detail: 'Ticket annulé, motif et responsable requis.', count: auditLogs.filter(log => log.action === 'cancel_order').length },
+    { title: 'Correction stock', detail: 'Écart inventaire important, validation direction.', count: auditLogs.filter(log => log.action === 'inventory_adjustment').length },
+    { title: 'Perte importante', detail: 'Casse, péremption, offert VIP ou direction.', count: auditLogs.filter(log => log.action === 'stock_loss').length },
+    { title: 'Écart caisse', detail: 'Clôture Z avec différence attendue/réelle.', count: auditLogs.filter(log => log.action === 'cash_close').length },
+  ];
+
+  const environmentRows = [
+    { title: 'Démo', status: 'Actif', detail: 'Données riches pour présentation et formation.' },
+    { title: 'Formation', status: 'Prêt', detail: 'Même configuration, ventes et stocks sans impact réel.' },
+    { title: 'Production', status: 'Protégé', detail: 'Publication contrôlée, audit obligatoire, sauvegarde avant changement.' },
   ];
 
   const handleCreatePOS = () => {
@@ -778,6 +860,255 @@ export default function HospiSettings() {
             <button type="button" onClick={() => setConfigNotice({ tone: simulationPrice && simulationWarehouse && simulationStock ? 'success' : 'warning', message: simulationPrice && simulationWarehouse && simulationStock ? 'Simulation valide : la vente peut être tracée de bout en bout.' : 'Simulation incomplète : vérifier prix, dépôt ou stock.' })} className="mt-4 w-full h-12 rounded-2xl bg-green text-white font-black text-sm">
               Lancer le contrôle
             </button>
+          </div>
+        )}
+
+        {adminView === 'drafts' && (
+          <div className="glass-card-lg p-5">
+            <h3 className="text-white font-black text-base mb-1">Mode brouillon / publication</h3>
+            <p className="text-text-secondary text-xs mb-4">Préparer, tester puis publier une configuration sans casser le service.</p>
+            <div className="space-y-2">
+              {draftRows.map(row => (
+                <div key={row.title} className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-white font-black text-sm">{row.title}</p>
+                    <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-orange/10 text-orange">{row.status}</span>
+                  </div>
+                  <p className="text-text-secondary text-xs mt-1">{row.detail}</p>
+                  <div className="grid grid-cols-3 gap-2 mt-3">
+                    {['Prévisualiser', 'Tester', 'Publier'].map(action => (
+                      <button key={action} type="button" onClick={() => setConfigNotice({ tone: 'success', message: `${action} : ${row.title}` })} className="h-9 rounded-xl bg-white/5 text-white text-[10px] font-black">
+                        {action}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {adminView === 'history' && (
+          <div className="glass-card-lg p-5">
+            <h3 className="text-white font-black text-base mb-1">Historique de configuration</h3>
+            <p className="text-text-secondary text-xs mb-4">Ancienne valeur, nouvelle valeur, auteur et module impacté.</p>
+            <div className="space-y-2">
+              {configHistoryRows.map(row => (
+                <div key={row.title} className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                  <p className="text-white font-black text-sm">{row.title}</p>
+                  <p className="text-text-tertiary text-[10px] mt-1">{row.module} • {row.actor}</p>
+                  <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center mt-3">
+                    <span className="rounded-xl bg-red/10 text-red text-xs font-black px-3 py-2">{row.before}</span>
+                    <span className="text-text-tertiary text-xs">→</span>
+                    <span className="rounded-xl bg-green/10 text-green text-xs font-black px-3 py-2">{row.after}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {adminView === 'duplicate' && (
+          <div className="grid grid-cols-2 gap-3">
+            {duplicateRows.map(row => (
+              <div key={row.title} className="glass-card p-4">
+                <Copy size={18} className="text-blue mb-3" />
+                <p className="text-white font-black text-sm">{row.title}</p>
+                <p className="text-text-secondary text-xs mt-1 min-h-[44px]">{row.detail}</p>
+                <button type="button" onClick={() => setConfigNotice({ tone: 'success', message: `${row.action} préparé en brouillon.` })} className="mt-3 w-full h-10 rounded-xl bg-blue/10 text-blue text-xs font-black">
+                  {row.action}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {adminView === 'packs' && (
+          <div className="grid grid-cols-2 gap-3">
+            {packRows.map(row => (
+              <div key={row.title} className="glass-card p-4">
+                <PackageCheck size={18} className="text-green mb-3" />
+                <p className="text-white font-black text-sm">{row.title}</p>
+                <p className="text-text-secondary text-xs mt-1 min-h-[54px]">{row.detail}</p>
+                <button type="button" onClick={() => setConfigNotice({ tone: 'success', message: `Pack ${row.title} ajouté aux brouillons.` })} className="mt-3 w-full h-10 rounded-xl bg-green/10 text-green text-xs font-black">
+                  Préparer le pack
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {adminView === 'priceMatrix' && (
+          <div className="glass-card-lg p-5 overflow-hidden">
+            <h3 className="text-white font-black text-base mb-1">Matrice POS × Produits</h3>
+            <p className="text-text-secondary text-xs mb-4">Prix, TVA et disponibilité par point de vente.</p>
+            <div className="overflow-x-auto scrollbar-none">
+              <div className="min-w-[720px] space-y-2">
+                <div className="grid gap-2" style={{ gridTemplateColumns: `160px repeat(${priceMatrixPOS.length}, 1fr)` }}>
+                  <div />
+                  {priceMatrixPOS.map(pos => <div key={pos.id} className="text-text-tertiary text-[10px] font-black uppercase truncate">{pos.name}</div>)}
+                </div>
+                {priceMatrixProducts.map(product => (
+                  <div key={product.id} className="grid gap-2" style={{ gridTemplateColumns: `160px repeat(${priceMatrixPOS.length}, 1fr)` }}>
+                    <div className="rounded-xl bg-white/5 p-3 text-white text-xs font-black truncate">{product.name}</div>
+                    {priceMatrixPOS.map(pos => {
+                      const price = posProductPrices.find(item => item.pos_id === pos.id && item.product_id === product.id);
+                      return (
+                        <button key={pos.id} type="button" onClick={() => price ? startEditPrice(price.id) : setConfigPanel('price')} className={`rounded-xl p-3 text-left ${price ? 'bg-green/10 text-green' : 'bg-white/5 text-text-tertiary'}`}>
+                          <p className="font-black text-xs">{price ? `${fmt(price.sale_price)} F` : 'Non vendu'}</p>
+                          <p className="text-[10px] opacity-80">{price ? `TVA ${price.tax_rate}%` : 'Ajouter'}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {adminView === 'permissionMatrix' && (
+          <div className="glass-card-lg p-5 overflow-hidden">
+            <h3 className="text-white font-black text-base mb-1">Matrice rôles × permissions</h3>
+            <p className="text-text-secondary text-xs mb-4">Lecture rapide : autorisé, validation manager ou bloqué.</p>
+            <div className="overflow-x-auto scrollbar-none">
+              <div className="min-w-[680px] space-y-2">
+                <div className="grid grid-cols-6 gap-2">
+                  <div />
+                  {permissionRoles.map(role => <div key={role} className="text-text-tertiary text-[10px] font-black uppercase">{role}</div>)}
+                </div>
+                {permissionActions.map(action => (
+                  <div key={action} className="grid grid-cols-6 gap-2">
+                    <div className="rounded-xl bg-white/5 p-3 text-white text-xs font-black">{action}</div>
+                    {permissionRoles.map(role => {
+                      const open = role === 'Direction' || role === 'Manager' || (action === 'Vendre' && role === 'Serveur') || (action === 'Encaisser' && role === 'Caissier') || (action.includes('inventaire') && role === 'Chef cuisine');
+                      const manager = ['Annuler', 'Remise', 'Corriger inventaire'].includes(action) && !['Direction', 'Manager'].includes(role);
+                      return (
+                        <div key={`${role}-${action}`} className={`rounded-xl p-3 text-center text-[10px] font-black ${open ? 'bg-green/10 text-green' : manager ? 'bg-orange/10 text-orange' : 'bg-red/10 text-red'}`}>
+                          {open ? 'Oui' : manager ? 'Manager' : 'Non'}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {adminView === 'impact' && (
+          <div className="glass-card-lg p-5">
+            <h3 className="text-white font-black text-base mb-1">Contrôle d’impact</h3>
+            <p className="text-text-secondary text-xs mb-4">Avant suppression ou modification sensible, voir ce qui sera touché.</p>
+            <div className="space-y-2">
+              {impactRows.map(row => (
+                <div key={row.title} className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                  <p className="text-white font-black text-sm">{row.title}</p>
+                  <p className="text-text-secondary text-xs mt-1">{row.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {adminView === 'multisite' && (
+          <div className="space-y-3">
+            {sites.map(site => {
+              const siteProducts = stockLevels.filter(level => warehouses.some(warehouse => warehouse.id === level.warehouse_id && warehouse.site_id === site.id));
+              return (
+                <div key={site.id} className="glass-card-lg p-5">
+                  <h3 className="text-white font-black text-base">{site.name}</h3>
+                  <p className="text-text-secondary text-xs mt-1">Catalogue commun, règles locales, prix et stocks locaux.</p>
+                  <div className="grid grid-cols-4 gap-2 mt-4">
+                    <div className="rounded-xl bg-white/5 p-3"><p className="text-text-tertiary text-[9px] font-black uppercase">POS</p><p className="text-white font-black">{posList.filter(pos => pos.site_id === site.id).length}</p></div>
+                    <div className="rounded-xl bg-white/5 p-3"><p className="text-text-tertiary text-[9px] font-black uppercase">Dépôts</p><p className="text-white font-black">{warehouses.filter(warehouse => warehouse.site_id === site.id).length}</p></div>
+                    <div className="rounded-xl bg-white/5 p-3"><p className="text-text-tertiary text-[9px] font-black uppercase">Stocks</p><p className="text-white font-black">{siteProducts.length}</p></div>
+                    <div className="rounded-xl bg-white/5 p-3"><p className="text-text-tertiary text-[9px] font-black uppercase">Taxes</p><p className="text-white font-black">Local</p></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {adminView === 'connectors' && (
+          <div className="glass-card-lg p-5">
+            <h3 className="text-white font-black text-base mb-1">Centre de connecteurs</h3>
+            <p className="text-text-secondary text-xs mb-4">Préparer les intégrations PMS, comptabilité, TPE, imprimantes et fournisseurs.</p>
+            <div className="space-y-2">
+              {connectorRows.map(row => (
+                <div key={row.title} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-start justify-between gap-3">
+                  <div><p className="text-white font-black text-sm">{row.title}</p><p className="text-text-secondary text-xs mt-1">{row.detail}</p></div>
+                  <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-blue/10 text-blue">{row.status}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {adminView === 'backup' && (
+          <div className="glass-card-lg p-5">
+            <h3 className="text-white font-black text-base mb-1">Sauvegarde / restauration configuration</h3>
+            <p className="text-text-secondary text-xs mb-4">Exporter, restaurer et sécuriser la configuration avant publication.</p>
+            <div className="grid grid-cols-2 gap-3">
+              {['Sauvegarder maintenant', 'Exporter config', 'Importer config', 'Restaurer version'].map(action => (
+                <button key={action} type="button" onClick={() => setConfigNotice({ tone: 'success', message: `${action} préparé.` })} className="h-20 rounded-2xl bg-white/5 border border-white/10 text-white text-xs font-black">
+                  {action}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {adminView === 'taxes' && (
+          <div className="glass-card-lg p-5">
+            <h3 className="text-white font-black text-base mb-1">Gestion des taxes avancée</h3>
+            <p className="text-text-secondary text-xs mb-4">Profils fiscaux par métier, site, client et famille produit.</p>
+            <div className="space-y-2">
+              {taxRows.map(row => (
+                <div key={row.title} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-start justify-between gap-3">
+                  <div><p className="text-white font-black text-sm">{row.title}</p><p className="text-text-secondary text-xs mt-1">{row.detail}</p></div>
+                  <span className="text-orange font-black text-xs">{row.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {adminView === 'approvals' && (
+          <div className="glass-card-lg p-5">
+            <h3 className="text-white font-black text-base mb-1">Centre de validation manager</h3>
+            <p className="text-text-secondary text-xs mb-4">Toutes les actions sensibles à approuver ou refuser.</p>
+            <div className="space-y-2">
+              {approvalRows.map(row => (
+                <div key={row.title} className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-white font-black text-sm">{row.title}</p>
+                    <span className="text-orange font-black text-sm">{row.count}</span>
+                  </div>
+                  <p className="text-text-secondary text-xs mt-1">{row.detail}</p>
+                  <div className="grid grid-cols-2 gap-2 mt-3">
+                    <button type="button" className="h-9 rounded-xl bg-green/10 text-green text-[10px] font-black">Approuver</button>
+                    <button type="button" className="h-9 rounded-xl bg-red/10 text-red text-[10px] font-black">Refuser</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {adminView === 'environments' && (
+          <div className="glass-card-lg p-5">
+            <h3 className="text-white font-black text-base mb-1">Environnements</h3>
+            <p className="text-text-secondary text-xs mb-4">Séparer démo, formation et production pour tester sans risque.</p>
+            <div className="space-y-2">
+              {environmentRows.map(row => (
+                <div key={row.title} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-start justify-between gap-3">
+                  <div><p className="text-white font-black text-sm">{row.title}</p><p className="text-text-secondary text-xs mt-1">{row.detail}</p></div>
+                  <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-green/10 text-green">{row.status}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </section>
