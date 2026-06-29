@@ -7,6 +7,25 @@ import { useBusinessRulesStore } from '../stores/businessRulesStore';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package, Settings } from 'lucide-react';
 
+const purchaseStatusLabels: Record<string, string> = {
+  draft: 'Brouillon',
+  ordered: 'Commandée',
+  partially_received: 'Réception partielle',
+  received: 'Réceptionnée',
+  cancelled: 'Annulée',
+};
+
+const stockMovementLabels: Record<string, string> = {
+  sale: 'Vente POS',
+  recipe_consumption: 'Recette',
+  production: 'Production',
+  purchase: 'Réception fournisseur',
+  transfer_out: 'Transfert sorti',
+  transfer_in: 'Transfert reçu',
+  adjustment: 'Correction inventaire',
+  loss: 'Perte',
+};
+
 export default function Stocks() {
   const { items, movements, addMovement, addItem } = useStockStore();
   const { user } = useAuthStore();
@@ -187,7 +206,7 @@ export default function Stocks() {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-xl font-black text-white">Stocks & dépôts</h1>
-          <p className="text-text-tertiary text-xs mt-1">Voir les quantités, recevoir, transférer et corriger le stock.</p>
+        <p className="text-text-tertiary text-xs mt-1">Par dépôt, par point de vente, avec réceptions fournisseur et transferts.</p>
         </div>
         <div className="flex gap-2">
           <button className="w-9 h-9 glass-card flex items-center justify-center rounded-full">
@@ -199,11 +218,11 @@ export default function Stocks() {
       {/* Tabs */}
       <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-none">
         {([
-          ['depots', 'Stock par dépôt'],
+          ['depots', 'Dépôts'],
           ['pertes', 'Pertes'],
-          ['entrees', 'Entrées'],
-          ['sorties', 'Sorties'],
-          ['inventaire', 'Ancien inventaire'],
+          ['entrees', 'Anciennes entrées'],
+          ['sorties', 'Anciennes sorties'],
+          ['inventaire', 'Stock simple'],
         ] as const).map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${tab === key
@@ -285,7 +304,7 @@ export default function Stocks() {
                         <p className="text-text-tertiary text-[10px]">{warehouse?.name} • {total.toLocaleString('fr-FR')} F</p>
                       </div>
                       <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${order.status === 'received' ? 'bg-green/10 text-green' : 'bg-orange/10 text-orange'}`}>
-                        {order.status}
+                        {purchaseStatusLabels[order.status] || order.status}
                       </span>
                     </div>
                     <div className="space-y-1 mb-3">
@@ -321,9 +340,14 @@ export default function Stocks() {
                     <h3 className="text-white font-black text-sm">{warehouse.name}</h3>
                     <p className="text-text-tertiary text-[10px] uppercase tracking-widest mt-1">{levels.length} référence(s) suivie(s)</p>
                   </div>
-                  <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${lowLevels.length ? 'bg-orange/10 text-orange' : 'bg-green/10 text-green'}`}>
-                    {lowLevels.length ? `${lowLevels.length} alerte(s)` : 'Stock OK'}
-                  </span>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${lowLevels.length ? 'bg-orange/10 text-orange' : 'bg-green/10 text-green'}`}>
+                      {lowLevels.length ? `${lowLevels.length} alerte(s)` : 'Stock OK'}
+                    </span>
+                    <button type="button" onClick={() => navigate('/settings')} className="text-[10px] font-black text-blue bg-blue/10 px-2.5 py-1 rounded-full">
+                      Modifier
+                    </button>
+                  </div>
                 </div>
                 <p className="text-text-secondary text-xs mb-3">
                   Utilisé par : <span className="text-white font-bold">{linkedPOS.length ? linkedPOS.map(pos => pos.name).join(', ') : 'Aucun point de vente lié'}</span>
@@ -362,7 +386,7 @@ export default function Stocks() {
                   <div key={move.id} className="flex items-center justify-between rounded-xl bg-white/5 px-3 py-2">
                     <div>
                       <p className="text-white font-bold text-xs">{product?.name || move.product_id}</p>
-                      <p className="text-text-tertiary text-[10px]">{move.movement_type} • {pos?.name || 'Back-office'} • {warehouse?.name}</p>
+                      <p className="text-text-tertiary text-[10px]">{stockMovementLabels[move.movement_type] || move.movement_type} • {pos?.name || 'Back-office'} • {warehouse?.name}</p>
                     </div>
                     <span className={`${isEntry ? 'text-green' : 'text-red'} font-black text-xs`}>
                       {isEntry ? '+' : '-'}{move.quantity}

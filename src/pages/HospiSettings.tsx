@@ -5,6 +5,16 @@ import { useHospiStore, type POSType, type WarehouseType } from '../stores/hospi
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
+const warehouseTypeLabels: Record<string, string> = {
+  restaurant: 'Restaurant',
+  bar: 'Bar',
+  kitchen: 'Cuisine',
+  cold_room: 'Chambre froide',
+  central: 'Dépôt central',
+  casino: 'Casino',
+  boutique: 'Boutique',
+  other: 'Autre',
+};
 
 export default function HospiSettings() {
   const {
@@ -55,6 +65,7 @@ export default function HospiSettings() {
   const [settingsSearch, setSettingsSearch] = useState('');
   const [settingsSiteId, setSettingsSiteId] = useState('all');
   const [productFilter, setProductFilter] = useState<'all' | 'active' | 'inactive' | 'stockable' | 'recipes'>('all');
+  const [configNotice, setConfigNotice] = useState<{ tone: 'success' | 'warning'; message: string } | null>(null);
   const [newPOS, setNewPOS] = useState({
     siteId: sites[0]?.id || 'site-dakar',
     name: '',
@@ -145,6 +156,7 @@ export default function HospiSettings() {
     } else {
       addPOS(payload);
     }
+    setConfigNotice({ tone: 'success', message: editingPOSId ? 'Point de vente modifié.' : 'Point de vente créé.' });
     setNewPOS(prev => ({ ...prev, name: '', printers: '', terminals: '' }));
   };
 
@@ -162,7 +174,31 @@ export default function HospiSettings() {
     } else {
       addWarehouse(payload);
     }
+    setConfigNotice({ tone: 'success', message: editingWarehouseId ? 'Dépôt modifié.' : 'Dépôt créé.' });
     setNewWarehouse(prev => ({ ...prev, name: '' }));
+  };
+
+  const handleDeleteWarehouse = (warehouseId: string) => {
+    const warehouse = warehouses.find(item => item.id === warehouseId);
+    if (!warehouse) return;
+    const linkedPOS = posList.filter(pos => pos.default_warehouse_id === warehouseId);
+    const stockedRefs = stockLevels.filter(level => level.warehouse_id === warehouseId && level.quantity > 0);
+    if (linkedPOS.length || stockedRefs.length) {
+      const reasons = [
+        linkedPOS.length ? `${linkedPOS.length} point(s) de vente utilisent ce dépôt` : '',
+        stockedRefs.length ? `${stockedRefs.length} référence(s) ont encore du stock` : '',
+      ].filter(Boolean).join(' et ');
+      setConfigNotice({
+        tone: 'warning',
+        message: `${warehouse.name} ne peut pas être supprimé : ${reasons}. Déplace d'abord le POS ou vide/transfère le stock.`,
+      });
+      return;
+    }
+    const deleted = deleteWarehouse(warehouseId);
+    setConfigNotice({
+      tone: deleted ? 'success' : 'warning',
+      message: deleted ? `${warehouse.name} supprimé.` : `${warehouse.name} n'a pas pu être supprimé.`,
+    });
   };
 
   const startEditPOS = (posId: string) => {
@@ -233,6 +269,7 @@ export default function HospiSettings() {
         alert_threshold: Number(newProduct.alertThreshold) || 0,
       });
     }
+    setConfigNotice({ tone: 'success', message: editingProductId ? 'Produit modifié.' : 'Produit créé.' });
     setNewProduct(prev => ({ ...prev, name: '', sku: '', averageCost: '', lotNumber: '', expiresAt: '', initialQuantity: '', alertThreshold: '' }));
   };
 
@@ -291,6 +328,7 @@ export default function HospiSettings() {
       is_available: true,
     });
     setEditingPriceId(null);
+    setConfigNotice({ tone: 'success', message: editingPriceId ? 'Prix POS modifié.' : 'Prix POS créé.' });
     setPriceForm(prev => ({ ...prev, salePrice: '' }));
   };
 
@@ -429,6 +467,16 @@ export default function HospiSettings() {
           ))}
         </div>
 
+        {configNotice && (
+          <div className={`mb-4 rounded-2xl border px-4 py-3 text-xs font-bold ${
+            configNotice.tone === 'success'
+              ? 'border-green/25 bg-green/10 text-green'
+              : 'border-orange/30 bg-orange/10 text-orange'
+          }`}>
+            {configNotice.message}
+          </div>
+        )}
+
         {configPanel === 'pos' && (
           <div className="space-y-3">
             <input value={newPOS.name} onChange={e => setNewPOS(p => ({ ...p, name: e.target.value }))} placeholder="Nom du point de vente"
@@ -479,7 +527,9 @@ export default function HospiSettings() {
               </select>
               <select value={newWarehouse.type} onChange={e => setNewWarehouse(p => ({ ...p, type: e.target.value as WarehouseType }))}
                 className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none">
-                {['restaurant', 'bar', 'kitchen', 'cold_room', 'central', 'casino', 'boutique', 'other'].map(type => <option key={type} value={type}>{type}</option>)}
+                {['restaurant', 'bar', 'kitchen', 'cold_room', 'central', 'casino', 'boutique', 'other'].map(type => (
+                  <option key={type} value={type}>{warehouseTypeLabels[type] || type}</option>
+                ))}
               </select>
             </div>
             <div className="grid grid-cols-[1fr_auto] gap-2">
@@ -734,7 +784,7 @@ export default function HospiSettings() {
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div>
                     <p className="text-white font-black text-sm">{warehouse.name}</p>
-                    <p className="text-text-tertiary text-[10px] uppercase tracking-widest">{warehouse.type}</p>
+                    <p className="text-text-tertiary text-[10px] uppercase tracking-widest">{warehouseTypeLabels[warehouse.type] || warehouse.type}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button type="button" title="Modifier le dépôt" aria-label={`Modifier ${warehouse.name}`} onClick={() => startEditWarehouse(warehouse.id)} className="h-8 px-3 rounded-xl bg-white/5 text-blue flex items-center justify-center gap-1.5 text-[10px] font-black">
@@ -745,7 +795,7 @@ export default function HospiSettings() {
                       type="button"
                       title="Supprimer le dépôt"
                       aria-label={`Supprimer ${warehouse.name}`}
-                      onClick={() => deleteWarehouse(warehouse.id)}
+                      onClick={() => handleDeleteWarehouse(warehouse.id)}
                       className="h-8 px-3 rounded-xl bg-red/10 text-red flex items-center justify-center gap-1.5 text-[10px] font-black"
                     >
                       <Trash2 size={14} />
