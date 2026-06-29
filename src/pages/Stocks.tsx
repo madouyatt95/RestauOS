@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStockStore } from '../stores/stockStore';
 import { useHospiStore } from '../stores/hospiStore';
 import { useAuthStore } from '../stores/authStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package, Settings } from 'lucide-react';
+import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package, Settings, Warehouse, Truck, Activity, CreditCard } from 'lucide-react';
 
 const purchaseStatusLabels: Record<string, string> = {
   draft: 'Brouillon',
@@ -22,9 +22,11 @@ const stockMovementLabels: Record<string, string> = {
   purchase: 'Réception fournisseur',
   transfer_out: 'Transfert sorti',
   transfer_in: 'Transfert reçu',
-  adjustment: 'Correction inventaire',
+  inventory_adjustment: 'Correction inventaire',
   loss: 'Perte',
 };
+
+type StockTab = 'pilotage' | 'depots' | 'achats' | 'mouvements' | 'pertes' | 'inventaire' | 'entrees' | 'sorties';
 
 export default function Stocks() {
   const { items, movements, addMovement, addItem } = useStockStore();
@@ -47,7 +49,7 @@ export default function Stocks() {
     receivePurchaseOrder
   } = useHospiStore();
   const { canPerform, requiresManagerApproval, recordAudit } = useBusinessRulesStore();
-  const [tab, setTab] = useState<'inventaire' | 'entrees' | 'sorties' | 'depots' | 'pertes'>('depots');
+  const [tab, setTab] = useState<StockTab>('pilotage');
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [showMove, setShowMove] = useState<{ type: 'entree' | 'sortie'; itemId: string } | null>(null);
@@ -68,10 +70,35 @@ export default function Stocks() {
   );
   const siteWarehouses = warehouses.filter(warehouse => warehouse.site_id === selectedSiteId);
   const selectedSite = sites.find(site => site.id === selectedSiteId) || sites[0];
-  const lowHospiStocks = stockLevels.filter(level => {
+  const siteStockLevels = stockLevels.filter(level => {
     const warehouse = warehouses.find(item => item.id === level.warehouse_id);
-    return warehouse?.site_id === selectedSiteId && level.quantity <= level.alert_threshold;
+    return warehouse?.site_id === selectedSiteId;
   });
+  const lowHospiStocks = siteStockLevels.filter(level => level.quantity <= level.alert_threshold);
+  const pendingPurchaseOrders = purchaseOrders.filter(order => order.status !== 'received' && order.status !== 'cancelled');
+  const siteStockMovements = stockMovements.filter(move => warehouses.find(warehouse => warehouse.id === move.warehouse_id)?.site_id === selectedSiteId);
+  const todayMovements = siteStockMovements.filter(move => new Date(move.created_at).toDateString() === new Date().toDateString());
+  const stockValue = siteStockLevels.reduce((sum, level) => {
+    const product = products.find(item => item.id === level.product_id);
+    return sum + level.quantity * (product?.average_purchase_price || 0);
+  }, 0);
+  const stockProducts = useMemo(() => products
+    .map(product => {
+      const levels = siteStockLevels.filter(level => level.product_id === product.id);
+      const total = levels.reduce((sum, level) => sum + level.quantity, 0);
+      const low = levels.some(level => level.quantity <= level.alert_threshold);
+      const locations = levels
+        .map(level => warehouses.find(warehouse => warehouse.id === level.warehouse_id)?.name)
+        .filter(Boolean) as string[];
+      return { product, levels, total, low, locations };
+    })
+    .filter(row => row.levels.length > 0)
+    .filter(row => !search.trim() || [row.product.name, row.product.sku, row.product.category_id, row.locations.join(' ')]
+      .join(' ')
+      .toLowerCase()
+      .includes(search.trim().toLowerCase())),
+    [products, search, siteStockLevels, warehouses]
+  );
 
   const handleMove = () => {
     if (!showMove || !moveQty) return;
@@ -206,7 +233,7 @@ export default function Stocks() {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-xl font-black text-white">Stocks & dépôts</h1>
-        <p className="text-text-tertiary text-xs mt-1">Par dépôt, par point de vente, avec réceptions fournisseur et transferts.</p>
+          <p className="text-text-tertiary text-xs mt-1">Piloter le stock réel du complexe, par dépôt et par point de vente.</p>
         </div>
         <div className="flex gap-2">
           <button className="w-9 h-9 glass-card flex items-center justify-center rounded-full">
@@ -218,11 +245,12 @@ export default function Stocks() {
       {/* Tabs */}
       <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-none">
         {([
+          ['pilotage', 'Pilotage'],
           ['depots', 'Dépôts'],
+          ['achats', 'Achats'],
+          ['mouvements', 'Mouvements'],
           ['pertes', 'Pertes'],
-          ['entrees', 'Anciennes entrées'],
-          ['sorties', 'Anciennes sorties'],
-          ['inventaire', 'Stock simple'],
+          ['inventaire', 'Ancien stock'],
         ] as const).map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${tab === key
@@ -260,7 +288,177 @@ export default function Stocks() {
         </div>
       </div>
 
-      {tab === 'depots' ? (
+      {tab === 'pilotage' ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: 'Valeur stock', value: `${stockValue.toLocaleString('fr-FR')} F`, sub: 'au coût moyen', icon: CreditCard, color: '#22C55E' },
+              { label: 'Alertes', value: lowHospiStocks.length, sub: 'références à traiter', icon: AlertTriangle, color: '#F59E0B' },
+              { label: 'Dépôts', value: siteWarehouses.length, sub: 'sur le site actif', icon: Warehouse, color: '#3B82F6' },
+              { label: 'Mouvements jour', value: todayMovements.length, sub: 'ventes, transferts, pertes', icon: Activity, color: '#8B5CF6' },
+            ].map(card => (
+              <div key={card.label} className="glass-card p-4">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ background: `${card.color}20`, color: card.color }}>
+                  <card.icon size={18} />
+                </div>
+                <p className="text-text-tertiary text-[9px] font-black uppercase tracking-widest">{card.label}</p>
+                <p className="text-white font-black text-lg mt-1">{card.value}</p>
+                <p className="text-text-secondary text-[10px] mt-1">{card.sub}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <button onClick={() => setShowTransfer(true)} className="py-3 rounded-2xl bg-blue/10 border border-blue/20 text-blue font-black text-[10px] uppercase tracking-widest">
+              Transférer
+            </button>
+            <button onClick={() => setShowAdjustment(true)} className="py-3 rounded-2xl bg-orange/10 border border-orange/20 text-orange font-black text-[10px] uppercase tracking-widest">
+              Inventaire
+            </button>
+            <button onClick={() => setShowLoss(true)} className="py-3 rounded-2xl bg-red/10 border border-red/20 text-red font-black text-[10px] uppercase tracking-widest">
+              Perte
+            </button>
+          </div>
+
+          <section className="glass-card-lg p-4">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-white font-black text-sm">À traiter maintenant</h3>
+                <p className="text-text-secondary text-xs">{pendingPurchaseOrders.length} réception(s) fournisseur • {lowHospiStocks.length} alerte(s) stock</p>
+              </div>
+              <button type="button" onClick={() => setTab('achats')} className="text-blue text-xs font-black">
+                Achats
+              </button>
+            </div>
+            <div className="space-y-2">
+              {lowHospiStocks.slice(0, 5).map(level => {
+                const product = products.find(item => item.id === level.product_id);
+                const warehouse = warehouses.find(item => item.id === level.warehouse_id);
+                return (
+                  <div key={level.id} className="rounded-xl bg-orange/10 border border-orange/15 px-3 py-2 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-white font-bold text-xs">{product?.name || level.product_id}</p>
+                      <p className="text-text-secondary text-[10px]">{warehouse?.name} • seuil {level.alert_threshold} {level.unit}</p>
+                    </div>
+                    <span className="text-orange font-black text-xs">{level.quantity} {level.unit}</span>
+                  </div>
+                );
+              })}
+              {pendingPurchaseOrders.slice(0, 3).map(order => {
+                const supplier = suppliers.find(item => item.id === order.supplier_id);
+                const warehouse = warehouses.find(item => item.id === order.warehouse_id);
+                return (
+                  <button key={order.id} type="button" onClick={() => setTab('achats')} className="w-full rounded-xl bg-green/10 border border-green/15 px-3 py-2 flex items-center justify-between gap-3 text-left">
+                    <div>
+                      <p className="text-white font-bold text-xs">{supplier?.name || 'Fournisseur'}</p>
+                      <p className="text-text-secondary text-[10px]">À réceptionner vers {warehouse?.name}</p>
+                    </div>
+                    <Truck size={16} className="text-green" />
+                  </button>
+                );
+              })}
+              {lowHospiStocks.length === 0 && pendingPurchaseOrders.length === 0 && (
+                <p className="text-text-tertiary text-xs text-center py-5">Rien d’urgent sur ce site.</p>
+              )}
+            </div>
+          </section>
+
+          <section className="glass-card-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-white font-black text-sm">Catalogue multi-dépôts</h3>
+              <button type="button" onClick={() => setTab('depots')} className="text-blue text-xs font-black">Détails</button>
+            </div>
+            <div className="space-y-2">
+              {stockProducts.slice(0, 8).map(row => (
+                <div key={row.product.id} className="rounded-xl bg-white/5 px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-white font-bold text-xs truncate">{row.product.name}</p>
+                      <p className="text-text-tertiary text-[10px] truncate">{row.locations.join(' • ')}</p>
+                    </div>
+                    <span className={`font-black text-xs ${row.low ? 'text-orange' : 'text-green'}`}>{row.total} {row.product.unit}</span>
+                  </div>
+                </div>
+              ))}
+              {stockProducts.length === 0 && (
+                <p className="text-text-tertiary text-xs text-center py-5">Aucun produit trouvé.</p>
+              )}
+            </div>
+          </section>
+        </div>
+      ) : tab === 'achats' ? (
+        <div className="space-y-4">
+          <section className="glass-card-lg p-4">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-white font-black text-sm">Réceptions fournisseur</h3>
+                <p className="text-text-secondary text-xs">{pendingPurchaseOrders.length} commande(s) à réceptionner • {supplierReceipts.length} réception(s) enregistrée(s)</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {purchaseOrders.map(order => {
+                const supplier = suppliers.find(item => item.id === order.supplier_id);
+                const warehouse = warehouses.find(item => item.id === order.warehouse_id);
+                const lines = purchaseOrderLines.filter(line => line.purchase_order_id === order.id);
+                const total = lines.reduce((sum, line) => sum + line.quantity_ordered * line.unit_cost, 0);
+                return (
+                  <div key={order.id} className="rounded-2xl bg-white/5 p-4">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div>
+                        <p className="text-white font-black text-sm">{supplier?.name || 'Fournisseur'}</p>
+                        <p className="text-text-tertiary text-[10px]">{warehouse?.name} • {total.toLocaleString('fr-FR')} F</p>
+                      </div>
+                      <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${order.status === 'received' ? 'bg-green/10 text-green' : 'bg-orange/10 text-orange'}`}>
+                        {purchaseStatusLabels[order.status] || order.status}
+                      </span>
+                    </div>
+                    <div className="space-y-1 mb-3">
+                      {lines.map(line => {
+                        const product = products.find(item => item.id === line.product_id);
+                        return (
+                          <div key={line.id} className="flex justify-between text-[10px]">
+                            <span className="text-text-secondary">{product?.name}</span>
+                            <span className="text-white font-bold">{line.quantity_received}/{line.quantity_ordered}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {order.status !== 'received' && (
+                      <button onClick={() => handleReceivePurchase(order.id)} className="w-full py-2.5 rounded-xl bg-green/10 text-green font-black text-[10px] uppercase tracking-widest">
+                        Réceptionner vers dépôt
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+      ) : tab === 'mouvements' ? (
+        <div className="glass-card-lg p-4">
+          <h3 className="text-white font-black text-sm mb-3">Traçabilité du stock</h3>
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+            {siteStockMovements.map(move => {
+              const product = products.find(item => item.id === move.product_id);
+              const warehouse = warehouses.find(item => item.id === move.warehouse_id);
+              const pos = move.pos_id ? posList.find(item => item.id === move.pos_id) : undefined;
+              const isEntry = move.movement_type === 'production' || move.movement_type === 'purchase' || move.movement_type === 'transfer_in' || move.movement_type === 'inventory_adjustment';
+              return (
+                <div key={move.id} className="flex items-center justify-between rounded-xl bg-white/5 px-3 py-2">
+                  <div>
+                    <p className="text-white font-bold text-xs">{product?.name || move.product_id}</p>
+                    <p className="text-text-tertiary text-[10px]">{stockMovementLabels[move.movement_type] || move.movement_type} • {pos?.name || 'Back-office'} • {warehouse?.name}</p>
+                  </div>
+                  <span className={`${isEntry ? 'text-green' : 'text-red'} font-black text-xs`}>
+                    {isEntry ? '+' : '-'}{move.quantity}
+                  </span>
+                </div>
+              );
+            })}
+            {siteStockMovements.length === 0 && <p className="text-text-tertiary text-xs text-center py-6">Aucun mouvement pour ce site.</p>}
+          </div>
+        </div>
+      ) : tab === 'depots' ? (
         <div className="space-y-4">
           <div className="glass-card p-4">
             <p className="text-white font-black text-sm mb-2">Que voulez-vous faire ?</p>
