@@ -661,7 +661,10 @@ interface HospiState {
   updateWarehouse: (warehouseId: string, input: Partial<Omit<Warehouse, 'id' | 'created_at'>>) => Warehouse | null;
   deleteWarehouse: (warehouseId: string) => boolean;
   addProduct: (input: Omit<HospiProduct, 'id' | 'created_at'> & { initial_warehouse_id?: string; initial_quantity?: number; alert_threshold?: number }) => HospiProduct;
+  updateProduct: (productId: string, input: Partial<Omit<HospiProduct, 'id' | 'created_at'>>) => HospiProduct | null;
+  deleteProduct: (productId: string) => boolean;
   upsertPOSProductPrice: (input: Omit<POSProductPrice, 'id' | 'created_at'>) => POSProductPrice;
+  deletePOSProductPrice: (priceId: string) => boolean;
   upsertRecipe: (productId: string, name?: string) => Recipe;
   addRecipeItem: (input: Omit<RecipeItem, 'id'>) => RecipeItem;
   getActivePOS: () => POS | undefined;
@@ -819,6 +822,39 @@ export const useHospiStore = create<HospiState>()(
         });
         return product;
       },
+      updateProduct: (productId, input) => {
+        const state = get();
+        const product = state.products.find(item => item.id === productId);
+        if (!product) return null;
+        const updated: HospiProduct = { ...product, ...input };
+        set({
+          products: state.products.map(item => item.id === productId ? updated : item),
+          stockLevels: state.stockLevels.map(level => level.product_id === productId ? { ...level, unit: updated.unit } : level),
+        });
+        return updated;
+      },
+      deleteProduct: (productId) => {
+        const state = get();
+        const product = state.products.find(item => item.id === productId);
+        if (!product) return false;
+        const isUsed = state.stockLevels.some(level => level.product_id === productId && level.quantity > 0)
+          || state.stockMovements.some(move => move.product_id === productId)
+          || state.recipeItems.some(item => item.ingredient_product_id === productId)
+          || state.recipes.some(recipe => recipe.product_id === productId);
+        if (isUsed) {
+          set({
+            products: state.products.map(item => item.id === productId ? { ...item, is_active: false } : item),
+            posProductPrices: state.posProductPrices.map(price => price.product_id === productId ? { ...price, is_available: false } : price),
+          });
+          return true;
+        }
+        set({
+          products: state.products.filter(item => item.id !== productId),
+          posProductPrices: state.posProductPrices.filter(price => price.product_id !== productId),
+          stockLevels: state.stockLevels.filter(level => level.product_id !== productId),
+        });
+        return true;
+      },
       upsertPOSProductPrice: (input) => {
         const state = get();
         const existing = state.posProductPrices.find(price => price.pos_id === input.pos_id && price.product_id === input.product_id);
@@ -837,6 +873,13 @@ export const useHospiStore = create<HospiState>()(
         };
         set({ posProductPrices: [...state.posProductPrices, price] });
         return price;
+      },
+      deletePOSProductPrice: (priceId) => {
+        const state = get();
+        const price = state.posProductPrices.find(item => item.id === priceId);
+        if (!price) return false;
+        set({ posProductPrices: state.posProductPrices.filter(item => item.id !== priceId) });
+        return true;
       },
       upsertRecipe: (productId, name) => {
         const state = get();

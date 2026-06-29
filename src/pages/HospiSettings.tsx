@@ -36,7 +36,10 @@ export default function HospiSettings() {
     updateWarehouse,
     deleteWarehouse,
     addProduct,
+    updateProduct,
+    deleteProduct,
     upsertPOSProductPrice,
+    deletePOSProductPrice,
     upsertRecipe,
     addRecipeItem,
     recordProduction,
@@ -47,6 +50,8 @@ export default function HospiSettings() {
   const [configPanel, setConfigPanel] = useState<'pos' | 'warehouse' | 'product' | 'price' | 'recipe'>('pos');
   const [editingPOSId, setEditingPOSId] = useState<string | null>(null);
   const [editingWarehouseId, setEditingWarehouseId] = useState<string | null>(null);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [newPOS, setNewPOS] = useState({
     siteId: sites[0]?.id || 'site-dakar',
     name: '',
@@ -166,13 +171,17 @@ export default function HospiSettings() {
   const cancelEdit = () => {
     setEditingPOSId(null);
     setEditingWarehouseId(null);
+    setEditingProductId(null);
+    setEditingPriceId(null);
     setNewPOS(prev => ({ ...prev, name: '', printers: '', terminals: '' }));
     setNewWarehouse(prev => ({ ...prev, name: '' }));
+    resetProductForm();
+    resetPriceForm();
   };
 
   const handleCreateProduct = () => {
     if (!newProduct.name || !newProduct.sku) return;
-    addProduct({
+    const payload = {
       company_id: companies[0]?.id || 'comp-sartal-demo',
       name: newProduct.name,
       sku: newProduct.sku,
@@ -186,11 +195,64 @@ export default function HospiSettings() {
       average_purchase_price: Number(newProduct.averageCost) || 0,
       lot_number: newProduct.lotNumber || undefined,
       expires_at: newProduct.expiresAt ? new Date(newProduct.expiresAt).toISOString() : undefined,
-      initial_warehouse_id: newProduct.primaryWarehouseId || undefined,
-      initial_quantity: Number(newProduct.initialQuantity) || 0,
-      alert_threshold: Number(newProduct.alertThreshold) || 0,
-    });
+    };
+    if (editingProductId) {
+      updateProduct(editingProductId, payload);
+      setEditingProductId(null);
+    } else {
+      addProduct({
+        ...payload,
+        initial_warehouse_id: newProduct.primaryWarehouseId || undefined,
+        initial_quantity: Number(newProduct.initialQuantity) || 0,
+        alert_threshold: Number(newProduct.alertThreshold) || 0,
+      });
+    }
     setNewProduct(prev => ({ ...prev, name: '', sku: '', averageCost: '', lotNumber: '', expiresAt: '', initialQuantity: '', alertThreshold: '' }));
+  };
+
+  const startEditProduct = (productId: string) => {
+    const product = products.find(item => item.id === productId);
+    if (!product) return;
+    setConfigPanel('product');
+    setEditingProductId(product.id);
+    setNewProduct({
+      name: product.name,
+      sku: product.sku,
+      category: product.category_id,
+      unit: product.unit,
+      stockable: product.is_stockable,
+      primaryWarehouseId: product.primary_warehouse_id || warehouses[0]?.id || '',
+      secondaryWarehouseId: product.secondary_warehouse_id || '',
+      fallbackPolicy: product.fallback_policy || 'use_secondary',
+      averageCost: String(product.average_purchase_price || ''),
+      lotNumber: product.lot_number || '',
+      expiresAt: product.expires_at ? product.expires_at.slice(0, 10) : '',
+      initialQuantity: '',
+      alertThreshold: '',
+    });
+  };
+
+  const startEditPrice = (priceId: string) => {
+    const price = posProductPrices.find(item => item.id === priceId);
+    if (!price) return;
+    setConfigPanel('price');
+    setEditingPriceId(price.id);
+    setPriceForm({
+      posId: price.pos_id,
+      productId: price.product_id,
+      salePrice: String(price.sale_price),
+      taxRate: String(price.tax_rate),
+    });
+  };
+
+  const resetProductForm = () => {
+    setEditingProductId(null);
+    setNewProduct(prev => ({ ...prev, name: '', sku: '', averageCost: '', lotNumber: '', expiresAt: '', initialQuantity: '', alertThreshold: '' }));
+  };
+
+  const resetPriceForm = () => {
+    setEditingPriceId(null);
+    setPriceForm(prev => ({ ...prev, salePrice: '' }));
   };
 
   const handleSavePrice = () => {
@@ -202,6 +264,7 @@ export default function HospiSettings() {
       tax_rate: Number(priceForm.taxRate) || 0,
       is_available: true,
     });
+    setEditingPriceId(null);
     setPriceForm(prev => ({ ...prev, salePrice: '' }));
   };
 
@@ -380,7 +443,16 @@ export default function HospiSettings() {
               <input type="number" value={newProduct.alertThreshold} onChange={e => setNewProduct(p => ({ ...p, alertThreshold: e.target.value }))} placeholder="Seuil"
                 className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
             </div>
-            <button type="button" onClick={handleCreateProduct} className="w-full py-3 rounded-2xl bg-blue text-white font-black text-sm">Créer le produit</button>
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <button type="button" onClick={handleCreateProduct} className="py-3 rounded-2xl bg-blue text-white font-black text-sm">
+                {editingProductId ? 'Enregistrer le produit' : 'Créer le produit'}
+              </button>
+              {editingProductId && (
+                <button type="button" onClick={cancelEdit} className="w-12 rounded-2xl bg-white/10 text-white flex items-center justify-center">
+                  <X size={16} />
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -400,7 +472,16 @@ export default function HospiSettings() {
               <input type="number" value={priceForm.taxRate} onChange={e => setPriceForm(p => ({ ...p, taxRate: e.target.value }))} placeholder="TVA"
                 className="w-full px-4 py-3 glass-card text-white text-sm bg-transparent border-none" />
             </div>
-            <button type="button" onClick={handleSavePrice} className="w-full py-3 rounded-2xl bg-violet text-white font-black text-sm">Enregistrer le prix POS</button>
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <button type="button" onClick={handleSavePrice} className="py-3 rounded-2xl bg-violet text-white font-black text-sm">
+                {editingPriceId ? 'Enregistrer le prix' : 'Enregistrer le prix POS'}
+              </button>
+              {editingPriceId && (
+                <button type="button" onClick={cancelEdit} className="w-12 rounded-2xl bg-white/10 text-white flex items-center justify-center">
+                  <X size={16} />
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -488,13 +569,66 @@ export default function HospiSettings() {
                   {prices.map(price => {
                     const product = products.find(item => item.id === price.product_id);
                     return (
-                      <div key={price.id} className="flex justify-between rounded-xl bg-white/5 px-3 py-2">
-                        <span className="text-text-secondary text-xs">{product?.name}</span>
-                        <span className="text-orange font-black text-xs">{fmt(price.sale_price)} F</span>
+                      <div key={price.id} className="flex items-center justify-between gap-2 rounded-xl bg-white/5 px-3 py-2">
+                        <span className="text-text-secondary text-xs truncate">{product?.name}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-orange font-black text-xs">{fmt(price.sale_price)} F</span>
+                          <button type="button" onClick={() => startEditPrice(price.id)} className="w-7 h-7 rounded-lg bg-white/5 text-blue flex items-center justify-center">
+                            <Edit2 size={12} />
+                          </button>
+                          <button type="button" onClick={() => deletePOSProductPrice(price.id)} className="w-7 h-7 rounded-lg bg-red/10 text-red flex items-center justify-center">
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mb-5">
+        <h3 className="text-white font-black text-sm mb-3 flex items-center gap-2"><ReceiptText size={16} className="text-violet" /> Catalogue produits</h3>
+        <div className="space-y-3">
+          {products.map(product => {
+            const productPrices = posProductPrices.filter(price => price.product_id === product.id);
+            const productStock = stockLevels
+              .filter(level => level.product_id === product.id)
+              .reduce((sum, level) => sum + level.quantity, 0);
+            return (
+              <motion.div key={product.id} layout className={`glass-card p-4 ${!product.is_active ? 'opacity-50' : ''}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-white font-black text-sm truncate">{product.name}</p>
+                    <p className="text-text-tertiary text-[10px] uppercase tracking-widest">{product.sku} • {product.category_id}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button type="button" onClick={() => startEditProduct(product.id)} className="w-8 h-8 rounded-xl bg-white/5 text-blue flex items-center justify-center">
+                      <Edit2 size={14} />
+                    </button>
+                    <button type="button" onClick={() => deleteProduct(product.id)} className="w-8 h-8 rounded-xl bg-red/10 text-red flex items-center justify-center">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mt-3">
+                  <div className="rounded-xl bg-white/5 p-3">
+                    <p className="text-text-tertiary text-[9px] font-black uppercase">Unité</p>
+                    <p className="text-white font-black text-xs">{product.unit}</p>
+                  </div>
+                  <div className="rounded-xl bg-white/5 p-3">
+                    <p className="text-text-tertiary text-[9px] font-black uppercase">Stock</p>
+                    <p className="text-white font-black text-xs">{fmt(productStock)}</p>
+                  </div>
+                  <div className="rounded-xl bg-white/5 p-3">
+                    <p className="text-text-tertiary text-[9px] font-black uppercase">Tarifs POS</p>
+                    <p className="text-white font-black text-xs">{productPrices.length}</p>
+                  </div>
+                </div>
+                {!product.is_active && <p className="text-red text-[10px] font-black uppercase tracking-widest mt-3">Produit désactivé</p>}
               </motion.div>
             );
           })}
