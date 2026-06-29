@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, ShoppingBag, Package, Users, MoreHorizontal, Truck, ChefHat, Calendar, Wallet, BedDouble, Grid2X2 } from 'lucide-react';
+import { Home, ShoppingBag, Package, Users, MoreHorizontal, Truck, ChefHat, Calendar, Wallet, Grid2X2, BarChart3, Settings } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { usePlanningStore } from '../stores/planningStore';
 
@@ -16,12 +16,12 @@ export default function BottomNav() {
     case 'Admin':
     case 'Gérant':
       navItems = [
-        { path: '/dashboard', icon: Home, label: 'Accueil' },
+        { path: '/dashboard', icon: Home, label: 'Hub' },
         { path: '/modules', icon: Grid2X2, label: 'Métiers' },
-        { path: '/caisse', icon: Wallet, label: 'Caisse' },
-        { path: '/stocks', icon: Package, label: 'Stocks' },
-        { path: '/pms', icon: BedDouble, label: 'Hôtel' },
-        { path: '/plus', icon: MoreHorizontal, label: 'Plus' },
+        { path: '/commandes', icon: ShoppingBag, label: 'Opérations' },
+        { path: '/rapports', icon: BarChart3, label: 'Rapports' },
+        { path: '/settings', icon: Settings, label: 'Admin' },
+        { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
       ];
 
 
