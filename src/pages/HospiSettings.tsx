@@ -1535,7 +1535,21 @@ export default function HospiSettings() {
               {taxProfiles.map(row => (
                 <div key={row.id} className="rounded-2xl bg-white/5 border border-white/10 p-4 flex items-start justify-between gap-3">
                   <div><p className="text-white font-black text-sm">{row.name}</p><p className="text-text-secondary text-xs mt-1">{row.detail}</p></div>
-                  <button type="button" onClick={() => { upsertTaxProfile({ ...row, rate: row.rate + 1 }); setConfigNotice({ tone: 'success', message: `${row.name} passé à ${row.rate + 1}%` }); }} className="text-orange font-black text-xs">{row.rate}%</button>
+                  <label className="shrink-0 flex items-center gap-2 rounded-xl bg-white/5 border border-white/10 px-3 py-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={row.rate}
+                      onChange={event => {
+                        const nextRate = Math.max(0, Math.min(100, Number(event.target.value) || 0));
+                        upsertTaxProfile({ ...row, rate: nextRate });
+                        setConfigNotice({ tone: 'success', message: `${row.name} passé à ${nextRate}%` });
+                      }}
+                      className="w-12 bg-transparent text-orange font-black text-xs outline-none text-right"
+                    />
+                    <span className="text-orange font-black text-xs">%</span>
+                  </label>
                 </div>
               ))}
               <button type="button" onClick={() => { upsertTaxProfile({ name: 'Corporate exonéré', module: 'Corporate', rate: 0, detail: 'Profil client entreprise avec exonération contrôlée.', is_active: true }); setConfigNotice({ tone: 'success', message: 'Profil fiscal corporate ajouté.' }); }} className="w-full h-11 rounded-xl bg-orange/10 text-orange text-xs font-black">Ajouter profil fiscal</button>

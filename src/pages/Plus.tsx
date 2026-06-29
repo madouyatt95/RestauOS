@@ -80,7 +80,7 @@ export default function Plus() {
       { icon: Building2, label: 'Modules métiers', description: 'Restaurant, hôtel, casino, spa, boutique', path: '/modules', color: '#06B6D4' },
     ] : []),
     { icon: Calendar, label: 'Planning & équipe', description: 'Présences, rôles et services', path: '/personnel', color: '#EC4899' },
-    { icon: HelpCircle, label: 'Aide & support', description: 'Assistance et accompagnement', path: '/support', color: '#F59E0B' },
+    { icon: HelpCircle, label: 'Parcours de démo', description: 'Profils, scénario et ordre de présentation', path: '/demo-guide', color: '#F59E0B' },
   ];
 
   return (

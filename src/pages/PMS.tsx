@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { BedDouble, CalendarDays, CheckCircle2, Menu, Plus, ReceiptText, SlidersHorizontal, Sparkles, Wrench } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useHospiStore } from '../stores/hospiStore';
 import type { RoomStatus } from '../stores/hospiStore';
-import { getVisibleSites } from '../utils/accessControl';
+import { canAccessRoute, getVisibleSites } from '../utils/accessControl';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
@@ -30,6 +31,7 @@ const statusDotClass: Record<RoomStatus, string> = {
 };
 
 export default function PMS() {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const [selectedFolioId, setSelectedFolioId] = useState('');
   const [chargeDescription, setChargeDescription] = useState('Mini-bar');
@@ -96,11 +98,11 @@ export default function PMS() {
   return (
     <div className="page-content pt-9 pb-28">
       <header className="flex items-center justify-between mb-6">
-        <button className="w-10 h-10 rounded-xl bg-white/5 text-white flex items-center justify-center">
+        <button onClick={() => navigate('/modules')} className="w-10 h-10 rounded-xl bg-white/5 text-white flex items-center justify-center" aria-label="Retour aux activités">
           <Menu size={22} />
         </button>
         <h1 className="text-white font-black text-xl">Chambres</h1>
-        <button className="w-10 h-10 rounded-xl bg-white/5 text-white flex items-center justify-center">
+        <button onClick={() => navigate(canAccessRoute(user, '/settings') ? '/settings' : '/plus')} className="w-10 h-10 rounded-xl bg-white/5 text-white flex items-center justify-center" aria-label="Réglages hôtel">
           <SlidersHorizontal size={20} />
         </button>
       </header>

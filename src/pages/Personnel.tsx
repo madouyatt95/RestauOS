@@ -60,6 +60,7 @@ export default function Personnel() {
   const [newEmpAvatar, setNewEmpAvatar] = useState('🧑‍🍽️');
   const [presenceFilter, setPresenceFilter] = useState('Tous');
   const [showQREmp, setShowQREmp] = useState<Employee | null>(null);
+  const [personnelNotice, setPersonnelNotice] = useState('');
 
   const isManager = ['Admin', 'Gérant'].includes(user?.role || '');
   const visibleSiteIds = getVisibleSites(user, sites).map(site => site.id);
@@ -164,6 +165,11 @@ export default function Personnel() {
           </button>
         )}
       </div>
+      {personnelNotice && (
+        <button onClick={() => setPersonnelNotice('')} className="mx-4 mb-4 w-[calc(100%-2rem)] rounded-2xl bg-green/10 border border-green/20 text-green text-xs font-black px-4 py-3 text-left">
+          {personnelNotice}
+        </button>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6 px-4">
@@ -782,9 +788,16 @@ export default function Personnel() {
                       avatar: newEmpAvatar,
                       schedule: 'À planifier',
                       status: 'repos',
+                      siteIds: user?.siteIds,
+                      posIds: user?.posIds,
+                      businessModules: user?.businessModules as Employee['businessModules'],
+                      accessLevel: 'staff',
                     });
                     setShowAddEmployee(false);
-                    if (newEmpRole === 'Livreur Indépendant') alert("Lien magique copié pour " + newEmpName.trim());
+                    setPersonnelNotice(newEmpRole === 'Livreur Indépendant'
+                      ? `Lien magique généré pour ${newEmpName.trim()}.`
+                      : `${newEmpName.trim()} ajouté à l'équipe visible.`
+                    );
                   }}
                   disabled={!newEmpName.trim()}
                   className="w-full py-4 rounded-2xl bg-orange text-white font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-transform disabled:opacity-30 shadow-lg shadow-orange/20">

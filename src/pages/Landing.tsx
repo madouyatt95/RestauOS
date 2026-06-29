@@ -4,15 +4,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore, DEMO_USERS } from '../stores/authStore';
 import { useHospiStore } from '../stores/hospiStore';
 
-import { ShoppingBag, Package, Users, BarChart3, Heart, Truck, ChefHat, X, ScanLine } from 'lucide-react';
+import { ShoppingBag, Package, Users, BarChart3, BedDouble, Building2, ChefHat, X, ScanLine } from 'lucide-react';
 
 const modules = [
-  { icon: ShoppingBag, label: 'Caisse & Commandes', color: '#FF8A00' },
-  { icon: Package, label: 'Stocks & Inventaires', color: '#8B5CF6' },
-  { icon: Users, label: 'Gestion du personnel', color: '#3B82F6' },
-  { icon: BarChart3, label: 'Analyses & Rapports', color: '#22C55E' },
-  { icon: Heart, label: 'Fidélité & Clients', color: '#EF4444' },
-  { icon: Truck, label: 'Livraisons', color: '#06B6D4' },
+  { icon: Building2, label: 'Cockpit holding multi-sites', color: '#8B5CF6' },
+  { icon: ShoppingBag, label: 'POS multi-points de vente', color: '#FF8A00' },
+  { icon: BedDouble, label: 'PMS hôtel & folios chambre', color: '#06B6D4' },
+  { icon: Package, label: 'Stocks multi-dépôts & achats', color: '#22C55E' },
+  { icon: Users, label: 'Affectations & permissions', color: '#3B82F6' },
+  { icon: BarChart3, label: 'Rapports consolidés', color: '#EC4899' },
 ];
 
 // Onboarding slides with real app screenshots
@@ -33,6 +33,7 @@ export default function Landing() {
   const [showLogin, setShowLogin] = useState(false);
   const [showQRInput, setShowQRInput] = useState(false);
   const [qrInput, setQRInput] = useState('');
+  const [loginNotice, setLoginNotice] = useState('');
 
   // Onboarding
   const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem('restauos_onboarding_done'));
@@ -56,7 +57,7 @@ export default function Landing() {
     if (user) {
       handleLogin(user);
     } else {
-      alert('Code invalide. Essayez un ID comme u1, u4, e2...');
+      setLoginNotice('Code invalide. Essaie par exemple u2, u1, u8, u14, u4 ou c1.');
     }
   };
 
@@ -155,13 +156,13 @@ export default function Landing() {
             <ChefHat size={48} className="text-white" />
           </div>
           <h1 className="text-3xl font-black text-white tracking-tight">
-            Restau<span className="text-orange">OS</span>
+            Sártal <span className="text-orange">OS</span>
           </h1>
-          <p className="text-orange font-bold text-sm tracking-widest uppercase mt-1">Sénégal</p>
+          <p className="text-orange font-bold text-sm tracking-widest uppercase mt-1">Hospi</p>
         </div>
 
         <p className="text-text-secondary text-base mb-10 leading-relaxed">
-          La solution tout-en-un pour gérer votre restaurant comme un pro.
+          Cockpit ERP pour complexe hôtelier : restaurant, hôtel, casino, spa, boutique, stocks et caisses.
         </p>
 
         {/* Modules */}
@@ -290,12 +291,17 @@ export default function Landing() {
               <input
                 type="text"
                 value={qrInput}
-                onChange={e => setQRInput(e.target.value)}
+                onChange={e => { setQRInput(e.target.value); setLoginNotice(''); }}
                 onKeyDown={e => e.key === 'Enter' && handleQRLogin()}
                 placeholder="ID employé (ex: u4, e2...)"
                 className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-white text-center text-lg font-mono focus:border-blue/50 transition-colors mb-4"
                 autoFocus
               />
+              {loginNotice && (
+                <button onClick={() => setLoginNotice('')} className="w-full rounded-2xl bg-red/10 border border-red/20 text-red text-xs font-bold px-4 py-3 mb-4">
+                  {loginNotice}
+                </button>
+              )}
               <button onClick={handleQRLogin} className="w-full py-4 rounded-2xl bg-blue text-white font-bold text-sm shadow-lg shadow-blue/20">
                 Se connecter
               </button>

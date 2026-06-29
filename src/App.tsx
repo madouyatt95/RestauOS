@@ -26,6 +26,7 @@ import WhatsAppBot from './pages/WhatsAppBot';
 import HospiSettings from './pages/HospiSettings';
 import PMS from './pages/PMS';
 import BusinessModules from './pages/BusinessModules';
+import DemoGuide from './pages/DemoGuide';
 import { useThemeStore } from './stores/themeStore';
 import { useEffect } from 'react';
 import './index.css';
@@ -82,6 +83,9 @@ function AppContent() {
           } />
           <Route path="/plus" element={
             <ProtectedRoute><Plus /></ProtectedRoute>
+          } />
+          <Route path="/demo-guide" element={
+            <ProtectedRoute><DemoGuide /></ProtectedRoute>
           } />
           <Route path="/client-order" element={<ClientOrder />} />
           <Route path="/client/review" element={<Review />} />

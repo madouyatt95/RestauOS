@@ -6,6 +6,7 @@ import { PRODUCTS, type Product } from '../stores/orderStore';
 export default function MenuBuilder() {
   const [items, setItems] = useState<Product[]>(PRODUCTS);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
 
   const handleAdd = () => {
     const newItem: Product = {
@@ -29,6 +30,7 @@ export default function MenuBuilder() {
   const handleDelete = (id: string) => {
     if (confirm("Supprimer ce produit ?")) {
       setItems(items.filter(i => i.id !== id));
+      setNotice('Produit supprimé de la carte.');
     }
   };
 
@@ -45,6 +47,11 @@ export default function MenuBuilder() {
       </div>
 
       <div className="px-4 space-y-4">
+        {notice && (
+          <button onClick={() => setNotice('')} className="w-full rounded-2xl bg-green/10 border border-green/20 text-green text-xs font-black px-4 py-3 text-left">
+            {notice}
+          </button>
+        )}
         {items.map(item => (
           <motion.div layout key={item.id} className="glass-card p-4 border-white/5 flex gap-4 items-center">
             <div className="w-16 h-16 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/50 shrink-0 overflow-hidden">
@@ -90,7 +97,7 @@ export default function MenuBuilder() {
 
             <div className="flex flex-col gap-2">
               {editingId === item.id ? (
-                <button onClick={() => setEditingId(null)} className="w-8 h-8 rounded-lg bg-green/20 text-green flex items-center justify-center"><Check size={16} /></button>
+                <button onClick={() => { setEditingId(null); setNotice(`${item.name} mis à jour.`); }} className="w-8 h-8 rounded-lg bg-green/20 text-green flex items-center justify-center"><Check size={16} /></button>
               ) : (
                 <button onClick={() => setEditingId(item.id)} className="w-8 h-8 rounded-lg bg-blue/10 text-blue flex items-center justify-center"><Edit2 size={16} /></button>
               )}
@@ -102,7 +109,7 @@ export default function MenuBuilder() {
 
       {/* Floating Save Button */}
       <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50">
-        <button onClick={() => alert("Menu synchronisé avec le Cloud Odoo/Supabase !")} className="px-6 py-3 rounded-full bg-white text-[#0a0c10] font-black text-sm uppercase tracking-widest flex items-center gap-2 shadow-2xl shadow-white/20 active:scale-95 transition-transform">
+        <button onClick={() => setNotice('Carte sauvegardée pour la démonstration. Les articles sont prêts pour le POS.')} className="px-6 py-3 rounded-full bg-white text-[#0a0c10] font-black text-sm uppercase tracking-widest flex items-center gap-2 shadow-2xl shadow-white/20 active:scale-95 transition-transform">
           <Save size={18} /> Sauvegarder
         </button>
       </div>
