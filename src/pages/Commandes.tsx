@@ -1,14 +1,14 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOrderStore, PRODUCTS } from '../stores/orderStore';
-import { useTableStore, type Table } from '../stores/tableStore';
+import { useTableStore, type Table, type TableStatus } from '../stores/tableStore';
 import { useAuthStore } from '../stores/authStore';
 import { useReservationStore, type Reservation } from '../stores/reservationStore';
 import { useClientStore } from '../stores/clientStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useHospiStore } from '../stores/hospiStore';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, ShoppingCart, X, ChefHat, Calendar, UserPlus, Phone, Plus, Minus, Trash2, Layout, Layers, Map as MapIcon, User, QrCode, Gift, Wallet, CheckCircle2, Store, Warehouse, CreditCard, Percent } from 'lucide-react';
+import { Search, ShoppingCart, X, ChefHat, Calendar, UserPlus, Phone, Plus, Minus, Trash2, Layout, Layers, Map as MapIcon, QrCode, Gift, Wallet, CheckCircle2, Store, Warehouse, CreditCard, Percent } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 
@@ -93,7 +93,7 @@ const getTableDimensions = (capacity: number): { w: number, h: number } => {
 export default function Commandes() {
   const { cart, addToCart, updateQuantity, clearCart, checkout, orders, setLoyaltyClient, updateOrderStatus } = useOrderStore();
   const { posList, warehouses, activePOSId, setActivePOS, getProductsForPOS, recordSale } = useHospiStore();
-  const { tables, addTable, removeTable, updateTableStatus, updateTablePosition, updateTableCapacity, updateTableFloor } = useTableStore();
+  const { tables, addTable, removeTable, updateTableStatus, updateTablePosition, updateTableCapacity, updateTableFloor, updateTableDetails } = useTableStore();
   const { reservations, updateStatus, addReservation, cancelReservation } = useReservationStore();
   const { clients } = useClientStore();
   const { addNotification } = useNotificationStore();
@@ -143,6 +143,7 @@ export default function Commandes() {
   if (!selectedZone && zones.length > 0) setSelectedZone(zones[0]);
 
   const floorTables = tables.filter(t => t.floor === selectedFloor && t.zone === selectedZone);
+  const allZones = Array.from(new Set(tables.map(t => t.zone)));
 
   const activePOS = posList.find(pos => pos.id === activePOSId);
   const activeWarehouse = warehouses.find(warehouse => warehouse.id === activePOS?.default_warehouse_id);
@@ -290,6 +291,12 @@ export default function Commandes() {
 
   const handleDeleteTable = (id: string) => {
     requestDeleteTable(id);
+  };
+
+  const updateEditingTable = (input: Partial<Omit<Table, 'id'>>) => {
+    if (!editingTable) return;
+    updateTableDetails(editingTable.id, input);
+    setEditingTable({ ...editingTable, ...input });
   };
 
   const handleSendToKitchen = () => {
@@ -559,6 +566,15 @@ export default function Commandes() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
+                      <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Numéro</label>
+                      <input
+                        type="number"
+                        value={editingTable.number}
+                        onChange={event => updateEditingTable({ number: Number(event.target.value) || editingTable.number })}
+                        className="w-full h-[52px] bg-white/5 rounded-2xl px-4 text-white font-black text-sm border border-white/5 outline-none"
+                      />
+                    </div>
+                    <div>
                       <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Capacité</label>
                       <div className="flex items-center justify-between bg-white/5 rounded-2xl px-4 py-3 border border-white/5">
                         <button onClick={() => {
@@ -581,22 +597,45 @@ export default function Commandes() {
 
                     </div>
                     <div>
-                      <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Déplacer vers Zone</label>
-                      <div className="flex gap-1 bg-white/5 rounded-2xl p-1 border border-white/5 h-[52px] items-center px-2">
-                        {zones.slice(0, 3).map(z => (
-                          <button key={z} onClick={() => {
-                            updateTableFloor(editingTable.id, editingTable.floor, z);
-                            setEditingTable({ ...editingTable, zone: z });
-                          }} className={`flex-1 py-2 rounded-xl text-[8px] font-black uppercase transition-all ${editingTable.zone === z ? 'bg-orange text-white shadow-md' : 'text-text-tertiary hover:text-text-secondary'}`}>{z.substring(0, 4)}</button>
-                        ))}
-                      </div>
+                      <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Étage</label>
+                      <select
+                        value={editingTable.floor}
+                        onChange={event => {
+                          updateTableFloor(editingTable.id, event.target.value, editingTable.zone);
+                          setEditingTable({ ...editingTable, floor: event.target.value });
+                        }}
+                        className="w-full h-[52px] bg-white/5 rounded-2xl px-4 text-white font-black text-xs border border-white/5 outline-none"
+                      >
+                        {['RDC', 'ETAGE', 'TERRASSE'].map(floor => <option key={floor} value={floor}>{floor === 'ETAGE' ? '1er Étage' : floor}</option>)}
+                      </select>
                     </div>
-                  </div>
-                  <div>
-                    <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Affecter Serveur (Planning)</label>
-                    <button className="w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-white text-xs font-bold flex items-center justify-center gap-2">
-                      <User size={16} className="text-orange" /> Choisir un responsable de zone
-                    </button>
+                    <div>
+                      <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Zone</label>
+                      <input
+                        value={editingTable.zone}
+                        list="table-zones"
+                        onChange={event => {
+                          updateTableFloor(editingTable.id, editingTable.floor, event.target.value);
+                          setEditingTable({ ...editingTable, zone: event.target.value });
+                        }}
+                        className="w-full h-[52px] bg-white/5 rounded-2xl px-4 text-white font-black text-xs border border-white/5 outline-none"
+                      />
+                      <datalist id="table-zones">
+                        {allZones.map(zone => <option key={zone} value={zone} />)}
+                      </datalist>
+                    </div>
+                    <div>
+                      <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Statut</label>
+                      <select
+                        value={editingTable.status}
+                        onChange={event => updateEditingTable({ status: event.target.value as TableStatus })}
+                        className="w-full h-[52px] bg-white/5 rounded-2xl px-4 text-white font-black text-xs border border-white/5 outline-none"
+                      >
+                        <option value="libre">Libre</option>
+                        <option value="reservee">Réservée</option>
+                        <option value="occupee">Occupée</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               )}

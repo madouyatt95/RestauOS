@@ -26,6 +26,7 @@ interface TableState {
   updateTablePosition: (id: string, x: number, y: number) => void;
   updateTableCapacity: (id: string, capacity: number) => void;
   updateTableFloor: (id: string, floor: string, zone?: string) => void;
+  updateTableDetails: (id: string, input: Partial<Omit<Table, 'id'>>) => void;
   getTable: (id: string) => Table | undefined;
 }
 
@@ -108,6 +109,13 @@ export const useTableStore = create<TableState>()(
       })),
       updateTableFloor: (id, floor, zone) => set(state => ({
         tables: state.tables.map(t => t.id === id ? { ...t, floor, zone: zone || t.zone } : t)
+      })),
+      updateTableDetails: (id, input) => set(state => ({
+        tables: state.tables.map(t => t.id === id ? {
+          ...t,
+          ...input,
+          shape: input.capacity ? (input.capacity <= 2 ? 'round' : input.capacity <= 4 ? 'square' : 'rectangle') : t.shape,
+        } : t)
       })),
 
       getTable: (id) => get().tables.find(t => t.id === id),
