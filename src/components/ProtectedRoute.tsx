@@ -2,7 +2,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useHospiStore, type PermissionMode } from '../stores/hospiStore';
 import { usePlanningStore } from '../stores/planningStore';
-import { canAccessRoute } from '../utils/accessControl';
+import { canAccessRoute, isDirection } from '../utils/accessControl';
 
 const routePermissionActions: Array<{ prefix: string; action: string }> = [
   { prefix: '/settings', action: 'Admin Hospi' },
@@ -23,7 +23,7 @@ const routePermissionActions: Array<{ prefix: string; action: string }> = [
 
 const roleAliases: Record<string, string[]> = {
   Admin: ['Admin', 'Direction'],
-  Gérant: ['Gérant', 'Direction', 'Manager'],
+  Gérant: ['Gérant', 'Manager'],
   Caissier: ['Caissier'],
   Serveur: ['Serveur'],
   'Chef cuisine': ['Chef cuisine'],
@@ -59,7 +59,8 @@ export default function ProtectedRoute({ children, allowedRoles }: { children: R
     return <Navigate to="/dashboard" replace />;
   }
 
-  const routePermission = getRoutePermission(location.pathname, user.role, getPermissionMode);
+  const rootAdmin = isDirection(user);
+  const routePermission = rootAdmin ? 'allow' : getRoutePermission(location.pathname, user.role, getPermissionMode);
   const scopedAccess = canAccessRoute(user, location.pathname);
   if (!scopedAccess) {
     return (

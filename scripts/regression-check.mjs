@@ -73,6 +73,12 @@ function setPermission(role, action, mode) {
   else state.permissionPolicies.push({ role, action, mode });
 }
 
+function canRootAdminOpenAdminHospi(user, policies) {
+  if (user.role === 'Admin' || user.accessLevel === 'direction') return true;
+  const exact = policies.find(item => item.role === user.role && item.action === 'Admin Hospi');
+  return exact?.mode !== 'deny';
+}
+
 function createBusinessPack(label) {
   const warehouse = { id: `wh-${label}`, name: `Dépôt ${label}`, type: 'bar' };
   const pos = { id: `pos-${label}`, name: label, type: 'bar', default_warehouse_id: warehouse.id };
@@ -149,6 +155,8 @@ assert.equal(state.configHistory[0].after_value, '2800 F', 'published draft crea
 setPermission('Serveur', 'Remise', 'manager');
 assert.equal(state.permissionPolicies[0].mode, 'manager', 'permission matrix persists manager validation mode');
 assert.equal(state.permissionPolicies.some(item => item.role === 'Serveur' && item.action === 'Remise' && item.mode === 'manager'), true, 'persisted permission can block action behind manager approval');
+setPermission('Admin', 'Admin Hospi', 'deny');
+assert.equal(canRootAdminOpenAdminHospi({ role: 'Admin', accessLevel: 'direction' }, state.permissionPolicies), true, 'root admin bypasses accidental admin hospi deny policy');
 
 state.criticalAlert = true;
 const blockedDraft = createDraft('Pack fiscal', 'ancien', 'nouveau');
