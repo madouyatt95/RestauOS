@@ -16,7 +16,7 @@ const warehouseTypeLabels: Record<string, string> = {
   other: 'Autre',
 };
 
-type AdminView = 'assistant' | 'architecture' | 'modules' | 'pos' | 'permissions' | 'rules' | 'health' | 'imports' | 'audit' | 'simulation' | 'drafts' | 'history' | 'duplicate' | 'packs' | 'priceMatrix' | 'permissionMatrix' | 'impact' | 'multisite' | 'connectors' | 'backup' | 'taxes' | 'approvals' | 'environments';
+type AdminView = 'assistant' | 'modules' | 'pos' | 'health' | 'advanced' | 'architecture' | 'permissions' | 'rules' | 'imports' | 'audit' | 'simulation' | 'drafts' | 'history' | 'duplicate' | 'packs' | 'priceMatrix' | 'permissionMatrix' | 'impact' | 'multisite' | 'connectors' | 'backup' | 'taxes' | 'approvals' | 'environments';
 
 export default function HospiSettings() {
   const {
@@ -95,6 +95,7 @@ export default function HospiSettings() {
   const [settingsSiteId, setSettingsSiteId] = useState('all');
   const [productFilter, setProductFilter] = useState<'all' | 'active' | 'inactive' | 'stockable' | 'recipes'>('all');
   const [importKind, setImportKind] = useState<'products' | 'prices'>('products');
+  const [showQuickConfig, setShowQuickConfig] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const [configNotice, setConfigNotice] = useState<{ tone: 'success' | 'warning'; message: string } | null>(null);
   const [newPOS, setNewPOS] = useState({
@@ -170,28 +171,32 @@ export default function HospiSettings() {
 
   const adminViews: Array<{ key: AdminView; label: string; icon: typeof Sparkles }> = [
     { key: 'assistant', label: 'Assistant', icon: Sparkles },
-    { key: 'architecture', label: 'Architecture', icon: Network },
     { key: 'modules', label: 'Modules métier', icon: Boxes },
-    { key: 'pos', label: 'Centre POS', icon: Store },
-    { key: 'permissions', label: 'Permissions', icon: KeyRound },
-    { key: 'rules', label: 'Règles', icon: Settings2 },
+    { key: 'pos', label: 'POS & dépôts', icon: Store },
     { key: 'health', label: 'Santé', icon: AlertTriangle },
-    { key: 'imports', label: 'Imports', icon: Upload },
-    { key: 'audit', label: 'Audit', icon: ShieldCheck },
-    { key: 'simulation', label: 'Simulation', icon: PlayCircle },
-    { key: 'drafts', label: 'Brouillons', icon: Layers },
-    { key: 'history', label: 'Historique config', icon: History },
-    { key: 'duplicate', label: 'Duplication', icon: Copy },
-    { key: 'packs', label: 'Packs métier', icon: PackageCheck },
-    { key: 'priceMatrix', label: 'Matrice prix', icon: Table2 },
-    { key: 'permissionMatrix', label: 'Matrice droits', icon: KeyRound },
-    { key: 'impact', label: 'Impact', icon: GitCompare },
-    { key: 'multisite', label: 'Multi-site', icon: Globe2 },
-    { key: 'connectors', label: 'Connecteurs', icon: PlugZap },
-    { key: 'backup', label: 'Sauvegarde', icon: RotateCcw },
-    { key: 'taxes', label: 'Taxes', icon: Percent },
-    { key: 'approvals', label: 'Validations', icon: UserCheck },
-    { key: 'environments', label: 'Environnements', icon: Layers },
+    { key: 'advanced', label: 'Avancé', icon: Settings2 },
+  ];
+
+  const advancedViews: Array<{ key: AdminView; label: string; detail: string; icon: typeof Sparkles }> = [
+    { key: 'architecture', label: 'Architecture', detail: 'Sites, POS, dépôts et liens visibles.', icon: Network },
+    { key: 'permissions', label: 'Permissions', detail: 'Rôles terrain et droits métier.', icon: KeyRound },
+    { key: 'rules', label: 'Règles métier', detail: 'Stock, validations, remises et annulations.', icon: Settings2 },
+    { key: 'imports', label: 'Imports', detail: 'Importer produits, prix et données terrain.', icon: Upload },
+    { key: 'audit', label: 'Audit', detail: 'Actions sensibles et traces.', icon: ShieldCheck },
+    { key: 'simulation', label: 'Simulation', detail: 'Tester POS, prix, stock et caisse.', icon: PlayCircle },
+    { key: 'drafts', label: 'Brouillons', detail: 'Tester puis publier une configuration.', icon: Layers },
+    { key: 'history', label: 'Historique', detail: 'Voir les modifications publiées.', icon: History },
+    { key: 'duplicate', label: 'Duplication', detail: 'Copier POS, site, prix ou droits.', icon: Copy },
+    { key: 'packs', label: 'Packs métier', detail: 'Créer un métier complet rapidement.', icon: PackageCheck },
+    { key: 'priceMatrix', label: 'Matrice prix', detail: 'Prix par produit et par POS.', icon: Table2 },
+    { key: 'permissionMatrix', label: 'Matrice droits', detail: 'Autoriser, bloquer ou exiger manager.', icon: KeyRound },
+    { key: 'impact', label: 'Impact', detail: 'Voir les dépendances avant modification.', icon: GitCompare },
+    { key: 'multisite', label: 'Multi-site', detail: 'Comparer les sites et leurs stocks.', icon: Globe2 },
+    { key: 'connectors', label: 'Connecteurs', detail: 'PMS externe, compta, TPE, imprimantes.', icon: PlugZap },
+    { key: 'backup', label: 'Sauvegarde', detail: 'Sauvegarder et restaurer la configuration.', icon: RotateCcw },
+    { key: 'taxes', label: 'Taxes', detail: 'Profils fiscaux par métier.', icon: Percent },
+    { key: 'approvals', label: 'Validations', detail: 'Demandes manager à approuver.', icon: UserCheck },
+    { key: 'environments', label: 'Environnements', detail: 'Démo, formation et production.', icon: Layers },
   ];
 
   const setupSteps = [
@@ -326,6 +331,7 @@ export default function HospiSettings() {
   const getPermissionMode = (role: string, action: string) => permissionPolicies.find(item => item.role === role && item.action === action)?.mode;
 
   const openQuickConfig = (panel: typeof configPanel) => {
+    setShowQuickConfig(true);
     setConfigPanel(panel);
     window.requestAnimationFrame(() => {
       document.getElementById('quick-config')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -351,6 +357,7 @@ export default function HospiSettings() {
   };
 
   const openAdminView = (view: AdminView, message?: string) => {
+    setShowQuickConfig(false);
     setAdminView(view);
     window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
     if (message) setConfigNotice({ tone: 'success', message });
@@ -732,6 +739,16 @@ export default function HospiSettings() {
         </div>
       </div>
 
+      {configNotice && !showQuickConfig && (
+        <div className={`mb-5 rounded-2xl border px-4 py-3 text-xs font-bold ${
+          configNotice.tone === 'success'
+            ? 'border-green/25 bg-green/10 text-green'
+            : 'border-orange/30 bg-orange/10 text-orange'
+        }`}>
+          {configNotice.message}
+        </div>
+      )}
+
       <section className="glass-card-lg p-4 mb-5">
         <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
           {adminViews.map(view => {
@@ -740,7 +757,7 @@ export default function HospiSettings() {
               <button
                 key={view.key}
                 type="button"
-                onClick={() => setAdminView(view.key)}
+                onClick={() => openAdminView(view.key)}
                 className={`shrink-0 min-w-[112px] rounded-2xl px-3 py-3 text-left transition-all ${adminView === view.key ? 'bg-orange text-white shadow-[0_8px_24px_rgba(255,138,0,0.25)]' : 'bg-white/5 text-text-secondary border border-white/10'}`}
               >
                 <Icon size={16} className="mb-2" />
@@ -767,10 +784,13 @@ export default function HospiSettings() {
                   key={step.title}
                   type="button"
                   onClick={() => {
-                    if (step.title === 'POS') setConfigPanel('pos');
-                    if (step.title === 'Dépôts') setConfigPanel('warehouse');
-                    if (step.title === 'Catalogue') setConfigPanel('product');
-                    if (step.title === 'Prix par POS') setConfigPanel('price');
+                    if (step.title === 'Entreprise' || step.title === 'Sites') openAdminView('advanced', 'La création entreprise/site complète sera rangée dans Paramètres avancés.');
+                    if (step.title === 'Modules métier') openAdminView('modules');
+                    if (step.title === 'POS') openQuickConfig('pos');
+                    if (step.title === 'Dépôts') openQuickConfig('warehouse');
+                    if (step.title === 'Catalogue') openQuickConfig('product');
+                    if (step.title === 'Prix par POS') openQuickConfig('price');
+                    if (step.title === 'Contrôles') openAdminView('simulation');
                   }}
                   className="w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3 flex items-center gap-3 text-left"
                 >
@@ -783,6 +803,14 @@ export default function HospiSettings() {
                   </div>
                 </button>
               ))}
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <button type="button" onClick={() => openAdminView('modules')} className="h-12 rounded-2xl bg-orange text-white text-xs font-black">
+                Configurer les métiers
+              </button>
+              <button type="button" onClick={() => openQuickConfig('pos')} className="h-12 rounded-2xl bg-white/5 text-white text-xs font-black">
+                Ajouter un POS
+              </button>
             </div>
           </div>
         )}
@@ -835,19 +863,40 @@ export default function HospiSettings() {
         )}
 
         {adminView === 'modules' && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3">
             {businessModules.map(module => {
               const Icon = module.icon;
+              const typePOS = posList.filter(pos => pos.type === module.type);
               return (
-                <div key={module.type} className="glass-card p-4">
-                  <div className="w-10 h-10 rounded-2xl flex items-center justify-center mb-3" style={{ background: `${module.color}1F`, color: module.color }}>
-                    <Icon size={19} />
+                <div key={module.type} className="glass-card-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style={{ background: `${module.color}1F`, color: module.color }}>
+                      <Icon size={20} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-white font-black text-sm">{module.label}</p>
+                      <p className="text-text-secondary text-xs mt-1">{module.posCount} POS • {module.priceCount} tarif(s)</p>
+                      <div className="flex gap-2 overflow-x-auto scrollbar-none mt-3">
+                        {typePOS.map(pos => (
+                          <button key={pos.id} type="button" onClick={() => startEditPOS(pos.id)} className="shrink-0 h-8 px-3 rounded-xl bg-white/5 text-white text-[10px] font-black">
+                            {pos.name}
+                          </button>
+                        ))}
+                        {typePOS.length === 0 && <span className="text-text-tertiary text-[10px] py-2">Aucun POS configuré</span>}
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-white font-black text-sm">{module.label}</p>
-                  <p className="text-text-secondary text-xs mt-1">{module.posCount} POS • {module.priceCount} tarif(s)</p>
-                  <button type="button" onClick={() => configureBusinessModule(module.type as POSType, module.label)} className="mt-3 w-full h-10 rounded-xl bg-white/5 text-white text-xs font-black">
-                    Configurer
-                  </button>
+                  <div className="grid grid-cols-3 gap-2 mt-4">
+                    <button type="button" onClick={() => configureBusinessModule(module.type as POSType, module.label)} className="h-10 rounded-xl bg-orange/10 text-orange text-[10px] font-black">
+                      Configurer
+                    </button>
+                    <button type="button" onClick={() => openQuickConfig('price')} className="h-10 rounded-xl bg-blue/10 text-blue text-[10px] font-black">
+                      Prix
+                    </button>
+                    <button type="button" onClick={() => openQuickConfig('warehouse')} className="h-10 rounded-xl bg-green/10 text-green text-[10px] font-black">
+                      Dépôt
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -856,6 +905,17 @@ export default function HospiSettings() {
 
         {adminView === 'pos' && (
           <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              <button type="button" onClick={() => openQuickConfig('pos')} className="h-12 rounded-2xl bg-orange text-white text-xs font-black">
+                + POS
+              </button>
+              <button type="button" onClick={() => openQuickConfig('warehouse')} className="h-12 rounded-2xl bg-green/10 text-green text-xs font-black">
+                + Dépôt
+              </button>
+              <button type="button" onClick={() => openQuickConfig('price')} className="h-12 rounded-2xl bg-blue/10 text-blue text-xs font-black">
+                + Prix
+              </button>
+            </div>
             {posList.map(pos => {
               const warehouse = warehouses.find(item => item.id === pos.default_warehouse_id);
               const prices = posProductPrices.filter(price => price.pos_id === pos.id);
@@ -965,6 +1025,32 @@ export default function HospiSettings() {
                 </div>
               ))}
               {healthAlerts.length === 0 && <p className="text-text-tertiary text-sm text-center py-6">Configuration saine.</p>}
+            </div>
+          </div>
+        )}
+
+        {adminView === 'advanced' && (
+          <div className="space-y-3">
+            <div className="glass-card-lg p-5">
+              <h3 className="text-white font-black text-base mb-1">Réglages avancés</h3>
+              <p className="text-text-secondary text-xs">Ces outils restent disponibles, mais ils sont rangés ici pour ne pas encombrer la configuration quotidienne.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {advancedViews.map(view => {
+                const Icon = view.icon;
+                return (
+                  <button
+                    key={view.key}
+                    type="button"
+                    onClick={() => openAdminView(view.key)}
+                    className="glass-card p-4 text-left min-h-[112px]"
+                  >
+                    <Icon size={18} className="text-orange mb-3" />
+                    <p className="text-white font-black text-sm">{view.label}</p>
+                    <p className="text-text-secondary text-[10px] mt-1">{view.detail}</p>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -1427,6 +1513,8 @@ export default function HospiSettings() {
         )}
       </section>
 
+      {showQuickConfig && (
+      <>
       <section className="glass-card-lg p-4 mb-5">
         <div className="relative mb-3">
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary" />
@@ -1503,7 +1591,7 @@ export default function HospiSettings() {
             ['price', 'Prix POS'],
             ['recipe', 'Recette'],
           ].map(([key, label]) => (
-            <button key={key} type="button" onClick={() => setConfigPanel(key as any)}
+            <button key={key} type="button" onClick={() => { setShowQuickConfig(true); setConfigPanel(key as any); }}
               className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${configPanel === key ? 'bg-orange text-white' : 'bg-white/5 text-text-secondary'}`}>
               {label}
             </button>
@@ -2104,6 +2192,8 @@ export default function HospiSettings() {
           )}
         </div>
       </section>
+      </>
+      )}
     </div>
   );
 }
