@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore, DEMO_USERS } from '../stores/authStore';
 import { useHospiStore } from '../stores/hospiStore';
+import { getHomePathForUser } from '../utils/accessControl';
 
 import { ShoppingBag, Package, Users, BarChart3, BedDouble, Building2, ChefHat, X, ScanLine } from 'lucide-react';
 
@@ -42,14 +43,7 @@ export default function Landing() {
   const handleLogin = (user: typeof DEMO_USERS[0]) => {
     login(user);
     if (user.posIds?.[0]) setActivePOS(user.posIds[0]);
-    if (user.role === 'Admin' || user.role === 'Gérant') navigate('/dashboard');
-    else if (user.role === 'Chef cuisine') navigate('/cuisine');
-    else if (user.role === 'Livreur') navigate('/livraisons');
-    else if (user.role === 'Client') navigate('/client');
-    else if (user.role === 'Serveur') navigate('/commandes');
-    else if (user.role === 'Caissier' && user.businessModules?.includes('hotel')) navigate('/pms');
-    else if (user.role === 'Caissier') navigate('/caisse');
-    else navigate('/dashboard');
+    navigate(getHomePathForUser(user));
   };
 
   const handleQRLogin = () => {

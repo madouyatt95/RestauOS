@@ -2,7 +2,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useHospiStore, type PermissionMode } from '../stores/hospiStore';
 import { usePlanningStore } from '../stores/planningStore';
-import { canAccessRoute, isDirection } from '../utils/accessControl';
+import { canAccessRoute, getHomePathForUser, isDirection } from '../utils/accessControl';
 
 const routePermissionActions: Array<{ prefix: string; action: string }> = [
   { prefix: '/settings', action: 'Admin Hospi' },
@@ -51,12 +51,7 @@ export default function ProtectedRoute({ children, allowedRoles }: { children: R
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    // If user tries to access an unauthorized route, redirect to their home
-    if (user.role === 'Livreur') return <Navigate to="/livraisons" replace />;
-    if (user.role === 'Chef cuisine') return <Navigate to="/cuisine" replace />;
-    if (user.role === 'Caissier' || user.role === 'Serveur') return <Navigate to="/caisse" replace />;
-    if (user.role === 'Client') return <Navigate to="/client" replace />;
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={getHomePathForUser(user)} replace />;
   }
 
   const rootAdmin = isDirection(user);

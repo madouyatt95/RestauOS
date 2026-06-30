@@ -102,6 +102,40 @@ export function canAccessRoute(user: UserProfile | null | undefined, pathname: s
   return route.modules.some(module => canAccessModule(user, module));
 }
 
+export function getHomePathForUser(user: UserProfile | null | undefined) {
+  if (!user) return '/';
+  const modules = user.businessModules || [];
+  const hasOnly = (module: BusinessModule) => modules.length === 1 && modules.includes(module);
+  const has = (module: BusinessModule) => modules.includes(module);
+  const isRoomServiceOnly = (user.posIds || []).length > 0
+    && (user.posIds || []).every(posId => posId.includes('room-service') || posId.includes('minibar'));
+
+  if (user.role === 'Client') return '/client';
+  if (user.role === 'Livreur') return '/livraisons';
+  if (user.role === 'Chef cuisine') return '/cuisine';
+
+  if (user.role === 'Serveur') {
+    if ((has('hotel') && !has('restaurant')) || isRoomServiceOnly) return '/pos-metier';
+    return '/commandes';
+  }
+
+  if (user.role === 'Caissier') {
+    if (hasOnly('hotel')) return '/pms';
+    if (has('restaurant')) return '/caisse';
+    if (has('boutique') || has('spa') || has('casino')) return '/pos-metier';
+    return '/caisse';
+  }
+
+  if (user.accessLevel === 'business_manager' || user.accessLevel === 'pos_manager') {
+    if (hasOnly('hotel')) return '/pms';
+    if (hasOnly('stock')) return '/stocks';
+    if (has('restaurant') && !has('hotel') && !has('casino') && !has('spa') && !has('boutique')) return '/commandes';
+    if (has('casino') || has('spa') || has('boutique') || has('hotel')) return '/pos-metier';
+  }
+
+  return '/dashboard';
+}
+
 export function getAccessSummary(user: UserProfile | null | undefined, sites: Site[], posList: POS[]) {
   if (!user) return 'Aucun profil actif';
   if (isDirection(user)) return 'Toute l’entreprise · tous les sites · tous les métiers';

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, ShoppingBag, Package, Users, MoreHorizontal, Truck, ChefHat, Calendar, Wallet, Grid2X2, Settings, BedDouble } from 'lucide-react';
+import { Home, ShoppingBag, Package, Users, MoreHorizontal, Truck, ChefHat, Calendar, Wallet, BedDouble, Dice5, Sparkles, Store } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { usePlanningStore } from '../stores/planningStore';
 import { canAccessRoute } from '../utils/accessControl';
@@ -15,37 +15,72 @@ export default function BottomNav() {
   if (hiddenPaths.includes(pathname)) return null;
 
   let navItems: NavItem[];
+  const modules = user?.businessModules || [];
+  const hasModule = (module: string) => modules.includes(module as never);
+  const isFocusedManager = user?.accessLevel === 'business_manager' || user?.accessLevel === 'pos_manager';
+  const isRoomServiceOnly = (user?.posIds || []).length > 0
+    && (user?.posIds || []).every(posId => posId.includes('room-service') || posId.includes('minibar'));
+  const primaryBusinessItem = (): NavItem => {
+    if ((hasModule('hotel') && !hasModule('restaurant') && !hasModule('casino') && !hasModule('spa') && !hasModule('boutique')) || isRoomServiceOnly) {
+      return { path: '/pms', icon: BedDouble, label: 'Hôtel' };
+    }
+    if (hasModule('spa')) return { path: '/pos-metier', icon: Sparkles, label: 'Spa' };
+    if (hasModule('boutique')) return { path: '/pos-metier', icon: Store, label: 'Boutique' };
+    if (hasModule('casino')) return { path: '/pos-metier', icon: Dice5, label: 'Casino' };
+    return { path: '/commandes', icon: ShoppingBag, label: 'Restaurant' };
+  };
 
   switch (user?.role) {
     case 'Admin':
     case 'Gérant':
-      navItems = [
-        { path: '/dashboard', icon: Home, label: 'Direction' },
-        { path: '/modules', icon: Grid2X2, label: 'Métiers' },
-        { path: '/commandes', icon: ShoppingBag, label: 'Restaurant' },
-        { path: '/pms', icon: BedDouble, label: 'Hôtel' },
-        { path: '/stocks', icon: Package, label: 'Stocks' },
-        { path: '/settings', icon: Settings, label: 'Réglages' },
-      ];
+      navItems = isFocusedManager
+        ? [
+            primaryBusinessItem(),
+            { path: '/caisse', icon: Wallet, label: 'Caisse' },
+            { path: '/stocks', icon: Package, label: 'Stock' },
+            { path: '/personnel', icon: Calendar, label: 'Équipe' },
+            { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
+          ]
+        : [
+            { path: '/dashboard', icon: Home, label: 'Direction' },
+            { path: '/commandes', icon: ShoppingBag, label: 'Restaurant' },
+            { path: '/pms', icon: BedDouble, label: 'Hôtel' },
+            { path: '/stocks', icon: Package, label: 'Stocks' },
+            { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
+          ];
 
 
       break;
     case 'Caissier':
-      navItems = [
-        { path: '/caisse', icon: ShoppingBag, label: 'Encaissement' },
-        { path: '/fidelite', icon: Users, label: 'Fidélité' },
-        { path: '/personnel', icon: Calendar, label: 'Planning' },
-        { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
-      ];
+      navItems = hasModule('restaurant')
+        ? [
+            { path: '/caisse', icon: ShoppingBag, label: 'Caisse' },
+            { path: '/pos-metier', icon: Dice5, label: 'Bar' },
+            { path: '/fidelite', icon: Users, label: 'Clients' },
+            { path: '/personnel', icon: Calendar, label: 'Planning' },
+            { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
+          ]
+        : [
+            primaryBusinessItem(),
+            { path: '/caisse', icon: ShoppingBag, label: 'Caisse' },
+            { path: '/personnel', icon: Calendar, label: 'Planning' },
+            { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
+          ];
       break;
     case 'Serveur':
-      navItems = [
-        { path: '/commandes', icon: ShoppingBag, label: 'Salle' },
-        { path: '/caisse', icon: Wallet, label: 'Caisse' },
-        { path: '/fidelite', icon: Users, label: 'Fidélité' },
-        { path: '/personnel', icon: Calendar, label: 'Planning' },
-        { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
-      ];
+      navItems = (hasModule('hotel') && !hasModule('restaurant')) || isRoomServiceOnly
+        ? [
+            { path: '/pos-metier', icon: BedDouble, label: 'Room service' },
+            { path: '/personnel', icon: Calendar, label: 'Planning' },
+            { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
+          ]
+        : [
+            { path: '/commandes', icon: ShoppingBag, label: 'Salle' },
+            { path: '/caisse', icon: Wallet, label: 'Caisse' },
+            { path: '/fidelite', icon: Users, label: 'Clients' },
+            { path: '/personnel', icon: Calendar, label: 'Planning' },
+            { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
+          ];
       break;
     case 'Chef cuisine':
       navItems = [

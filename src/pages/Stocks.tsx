@@ -5,7 +5,7 @@ import { useHospiStore } from '../stores/hospiStore';
 import { useAuthStore } from '../stores/authStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
 import { getVisibleSites } from '../utils/accessControl';
-import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package, Settings, Warehouse, Truck, Activity, CreditCard, X, Store, ReceiptText, Download, ShieldCheck, ClipboardCheck, Printer, ChefHat, Scale, Boxes, RefreshCcw, Ban, CircleDollarSign, BookmarkCheck, Gift } from 'lucide-react';
+import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package, Settings, Warehouse, Truck, Activity, CreditCard, X, Store, ReceiptText, Download, ShieldCheck, ClipboardCheck, Printer, ChefHat, Scale, Boxes, RefreshCcw, Ban, CircleDollarSign, BookmarkCheck, Gift, Trash2 } from 'lucide-react';
 import { runtimeDateOffset, runtimeTimestamp } from '../utils/runtime';
 
 const purchaseStatusLabels: Record<string, string> = {
@@ -36,6 +36,7 @@ export default function Stocks() {
   const { items, movements, addMovement, addItem } = useStockStore();
   const { user } = useAuthStore();
   const {
+    companies,
     sites,
     posList,
     warehouses,
@@ -58,6 +59,8 @@ export default function Stocks() {
     transferStock,
     adjustInventory,
     recordLoss,
+    addProduct,
+    deleteProduct,
     addPurchaseOrder,
     updatePurchaseOrder,
     receivePurchaseOrderLines,
@@ -105,6 +108,18 @@ export default function Stocks() {
       { productId: products[0]?.id || '', quantity: '1', unitCost: String(products[0]?.average_purchase_price || 0), lotNumber: '', expiresAt: '' },
     ],
   });
+  const [showProductForm, setShowProductForm] = useState(false);
+  const [productToDeleteId, setProductToDeleteId] = useState<string | null>(null);
+  const [newStockProduct, setNewStockProduct] = useState({
+    name: '',
+    sku: '',
+    category: 'boissons',
+    unit: 'unité',
+    averageCost: '',
+    warehouseId: warehouses[0]?.id || '',
+    quantity: '',
+    threshold: '',
+  });
 
   const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
   const filteredMoves = movements.filter(m =>
@@ -126,6 +141,7 @@ export default function Stocks() {
     return sum + level.quantity * (product?.average_purchase_price || 0);
   }, 0);
   const stockProducts = products
+    .filter(product => product.is_active)
     .map(product => {
       const levels = siteStockLevels.filter(level => level.product_id === product.id);
       const total = levels.reduce((sum, level) => sum + level.quantity, 0);
@@ -253,6 +269,65 @@ export default function Stocks() {
   const canTransferStock = canManageStock || canPerform(user, 'stock_transfer', 1);
   const canAdjustStock = canManageStock || canPerform(user, 'inventory_adjustment', 1);
   const canDeclareLoss = canManageStock || canPerform(user, 'stock_loss', 1);
+
+  const resetStockProductForm = () => {
+    setNewStockProduct({
+      name: '',
+      sku: '',
+      category: 'boissons',
+      unit: 'unité',
+      averageCost: '',
+      warehouseId: siteWarehouses[0]?.id || warehouses[0]?.id || '',
+      quantity: '',
+      threshold: '',
+    });
+  };
+
+  const handleCreateStockProduct = () => {
+    if (!canManageStock) {
+      setStockNotice('Action bloquée : seuls la direction et les gérants peuvent créer une nouvelle référence.');
+      return;
+    }
+    if (!newStockProduct.name.trim() || !newStockProduct.sku.trim()) {
+      setStockNotice('Nom et SKU sont obligatoires pour créer une référence.');
+      return;
+    }
+    const created = addProduct({
+      company_id: companies[0]?.id || 'comp-sartal-demo',
+      name: newStockProduct.name.trim(),
+      sku: newStockProduct.sku.trim(),
+      category_id: newStockProduct.category.trim() || 'stock',
+      unit: newStockProduct.unit.trim() || 'unité',
+      is_stockable: true,
+      is_active: true,
+      primary_warehouse_id: newStockProduct.warehouseId || undefined,
+      fallback_policy: 'block_sale',
+      average_purchase_price: Number(newStockProduct.averageCost) || 0,
+      initial_warehouse_id: newStockProduct.warehouseId || undefined,
+      initial_quantity: Number(newStockProduct.quantity) || 0,
+      alert_threshold: Number(newStockProduct.threshold) || 0,
+    });
+    setSelectedProductId(created.id);
+    setShowProductForm(false);
+    resetStockProductForm();
+    setStockNotice(`${created.name} ajouté au catalogue stock. Ajoute ensuite ses prix par point de vente si le produit doit être vendu.`);
+  };
+
+  const handleDeleteStockProduct = () => {
+    if (!productToDeleteId) return;
+    if (!canManageStock) {
+      setStockNotice('Action bloquée : seuls la direction et les gérants peuvent retirer une référence.');
+      setProductToDeleteId(null);
+      return;
+    }
+    const product = products.find(item => item.id === productToDeleteId);
+    const removed = deleteProduct(productToDeleteId);
+    if (removed) {
+      setStockNotice(`${product?.name || 'Référence'} retiré du catalogue actif. Si le produit avait déjà du stock ou un historique, il est désactivé pour conserver la traçabilité.`);
+      setSelectedProductId(null);
+    }
+    setProductToDeleteId(null);
+  };
 
   const handleMove = () => {
     if (!showMove || !moveQty) return;
@@ -663,10 +738,17 @@ export default function Stocks() {
       <section className="grid grid-cols-2 gap-3 mb-5">
         {[
           {
+            title: 'Nouveau produit',
+            detail: 'Créer une référence',
+            icon: Package,
+            color: '#22C55E',
+            action: () => { resetStockProductForm(); setShowProductForm(true); },
+          },
+          {
             title: 'Ajouter / corriger',
             detail: 'Mettre la quantité réelle',
             icon: Plus,
-            color: '#22C55E',
+            color: '#FF8A00',
             action: () => setShowAdjustment(true),
           },
           {
@@ -682,13 +764,6 @@ export default function Stocks() {
             icon: RefreshCcw,
             color: '#8B5CF6',
             action: () => setShowTransfer(true),
-          },
-          {
-            title: 'Inventaire',
-            detail: 'Compter un dépôt',
-            icon: ClipboardCheck,
-            color: '#FF8A00',
-            action: () => setTab('inventaire-guide'),
           },
         ].map(action => (
           <button key={action.title} onClick={action.action} className="glass-card p-4 text-left active:scale-[0.98] transition-transform">
@@ -1734,6 +1809,82 @@ export default function Stocks() {
 	                <button type="button" disabled={!canDeclareLoss} onClick={() => { setLossForm(prev => ({ ...prev, productId: selectedStockProduct.id })); setSelectedProductId(null); setShowLoss(true); }} className="py-3 rounded-2xl bg-red/10 text-red font-black text-[10px] uppercase tracking-widest disabled:opacity-40">
 	                  Perte
 	                </button>
+              </div>
+              <button type="button" disabled={!canManageStock} onClick={() => setProductToDeleteId(selectedStockProduct.id)} className="w-full mt-3 py-3 rounded-2xl bg-red/5 border border-red/20 text-red font-black text-xs disabled:opacity-40">
+                Retirer du catalogue actif
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Create Product Modal */}
+      <AnimatePresence>
+        {showProductForm && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setShowProductForm(false)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25 }}
+              className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <p className="text-text-tertiary text-xs font-bold">Nouvelle référence stock</p>
+                  <h3 className="text-white font-black text-xl">Ajouter un produit</h3>
+                  <p className="text-text-secondary text-sm mt-1">Le produit sera ajouté au catalogue unique, puis stocké dans le dépôt choisi.</p>
+                </div>
+                <button type="button" onClick={() => setShowProductForm(false)} className="w-9 h-9 rounded-xl bg-white/5 text-text-secondary flex items-center justify-center">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <input value={newStockProduct.name} onChange={e => setNewStockProduct(prev => ({ ...prev, name: e.target.value }))} placeholder="Nom du produit, ex : Jus bissap 33 cl"
+                  className="w-full h-12 rounded-2xl bg-white/5 border border-white/10 px-4 text-white text-sm outline-none" />
+                <div className="grid grid-cols-2 gap-3">
+                  <input value={newStockProduct.sku} onChange={e => setNewStockProduct(prev => ({ ...prev, sku: e.target.value }))} placeholder="SKU / code"
+                    className="h-12 rounded-2xl bg-white/5 border border-white/10 px-4 text-white text-sm outline-none" />
+                  <input value={newStockProduct.category} onChange={e => setNewStockProduct(prev => ({ ...prev, category: e.target.value }))} placeholder="Famille"
+                    className="h-12 rounded-2xl bg-white/5 border border-white/10 px-4 text-white text-sm outline-none" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <input value={newStockProduct.unit} onChange={e => setNewStockProduct(prev => ({ ...prev, unit: e.target.value }))} placeholder="Unité"
+                    className="h-12 rounded-2xl bg-white/5 border border-white/10 px-4 text-white text-sm outline-none" />
+                  <input value={newStockProduct.averageCost} onChange={e => setNewStockProduct(prev => ({ ...prev, averageCost: e.target.value }))} inputMode="numeric" placeholder="Coût moyen"
+                    className="h-12 rounded-2xl bg-white/5 border border-white/10 px-4 text-white text-sm outline-none" />
+                </div>
+                <select value={newStockProduct.warehouseId} onChange={e => setNewStockProduct(prev => ({ ...prev, warehouseId: e.target.value }))}
+                  className="w-full h-12 rounded-2xl bg-[#111827] border border-white/10 px-4 text-white text-sm outline-none">
+                  {siteWarehouses.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+                </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <input value={newStockProduct.quantity} onChange={e => setNewStockProduct(prev => ({ ...prev, quantity: e.target.value }))} inputMode="numeric" placeholder="Stock initial"
+                    className="h-12 rounded-2xl bg-white/5 border border-white/10 px-4 text-white text-sm outline-none" />
+                  <input value={newStockProduct.threshold} onChange={e => setNewStockProduct(prev => ({ ...prev, threshold: e.target.value }))} inputMode="numeric" placeholder="Seuil alerte"
+                    className="h-12 rounded-2xl bg-white/5 border border-white/10 px-4 text-white text-sm outline-none" />
+                </div>
+              </div>
+              <button type="button" onClick={handleCreateStockProduct} className="w-full h-12 rounded-2xl bg-green text-white text-sm font-black mt-5">
+                Ajouter au catalogue
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Product Modal */}
+      <AnimatePresence>
+        {productToDeleteId && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setProductToDeleteId(null)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <div className="w-14 h-14 rounded-2xl bg-red/10 text-red flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={26} />
+              </div>
+              <h3 className="text-white font-black text-xl text-center mb-2">Retirer ce produit ?</h3>
+              <p className="text-text-secondary text-sm text-center mb-6">
+                Si le produit a déjà du stock, des ventes ou une recette, il sera désactivé plutôt que supprimé afin de conserver l’historique.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <button type="button" onClick={() => setProductToDeleteId(null)} className="py-4 rounded-2xl bg-white/5 text-white font-black text-sm">Annuler</button>
+                <button type="button" onClick={handleDeleteStockProduct} className="py-4 rounded-2xl bg-red text-white font-black text-sm">Retirer</button>
               </div>
             </motion.div>
           </motion.div>

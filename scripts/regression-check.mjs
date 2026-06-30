@@ -12,7 +12,7 @@ globalThis.localStorage = {
 globalThis.window = globalThis;
 globalThis.window.localStorage = globalThis.localStorage;
 
-const [{ useHospiStore }, { useOrderStore }, { useBusinessOperationsStore }, { completePOSSale }, { canAccessRoute }, { DEMO_USERS }] = await Promise.all([
+const [{ useHospiStore }, { useOrderStore }, { useBusinessOperationsStore }, { completePOSSale }, { canAccessRoute, getHomePathForUser }, { DEMO_USERS }] = await Promise.all([
   import('../src/stores/hospiStore.ts'),
   import('../src/stores/orderStore.ts'),
   import('../src/stores/businessOperationsStore.ts'),
@@ -96,6 +96,12 @@ useHospiStore.getState().setPermissionPolicy('Serveur', 'Remise', 'manager');
 assert.equal(useHospiStore.getState().getPermissionMode('Serveur', 'Remise'), 'manager', 'permission policy persists in the real store');
 const rootAdmin = DEMO_USERS.find(user => user.accessLevel === 'direction');
 assert.equal(canAccessRoute(rootAdmin, '/settings'), true, 'root admin keeps administration access');
+assert.equal(getHomePathForUser(rootAdmin), '/dashboard', 'direction profile lands on holding dashboard');
+assert.equal(getHomePathForUser(DEMO_USERS.find(user => user.id === 'u8')), '/pms', 'hotel manager lands on PMS');
+assert.equal(getHomePathForUser(DEMO_USERS.find(user => user.id === 'u11')), '/pos-metier', 'spa manager lands on business POS');
+assert.equal(getHomePathForUser(DEMO_USERS.find(user => user.id === 'u12')), '/pos-metier', 'boutique cashier lands on boutique POS');
+assert.equal(getHomePathForUser(DEMO_USERS.find(user => user.id === 'u3')), '/caisse', 'restaurant/bar cashier lands on cash register');
+assert.equal(getHomePathForUser(DEMO_USERS.find(user => user.id === 'u7')), '/pos-metier', 'room service server lands on room service POS');
 
 const pack = useHospiStore.getState().createBusinessPack('bar', 'site-dakar', 'Rooftop Regression');
 assert.ok(pack && pack.pos.default_warehouse_id === pack.warehouse.id, 'business pack creates a linked POS and warehouse');
