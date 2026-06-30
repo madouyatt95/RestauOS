@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, BedDouble, CalendarDays, CreditCard, Dice5, Package, ReceiptText, RotateCcw, Store, UserRound, Warehouse } from 'lucide-react';
@@ -19,6 +19,7 @@ export default function BusinessPOS() {
     activePOSId,
     posList,
     warehouses,
+    setActivePOS,
     getProductsForPOS,
     getOccupiedRoomsWithOpenFolios,
     adjustInventory,
@@ -34,11 +35,15 @@ export default function BusinessPOS() {
     addBoutiqueReturn,
   } = useBusinessOperationsStore();
   const [notice, setNotice] = useState('');
+  const [selectedRoomId, setSelectedRoomId] = useState('');
 
-  const activePOS = posList.find(pos => pos.id === activePOSId);
+  const allowedPOS = posList.filter(pos => pos.is_active && canAccessPOS(user, pos));
+  const activePOS = allowedPOS.find(pos => pos.id === activePOSId) || allowedPOS[0];
   const warehouse = warehouses.find(item => item.id === activePOS?.default_warehouse_id);
-  const products = useMemo(() => activePOS ? getProductsForPOS(activePOS.id) : [], [activePOS, getProductsForPOS]);
+  const products = activePOS ? getProductsForPOS(activePOS.id) : [];
   const rooms = getOccupiedRoomsWithOpenFolios().filter(row => row.room.site_id === activePOS?.site_id);
+  const roomChargeEnabled = Boolean(activePOS?.payment_methods.includes('room_charge'));
+  const selectedRoom = rooms.find(row => row.room.id === selectedRoomId) || rooms[0];
   const posSpaAppointments = activePOS ? spaAppointments.filter(item => item.posId === activePOS.id) : [];
   const posCasinoSessions = activePOS ? casinoSessions.filter(item => item.posId === activePOS.id) : [];
   const posBoutiqueReturns = activePOS ? boutiqueReturns.filter(item => item.posId === activePOS.id) : [];
@@ -56,8 +61,8 @@ export default function BusinessPOS() {
     }
   };
 
-  const chargeRoom = (row: POSProduct) => {
-    const target = rooms[0];
+  const chargeRoom = (row: POSProduct, roomId?: string) => {
+    const target = rooms.find(item => item.room.id === roomId) || selectedRoom;
     if (!target) {
       setNotice('Aucune chambre occupée avec folio ouvert pour imputation.');
       return;
@@ -65,7 +70,7 @@ export default function BusinessPOS() {
     if (!activePOS) return;
     try {
       completePOSSale({ posId: activePOS.id, productId: row.product.id, payment: 'room_charge', actor: user?.name || activePOS.name, roomId: target.room.id });
-      setNotice(`${row.product.name} imputé à la chambre ${target.room.room_number}. Stock, POS et folio sont reliés.`);
+      setNotice(`${row.product.name} imputé à la chambre ${target.room.room_number} - ${target.guest.first_name} ${target.guest.last_name}. Stock, POS et folio sont reliés.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'L’imputation chambre a échoué.');
     }
@@ -123,7 +128,7 @@ export default function BusinessPOS() {
     setNotice(`Retour boutique enregistré : ${row.product.name}. Stock du dépôt ${warehouse.name} ajusté.`);
   };
 
-  if (!activePOS || !canAccessPOS(user, activePOS)) {
+  if (!activePOS) {
     return (
       <div className="page-content pt-14 pb-28">
         <button onClick={() => navigate('/modules')} className="h-11 px-4 rounded-2xl bg-white/5 text-white text-sm font-bold mb-6">
@@ -148,6 +153,21 @@ export default function BusinessPOS() {
           <Warehouse size={15} /> Dépôt
         </button>
       </div>
+
+      {allowedPOS.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto scrollbar-none mb-4">
+          {allowedPOS.map(pos => (
+            <button
+              key={pos.id}
+              type="button"
+              onClick={() => { setActivePOS(pos.id); setSelectedRoomId(''); }}
+              className={`shrink-0 px-4 py-2.5 rounded-2xl border text-[10px] font-black uppercase ${pos.id === activePOS.id ? 'bg-purple/15 border-purple/40 text-white' : 'bg-white/5 border-white/10 text-text-secondary'}`}
+            >
+              {pos.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="glass-card-lg p-5 mb-4">
         <div className="flex items-start justify-between gap-3">
@@ -197,6 +217,48 @@ export default function BusinessPOS() {
         </button>
       )}
 
+      {roomChargeEnabled && activePOS.type !== 'room_service' && (
+        <section className="glass-card-lg p-4 mb-4">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <p className="text-cyan-300 text-[10px] font-black uppercase tracking-widest">Imputation hôtel</p>
+              <h2 className="text-white font-black text-lg">Folio chambre</h2>
+              <p className="text-text-secondary text-xs mt-1">Choisis clairement le client avant d’envoyer une consommation sur sa chambre.</p>
+            </div>
+            <button onClick={() => navigate('/pms')} className="h-10 px-3 rounded-2xl bg-cyan-500/15 border border-cyan-400/20 text-cyan-200 text-xs font-black flex items-center gap-2">
+              <BedDouble size={15} /> PMS
+            </button>
+          </div>
+          <div className="space-y-2">
+            {rooms.slice(0, 4).map(row => (
+              <button
+                key={row.room.id}
+                type="button"
+                onClick={() => setSelectedRoomId(row.room.id)}
+                className={`w-full rounded-2xl border p-3 text-left transition-all ${selectedRoom?.room.id === row.room.id ? 'bg-cyan-500/10 border-cyan-400/30' : 'bg-white/5 border-white/10'}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-white font-black text-sm">Chambre {row.room.room_number}</p>
+                    <p className="text-text-secondary text-xs mt-1">{row.guest.first_name} {row.guest.last_name}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-cyan-300 text-[10px] font-black uppercase">Folio ouvert</p>
+                    <p className="text-white text-xs font-black mt-1">{fmt(row.folio.total_amount)} F</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+            {rooms.length === 0 && (
+              <div className="rounded-2xl bg-white/5 border border-dashed border-white/10 p-4 text-center">
+                <p className="text-white font-bold text-sm">Aucune chambre disponible</p>
+                <p className="text-text-secondary text-xs mt-1">Ce POS autorise l’imputation, mais aucun folio ouvert n’est rattaché au site.</p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {activePOS.type === 'room_service' && (
         <section className="glass-card-lg p-4 mb-4">
           <div className="flex items-center justify-between gap-3 mb-3">
@@ -221,10 +283,10 @@ export default function BusinessPOS() {
                   <button
                     type="button"
                     disabled={!quickProduct}
-                    onClick={() => quickProduct && chargeRoom(quickProduct)}
+                    onClick={() => quickProduct && chargeRoom(quickProduct, row.room.id)}
                     className="h-9 px-3 rounded-xl bg-blue/10 text-blue text-[10px] font-black disabled:opacity-40"
                   >
-                    Imputer
+                    Imputer folio
                   </button>
                 </div>
               );
@@ -337,13 +399,19 @@ export default function BusinessPOS() {
               </div>
               <p className="text-orange font-black text-sm whitespace-nowrap">{fmt(row.price.sale_price)} F</p>
             </div>
-            <div className="grid grid-cols-2 gap-2 mt-4">
+            <div className={`grid gap-2 mt-4 ${roomChargeEnabled ? 'grid-cols-2' : 'grid-cols-1'}`}>
               <button onClick={() => sellNow(row)} className="h-11 rounded-xl bg-orange text-white text-xs font-black flex items-center justify-center gap-2">
-                <ReceiptText size={15} /> Vendre
+                <ReceiptText size={15} /> {activePOS.type === 'casino' ? 'Encaisser' : 'Vendre'}
               </button>
-              <button onClick={() => chargeRoom(row)} className="h-11 rounded-xl bg-blue/10 text-blue text-xs font-black flex items-center justify-center gap-2">
-                <BedDouble size={15} /> Chambre
-              </button>
+              {roomChargeEnabled && (
+                <button
+                  onClick={() => chargeRoom(row)}
+                  disabled={!selectedRoom}
+                  className="h-11 rounded-xl bg-blue/10 text-blue text-xs font-black flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <BedDouble size={15} /> Folio hôtel
+                </button>
+              )}
             </div>
           </motion.div>
         ))}

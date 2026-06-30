@@ -22,6 +22,7 @@ import { useAuthStore, type UserRole } from '../stores/authStore';
 import { useHospiStore, type RoomStatus } from '../stores/hospiStore';
 import { useBusinessOperationsStore } from '../stores/businessOperationsStore';
 import { usePlanningStore } from '../stores/planningStore';
+import { useStaffStore } from '../stores/staffStore';
 import { getVisiblePOS, getVisibleSites } from '../utils/accessControl';
 import { getProfileWorkspace, workspaceToneClasses, type WorkspaceTone } from '../utils/profileWorkspace';
 import type { LucideIcon } from 'lucide-react';
@@ -48,6 +49,13 @@ const statusLabel: Record<RoomStatus, string> = {
   occupied: 'Occupée',
   cleaning: 'À nettoyer',
   maintenance: 'Hors service',
+};
+
+const shiftLabels: Record<string, string> = {
+  midi: 'Service midi',
+  soir: 'Service soir',
+  journee: 'Journée',
+  repos: 'Repos',
 };
 
 const roleLabels: Partial<Record<UserRole, string>> = {
@@ -94,6 +102,7 @@ export default function Workstation() {
   } = useHospiStore();
   const { spaAppointments, casinoSessions, boutiqueReturns, updateSpaAppointmentStatus, closeCasinoSession } = useBusinessOperationsStore();
   const { shifts } = usePlanningStore();
+  const { employees } = useStaffStore();
 
   const visibleSites = getVisibleSites(user, sites);
   const visibleSiteIds = visibleSites.map(site => site.id);
@@ -117,7 +126,17 @@ export default function Workstation() {
   });
   const pendingPurchases = purchaseOrders.filter(order => order.status !== 'received' && order.status !== 'cancelled');
   const posProducts = activePOS ? getProductsForPOS(activePOS.id) : [];
-  const todayShifts = user?.employeeId ? shifts.filter(shift => shift.employeeId === user.employeeId) : [];
+  const todayStr = new Date().toISOString().split('T')[0];
+  const currentEmployee = user?.employeeId
+    ? employees.find(employee => employee.id === user.employeeId)
+    : employees.find(employee => employee.name === user?.name);
+  const todayShifts = currentEmployee ? shifts.filter(shift => shift.employeeId === currentEmployee.id && shift.date === todayStr) : [];
+  const upcomingShifts = currentEmployee
+    ? [...shifts]
+      .filter(shift => shift.employeeId === currentEmployee.id && shift.date >= todayStr)
+      .sort((a, b) => `${a.date}-${a.hours}`.localeCompare(`${b.date}-${b.hours}`))
+      .slice(0, 3)
+    : [];
   const spaRows = spaAppointments.filter(item => visiblePOS.some(pos => pos.id === item.posId));
   const casinoRows = casinoSessions.filter(item => visiblePOS.some(pos => pos.id === item.posId));
   const boutiqueRows = boutiqueReturns.filter(item => visiblePOS.some(pos => pos.id === item.posId));
@@ -295,6 +314,48 @@ export default function Workstation() {
       <section className="glass-card-lg p-4 mb-5">
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
+            <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Service du jour</p>
+            <h2 className="text-white font-black text-lg">{currentEmployee?.name || user?.name || 'Profil actif'}</h2>
+          </div>
+          <CalendarDays size={20} className={workspaceTone.text} />
+        </div>
+        {todayShifts.length > 0 ? (
+          <div className="space-y-2">
+            {todayShifts.map(shift => (
+              <div key={shift.id} className="rounded-2xl bg-white/5 border border-white/10 p-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-white font-black text-sm">{shiftLabels[shift.type] || shift.type}</p>
+                  <p className="text-text-secondary text-xs mt-1">{shift.hours}</p>
+                </div>
+                <span className="text-green text-[10px] font-black uppercase">Planifié</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-orange/10 border border-orange/20 p-4">
+            <p className="text-orange font-black text-sm">Aucun service daté aujourd’hui</p>
+            <p className="text-text-secondary text-xs mt-1">
+              {currentEmployee?.schedule && currentEmployee.schedule !== 'À planifier'
+                ? `Horaire de référence : ${currentEmployee.schedule}.`
+                : 'Le manager doit encore affecter ce profil au planning du jour.'}
+            </p>
+          </div>
+        )}
+        {upcomingShifts.length > 0 && (
+          <div className="mt-3 grid gap-2">
+            {upcomingShifts.map(shift => (
+              <div key={`${shift.id}-mini`} className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.03] px-3 py-2">
+                <span className="text-text-secondary text-[10px] font-bold">{new Date(shift.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                <span className="text-white text-[10px] font-black">{shiftLabels[shift.type] || shift.type} · {shift.hours}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="glass-card-lg p-4 mb-5">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
             <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Actions du poste</p>
             <h2 className="text-white font-black text-lg">Ce que ce profil doit faire</h2>
           </div>
@@ -375,6 +436,12 @@ export default function Workstation() {
                   </button>
                 </div>
               ))}
+              {spaRows.length === 0 && (
+                <div className="rounded-2xl bg-white/5 border border-dashed border-white/10 p-4 text-center">
+                  <p className="text-white font-black text-sm">Aucun soin visible sur ce POS</p>
+                  <p className="text-text-secondary text-xs mt-1">Les rendez-vous apparaîtront ici dès qu’ils sont créés depuis le module spa.</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -393,6 +460,12 @@ export default function Workstation() {
                   )}
                 </div>
               ))}
+              {casinoRows.length === 0 && (
+                <div className="rounded-2xl bg-white/5 border border-dashed border-white/10 p-4 text-center">
+                  <p className="text-white font-black text-sm">Aucune session casino ouverte</p>
+                  <p className="text-text-secondary text-xs mt-1">Ouvre une session depuis le module métier pour suivre buy-in, cash-out et clôture.</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -407,6 +480,12 @@ export default function Workstation() {
                   <span className="text-orange font-black text-sm">{fmt(row.price.sale_price)} F</span>
                 </div>
               ))}
+              {posProducts.length === 0 && (
+                <div className="rounded-2xl bg-white/5 border border-dashed border-white/10 p-4 text-center">
+                  <p className="text-white font-black text-sm">Aucune offre visible</p>
+                  <p className="text-text-secondary text-xs mt-1">Le catalogue de ce POS doit être activé depuis les réglages métier.</p>
+                </div>
+              )}
               {role === 'Vendeur boutique' && boutiqueRows.length > 0 && (
                 <div className="rounded-2xl bg-blue/10 border border-blue/20 p-3">
                   <p className="text-blue font-black text-xs">{boutiqueRows.length} retour(s) boutique à suivre</p>
