@@ -35,6 +35,9 @@ const PMS = lazy(() => import('./pages/PMS'));
 const BusinessModules = lazy(() => import('./pages/BusinessModules'));
 const BusinessPOS = lazy(() => import('./pages/BusinessPOS'));
 const DemoGuide = lazy(() => import('./pages/DemoGuide'));
+const Workstation = lazy(() => import('./pages/Workstation'));
+
+const staffRoles = ['Caissier', 'Serveur', 'Chef cuisine', 'Livreur', 'Réceptionniste', 'Gouvernante', 'Maintenance', 'Barman', 'Croupier', 'Praticien spa', 'Vendeur boutique', 'Stockiste', 'Acheteur'];
 
 function AppContent() {
   const location = useLocation();
@@ -56,22 +59,25 @@ function AppContent() {
             <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Serveur']}><Commandes /></ProtectedRoute>
           } />
           <Route path="/caisse" element={
-            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier', 'Serveur']}><Caisse /></ProtectedRoute>
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier', 'Serveur', 'Réceptionniste', 'Barman', 'Croupier', 'Vendeur boutique']}><Caisse /></ProtectedRoute>
           } />
           <Route path="/cuisine" element={
             <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Chef cuisine']}><Cuisine /></ProtectedRoute>
           } />
           <Route path="/stocks" element={
-            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Chef cuisine']}><Stocks /></ProtectedRoute>
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Chef cuisine', 'Barman', 'Vendeur boutique', 'Stockiste', 'Acheteur']}><Stocks /></ProtectedRoute>
           } />
           <Route path="/pms" element={
-            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier']}><PMS /></ProtectedRoute>
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier', 'Réceptionniste', 'Gouvernante', 'Maintenance']}><PMS /></ProtectedRoute>
           } />
           <Route path="/pos-metier" element={
-            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier', 'Serveur']}><BusinessPOS /></ProtectedRoute>
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier', 'Serveur', 'Barman', 'Croupier', 'Praticien spa', 'Vendeur boutique']}><BusinessPOS /></ProtectedRoute>
+          } />
+          <Route path="/poste" element={
+            <ProtectedRoute allowedRoles={staffRoles}><Workstation /></ProtectedRoute>
           } />
           <Route path="/personnel" element={
-            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier', 'Serveur', 'Chef cuisine', 'Livreur']}><Personnel /></ProtectedRoute>
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant', ...staffRoles]}><Personnel /></ProtectedRoute>
           } />
           <Route path="/rapports" element={
             <ProtectedRoute allowedRoles={['Admin', 'Gérant']}><Rapports /></ProtectedRoute>

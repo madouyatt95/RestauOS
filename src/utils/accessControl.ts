@@ -32,6 +32,7 @@ const ROUTE_MODULES: Array<{ prefix: string; modules: BusinessModule[]; managers
   { prefix: '/rapports', modules: ['direction', 'restaurant', 'hotel', 'casino', 'spa', 'boutique', 'stock'], managersOnly: true },
   { prefix: '/demo-guide', modules: ['direction', 'restaurant', 'hotel', 'casino', 'spa', 'boutique', 'stock', 'delivery'], managersOnly: true },
   { prefix: '/whatsapp-bot', modules: ['direction', 'restaurant', 'hotel', 'delivery'], managersOnly: true },
+  { prefix: '/poste', modules: ['restaurant', 'hotel', 'casino', 'spa', 'boutique', 'stock', 'delivery'] },
   { prefix: '/pos-metier', modules: ['restaurant', 'hotel', 'casino', 'spa', 'boutique'] },
   { prefix: '/commandes', modules: ['restaurant', 'hotel', 'casino', 'spa', 'boutique'] },
   { prefix: '/caisse', modules: ['restaurant', 'hotel', 'casino', 'spa', 'boutique'] },
@@ -107,10 +108,12 @@ export function getHomePathForUser(user: UserProfile | null | undefined) {
   const modules = user.businessModules || [];
   const hasOnly = (module: BusinessModule) => modules.length === 1 && modules.includes(module);
   const has = (module: BusinessModule) => modules.includes(module);
+  const specialistRoles = ['Réceptionniste', 'Gouvernante', 'Maintenance', 'Barman', 'Croupier', 'Praticien spa', 'Vendeur boutique', 'Stockiste', 'Acheteur'];
   const isRoomServiceOnly = (user.posIds || []).length > 0
     && (user.posIds || []).every(posId => posId.includes('room-service') || posId.includes('minibar'));
 
   if (user.role === 'Client') return '/client';
+  if (specialistRoles.includes(user.role)) return '/poste';
   if (user.role === 'Livreur') return '/livraisons';
   if (user.role === 'Chef cuisine') return '/cuisine';
 

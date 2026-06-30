@@ -99,9 +99,15 @@ assert.equal(canAccessRoute(rootAdmin, '/settings'), true, 'root admin keeps adm
 assert.equal(getHomePathForUser(rootAdmin), '/dashboard', 'direction profile lands on holding dashboard');
 assert.equal(getHomePathForUser(DEMO_USERS.find(user => user.id === 'u8')), '/pms', 'hotel manager lands on PMS');
 assert.equal(getHomePathForUser(DEMO_USERS.find(user => user.id === 'u11')), '/pos-metier', 'spa manager lands on business POS');
-assert.equal(getHomePathForUser(DEMO_USERS.find(user => user.id === 'u12')), '/pos-metier', 'boutique cashier lands on boutique POS');
+assert.equal(getHomePathForUser(DEMO_USERS.find(user => user.id === 'u12')), '/poste', 'boutique seller lands on métier workstation');
 assert.equal(getHomePathForUser(DEMO_USERS.find(user => user.id === 'u3')), '/caisse', 'restaurant/bar cashier lands on cash register');
 assert.equal(getHomePathForUser(DEMO_USERS.find(user => user.id === 'u7')), '/pos-metier', 'room service server lands on room service POS');
+assert.equal(getHomePathForUser(DEMO_USERS.find(user => user.id === 'u16')), '/poste', 'housekeeping profile lands on workstation');
+assert.equal(getHomePathForUser(DEMO_USERS.find(user => user.id === 'u18')), '/poste', 'bar profile lands on workstation');
+assert.equal(getHomePathForUser(DEMO_USERS.find(user => user.id === 'u21')), '/poste', 'stock profile lands on workstation');
+assert.equal(canAccessRoute(DEMO_USERS.find(user => user.id === 'u16'), '/pms'), true, 'housekeeping can access hotel PMS scope');
+assert.equal(canAccessRoute(DEMO_USERS.find(user => user.id === 'u18'), '/pos-metier'), true, 'bar staff can access casino POS scope');
+assert.equal(canAccessRoute(DEMO_USERS.find(user => user.id === 'u21'), '/stocks'), true, 'stock staff can access stock scope');
 
 const pack = useHospiStore.getState().createBusinessPack('bar', 'site-dakar', 'Rooftop Regression');
 assert.ok(pack && pack.pos.default_warehouse_id === pack.warehouse.id, 'business pack creates a linked POS and warehouse');

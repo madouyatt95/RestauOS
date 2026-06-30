@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, ShoppingBag, Package, Users, MoreHorizontal, Truck, ChefHat, Calendar, Wallet, BedDouble, Dice5, Sparkles, Store } from 'lucide-react';
+import { Home, ShoppingBag, Package, Users, MoreHorizontal, Truck, ChefHat, Calendar, Wallet, BedDouble, Dice5, Sparkles, Store, BriefcaseBusiness, Wrench } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { usePlanningStore } from '../stores/planningStore';
 import { canAccessRoute } from '../utils/accessControl';
@@ -97,6 +97,75 @@ export default function BottomNav() {
         { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
       ];
       break;
+    case 'Réceptionniste':
+      navItems = [
+        { path: '/poste', icon: BriefcaseBusiness, label: 'Poste' },
+        { path: '/pms', icon: BedDouble, label: 'Hôtel' },
+        { path: '/caisse', icon: Wallet, label: 'Caisse' },
+        { path: '/personnel', icon: Calendar, label: 'Planning' },
+        { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
+      ];
+      break;
+    case 'Gouvernante':
+      navItems = [
+        { path: '/poste', icon: BriefcaseBusiness, label: 'Poste' },
+        { path: '/pms', icon: BedDouble, label: 'Chambres' },
+        { path: '/personnel', icon: Calendar, label: 'Planning' },
+        { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
+      ];
+      break;
+    case 'Maintenance':
+      navItems = [
+        { path: '/poste', icon: Wrench, label: 'Poste' },
+        { path: '/pms', icon: BedDouble, label: 'Tickets' },
+        { path: '/personnel', icon: Calendar, label: 'Planning' },
+        { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
+      ];
+      break;
+    case 'Barman':
+      navItems = [
+        { path: '/poste', icon: BriefcaseBusiness, label: 'Poste' },
+        { path: '/pos-metier', icon: Dice5, label: 'Bar' },
+        { path: '/caisse', icon: Wallet, label: 'Caisse' },
+        { path: '/stocks', icon: Package, label: 'Stock' },
+        { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
+      ];
+      break;
+    case 'Croupier':
+      navItems = [
+        { path: '/poste', icon: BriefcaseBusiness, label: 'Poste' },
+        { path: '/pos-metier', icon: Dice5, label: 'Tables' },
+        { path: '/caisse', icon: Wallet, label: 'Caisse' },
+        { path: '/personnel', icon: Calendar, label: 'Planning' },
+        { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
+      ];
+      break;
+    case 'Praticien spa':
+      navItems = [
+        { path: '/poste', icon: BriefcaseBusiness, label: 'Poste' },
+        { path: '/pos-metier', icon: Sparkles, label: 'Spa' },
+        { path: '/personnel', icon: Calendar, label: 'Planning' },
+        { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
+      ];
+      break;
+    case 'Vendeur boutique':
+      navItems = [
+        { path: '/poste', icon: BriefcaseBusiness, label: 'Poste' },
+        { path: '/pos-metier', icon: Store, label: 'Boutique' },
+        { path: '/caisse', icon: Wallet, label: 'Caisse' },
+        { path: '/stocks', icon: Package, label: 'Stock' },
+        { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
+      ];
+      break;
+    case 'Stockiste':
+    case 'Acheteur':
+      navItems = [
+        { path: '/poste', icon: BriefcaseBusiness, label: 'Poste' },
+        { path: '/stocks', icon: Package, label: 'Stocks' },
+        { path: '/personnel', icon: Calendar, label: 'Planning' },
+        { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
+      ];
+      break;
     case 'Client':
       navItems = [
         { path: '/client', icon: Home, label: 'Accueil' },
@@ -110,11 +179,11 @@ export default function BottomNav() {
   }
 
   // Shift-based Filtering
-  const operationalRoles = ['Serveur', 'Chef cuisine', 'Caissier', 'Livreur'];
+  const operationalRoles = ['Serveur', 'Chef cuisine', 'Caissier', 'Livreur', 'Réceptionniste', 'Gouvernante', 'Maintenance', 'Barman', 'Croupier', 'Praticien spa', 'Vendeur boutique', 'Stockiste', 'Acheteur'];
   if (user && operationalRoles.includes(user.role) && user.employeeId && !user.shiftOverride) {
     const isOffShift = checkIsOffShift(user.employeeId);
     if (isOffShift) {
-      navItems = navItems.filter(item => item.path === '/personnel' || item.path === '/plus');
+      navItems = navItems.filter(item => item.path === '/poste' || item.path === '/personnel' || item.path === '/plus');
     }
   }
 

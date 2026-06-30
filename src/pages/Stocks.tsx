@@ -265,7 +265,7 @@ export default function Stocks() {
     { title: 'Conso internes', value: `${internalConsumptions.length} trace(s)`, detail: 'Personnel, offert, VIP, direction, casino, room service et mini-bar sont tracés.', icon: Gift, tone: 'blue', action: () => setTab('pertes') },
     { title: 'Règles par POS', value: `${posList.length} POS`, detail: 'Prix, TVA, dépôt, caisse, imprimante, rapport Z et serveur restent liés au POS.', icon: Store, tone: 'green', action: () => setTab('depots') },
   ];
-  const canManageStock = user?.role === 'Admin' || user?.role === 'Gérant';
+  const canManageStock = user?.role === 'Admin' || user?.role === 'Gérant' || user?.role === 'Stockiste' || user?.role === 'Acheteur';
   const canTransferStock = canManageStock || canPerform(user, 'stock_transfer', 1);
   const canAdjustStock = canManageStock || canPerform(user, 'inventory_adjustment', 1);
   const canDeclareLoss = canManageStock || canPerform(user, 'stock_loss', 1);

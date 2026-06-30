@@ -133,6 +133,18 @@ export const usePlanningStore = create<PlanningState>()(
           { id: 's66', employeeId: 'e14', date: d(2), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
           { id: 's67', employeeId: 'e14', date: d(4), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
           { id: 's68', employeeId: 'e14', date: d(5), type: 'midi' as ShiftType, hours: '11:00 - 16:00' },
+          // Hôtel, casino, spa, stock - profils métier de démo
+          { id: 's69', employeeId: 'e16', date: d(0), type: 'journee' as ShiftType, hours: '08:00 - 17:00' },
+          { id: 's70', employeeId: 'e16', date: d(1), type: 'journee' as ShiftType, hours: '08:00 - 17:00' },
+          { id: 's71', employeeId: 'e16', date: d(2), type: 'journee' as ShiftType, hours: '08:00 - 17:00' },
+          { id: 's72', employeeId: 'e17', date: d(1), type: 'journee' as ShiftType, hours: '09:00 - 18:00' },
+          { id: 's73', employeeId: 'e17', date: d(2), type: 'journee' as ShiftType, hours: '09:00 - 18:00' },
+          { id: 's74', employeeId: 'e18', date: d(1), type: 'soir' as ShiftType, hours: '18:00 - 02:00' },
+          { id: 's75', employeeId: 'e18', date: d(2), type: 'soir' as ShiftType, hours: '18:00 - 02:00' },
+          { id: 's76', employeeId: 'e19', date: d(1), type: 'journee' as ShiftType, hours: '10:00 - 19:00' },
+          { id: 's77', employeeId: 'e19', date: d(2), type: 'journee' as ShiftType, hours: '10:00 - 19:00' },
+          { id: 's78', employeeId: 'e20', date: d(1), type: 'journee' as ShiftType, hours: '08:00 - 17:00' },
+          { id: 's79', employeeId: 'e21', date: d(1), type: 'journee' as ShiftType, hours: '08:00 - 17:00' },
         ];
       })(),
       addShift: (newShift) => set((state) => ({

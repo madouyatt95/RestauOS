@@ -102,6 +102,87 @@ export function getProfileWorkspace(user?: UserProfile | null, activePOS?: POS):
     };
   }
 
+  if (user.role === 'Réceptionniste') {
+    return {
+      eyebrow: 'Réception hôtel',
+      title: user.demoTitle || 'Réception PMS',
+      subtitle: 'Arrivées, départs, folios, paiements et demandes client.',
+      tone: 'cyan',
+    };
+  }
+
+  if (user.role === 'Gouvernante') {
+    return {
+      eyebrow: 'Housekeeping',
+      title: user.demoTitle || 'Gouvernante',
+      subtitle: 'Chambres à nettoyer, inspection, mini-bar et anomalies de séjour.',
+      tone: 'cyan',
+    };
+  }
+
+  if (user.role === 'Maintenance') {
+    return {
+      eyebrow: 'Technique hôtel',
+      title: user.demoTitle || 'Maintenance',
+      subtitle: 'Chambres bloquées, tickets techniques et remise en service.',
+      tone: 'orange',
+    };
+  }
+
+  if (user.role === 'Barman') {
+    return {
+      eyebrow: 'Service bar',
+      title: posName || user.demoTitle || 'Bar',
+      subtitle: 'Ventes comptoir, cave, caisse et stock boissons du POS.',
+      tone: 'purple',
+    };
+  }
+
+  if (user.role === 'Croupier') {
+    return {
+      eyebrow: 'Casino floor',
+      title: posName || user.demoTitle || 'Tables casino',
+      subtitle: 'Sessions, buy-in, cash-out, traçabilité et audit caisse.',
+      tone: 'purple',
+    };
+  }
+
+  if (user.role === 'Praticien spa') {
+    return {
+      eyebrow: 'Cabines spa',
+      title: posName || user.demoTitle || 'Spa',
+      subtitle: 'Planning soins, clients, cabines et consommables spa.',
+      tone: 'green',
+    };
+  }
+
+  if (user.role === 'Vendeur boutique') {
+    return {
+      eyebrow: 'Boutique hôtel',
+      title: posName || user.demoTitle || 'Boutique',
+      subtitle: 'Ventes, retours, échanges, stock boutique et room charge.',
+      tone: 'blue',
+    };
+  }
+
+  if (user.role === 'Stockiste') {
+    return {
+      eyebrow: 'Dépôts & inventaires',
+      title: user.demoTitle || 'Stocks',
+      subtitle: 'Seuils, transferts, inventaires, pertes et mouvements multi-dépôts.',
+      tone: 'blue',
+    };
+  }
+
+  if (user.role === 'Acheteur') {
+    return {
+      eyebrow: 'Achats fournisseurs',
+      title: user.demoTitle || 'Achats',
+      subtitle: 'Commandes fournisseurs, réceptions partielles, lots et coûts.',
+      tone: 'orange',
+    };
+  }
+
   if (user.role === 'Serveur') {
     if (activePOS?.type === 'room_service') {
       return {

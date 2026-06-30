@@ -28,6 +28,15 @@ const roleAliases: Record<string, string[]> = {
   Serveur: ['Serveur'],
   'Chef cuisine': ['Chef cuisine'],
   Livreur: ['Livreur'],
+  Réceptionniste: ['Réceptionniste', 'Caissier'],
+  Gouvernante: ['Gouvernante'],
+  Maintenance: ['Maintenance'],
+  Barman: ['Barman', 'Serveur', 'Caissier'],
+  Croupier: ['Croupier', 'Caissier'],
+  'Praticien spa': ['Praticien spa', 'Serveur'],
+  'Vendeur boutique': ['Vendeur boutique', 'Caissier'],
+  Stockiste: ['Stockiste', 'Chef cuisine'],
+  Acheteur: ['Acheteur', 'Stockiste'],
   Client: ['Client'],
 };
 
@@ -86,8 +95,8 @@ export default function ProtectedRoute({ children, allowedRoles }: { children: R
   }
 
   // Shift-based Access Control
-  const operationalRoles = ['Serveur', 'Chef cuisine', 'Caissier', 'Livreur'];
-  const personalRoutes = ['/personnel', '/plus']; // Routes allowed off-shift
+  const operationalRoles = ['Serveur', 'Chef cuisine', 'Caissier', 'Livreur', 'Réceptionniste', 'Gouvernante', 'Maintenance', 'Barman', 'Croupier', 'Praticien spa', 'Vendeur boutique', 'Stockiste', 'Acheteur'];
+  const personalRoutes = ['/personnel', '/plus', '/poste']; // Routes allowed off-shift
 
   if (operationalRoles.includes(user.role) && user.employeeId && !user.shiftOverride) {
     const isOffShift = checkIsOffShift(user.employeeId);
