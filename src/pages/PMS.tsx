@@ -3,18 +3,23 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
+  Banknote,
   BedDouble,
+  Bell,
   CalendarDays,
   CreditCard,
   DoorOpen,
+  Download,
   FileText,
   Hotel,
   Menu,
+  Percent,
   ReceiptText,
   Search,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
+  UserRound,
   Wrench,
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
@@ -46,16 +51,22 @@ const roomTileClass: Record<RoomStatus, string> = {
   maintenance: 'bg-gradient-to-br from-slate-600 to-slate-950 text-white ring-1 ring-white/15',
 };
 
-type HotelTab = 'reception' | 'planning' | 'rooms' | 'folios' | 'housekeeping' | 'rates' | 'maintenance' | 'reports';
+type HotelTab = 'reception' | 'reservations' | 'availability' | 'planning' | 'rooms' | 'folios' | 'payments' | 'clients' | 'housekeeping' | 'rates' | 'maintenance' | 'documents' | 'alerts' | 'reports';
 
 const tabs: Array<{ id: HotelTab; label: string; icon: any }> = [
   { id: 'reception', label: 'Reception', icon: DoorOpen },
+  { id: 'reservations', label: 'Reservations', icon: CalendarDays },
+  { id: 'availability', label: 'Disponibilite', icon: Hotel },
   { id: 'planning', label: 'Planning', icon: CalendarDays },
   { id: 'rooms', label: 'Chambres', icon: BedDouble },
   { id: 'folios', label: 'Folios', icon: ReceiptText },
+  { id: 'payments', label: 'Paiements', icon: Banknote },
+  { id: 'clients', label: 'Clients', icon: UserRound },
   { id: 'housekeeping', label: 'Menage', icon: Sparkles },
   { id: 'rates', label: 'Tarifs', icon: CreditCard },
   { id: 'maintenance', label: 'Technique', icon: Wrench },
+  { id: 'documents', label: 'Documents', icon: Download },
+  { id: 'alerts', label: 'Alertes', icon: Bell },
   { id: 'reports', label: 'Rapports', icon: FileText },
 ];
 
@@ -72,6 +83,27 @@ const maintenanceSeed = [
   { room: '103', title: 'Controle serrure', owner: 'Reception', priority: 'Basse', status: 'Ouvert' },
 ];
 
+type DemoReservation = {
+  id: string;
+  guestName: string;
+  channel: string;
+  roomType: string;
+  checkIn: string;
+  checkOut: string;
+  status: 'booked' | 'precheckin' | 'checkedin' | 'cancelled' | 'noshow';
+  deposit: number;
+  rate: number;
+};
+
+type DemoPayment = {
+  id: string;
+  folioId: string;
+  label: string;
+  amount: number;
+  method: string;
+  status: 'paid' | 'deposit' | 'refund';
+};
+
 export default function PMS() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -82,6 +114,21 @@ export default function PMS() {
   const [chargeAmount, setChargeAmount] = useState('3700');
   const [notice, setNotice] = useState('');
   const [activeFloor, setActiveFloor] = useState('Tous');
+  const [reservationForm, setReservationForm] = useState({
+    guestName: 'Mame Diarra',
+    channel: 'Walk-in',
+    roomType: 'Deluxe',
+    checkIn: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+    checkOut: new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 10),
+    deposit: '50000',
+  });
+  const [demoReservations, setDemoReservations] = useState<DemoReservation[]>([
+    { id: 'res-demo-1', guestName: 'Mame Diarra', channel: 'Telephone', roomType: 'Deluxe', checkIn: new Date(Date.now() + 86400000).toISOString().slice(0, 10), checkOut: new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 10), status: 'booked', deposit: 50000, rate: 95000 },
+    { id: 'res-demo-2', guestName: 'Societe Baobab', channel: 'Corporate', roomType: 'Suite', checkIn: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10), checkOut: new Date(Date.now() + 86400000 * 6).toISOString().slice(0, 10), status: 'precheckin', deposit: 180000, rate: 145000 },
+  ]);
+  const [payments, setPayments] = useState<DemoPayment[]>([]);
+  const [editableRates, setEditableRates] = useState(rateRows);
+  const [maintenanceTickets, setMaintenanceTickets] = useState(maintenanceSeed);
   const {
     sites,
     rooms,
@@ -134,6 +181,10 @@ export default function PMS() {
   const occupancyRate = visibleRooms.length ? Math.round((occupied / visibleRooms.length) * 100) : 0;
   const adr = occupied ? Math.round(revenueOpen / occupied) : 0;
   const revPar = visibleRooms.length ? Math.round(revenueOpen / visibleRooms.length) : 0;
+  const availableRooms = roomsWithContext.filter(row => row.room.status === 'available');
+  const dirtyArrivals = demoReservations.filter(res => res.status !== 'cancelled').length && roomsWithContext.filter(row => row.room.status === 'cleaning').length;
+  const vipArrivals = demoReservations.filter(res => res.guestName.toLowerCase().includes('societe') || res.roomType === 'Suite').length;
+  const unpaidDepartures = openFolios.filter(folio => folio.total_amount > 0).length;
 
   const addFolioCharge = (kind: 'manual' | 'minibar' | 'room_service') => {
     if (!selectedFolio) return;
@@ -153,6 +204,80 @@ export default function PMS() {
     }
     setNotice(`${label} ajoute au folio ${selectedFolio.id}. ${kind === 'manual' ? '' : 'Stock et POS relies.'}`);
     setChargeAmount('');
+  };
+
+  const createReservation = () => {
+    const rate = editableRates.find(row => row.roomType === reservationForm.roomType)?.tonight || 75000;
+    const reservation: DemoReservation = {
+      id: `res-${Date.now()}`,
+      guestName: reservationForm.guestName.trim() || 'Client walk-in',
+      channel: reservationForm.channel,
+      roomType: reservationForm.roomType,
+      checkIn: reservationForm.checkIn,
+      checkOut: reservationForm.checkOut,
+      status: Number(reservationForm.deposit) > 0 ? 'precheckin' : 'booked',
+      deposit: Number(reservationForm.deposit) || 0,
+      rate,
+    };
+    setDemoReservations(prev => [reservation, ...prev]);
+    setNotice(`Reservation creee pour ${reservation.guestName}. Acompte ${money(reservation.deposit)}.`);
+  };
+
+  const markReservation = (reservationId: string, status: DemoReservation['status']) => {
+    setDemoReservations(prev => prev.map(res => res.id === reservationId ? { ...res, status } : res));
+    const reservation = demoReservations.find(res => res.id === reservationId);
+    if (reservation && status === 'checkedin') {
+      const room = availableRooms.find(row => row.room.room_type === reservation.roomType) || availableRooms[0];
+      if (room) updateRoomStatus(room.room.id, 'occupied');
+      setNotice(`Check-in de ${reservation.guestName} confirme${room ? ` en chambre ${room.room.room_number}` : ''}. Folio ouvert en demonstration.`);
+    } else if (reservation) {
+      setNotice(`${reservation.guestName} : statut ${status}.`);
+    }
+  };
+
+  const addPayment = (kind: DemoPayment['status']) => {
+    if (!selectedFolio) return;
+    const amount = kind === 'refund' ? -25000 : kind === 'deposit' ? 50000 : Math.min(selectedFolio.total_amount, 75000);
+    const payment: DemoPayment = {
+      id: `pay-${Date.now()}`,
+      folioId: selectedFolio.id,
+      label: kind === 'refund' ? 'Remboursement garantie' : kind === 'deposit' ? 'Acompte reservation' : 'Reglement folio',
+      amount,
+      method: kind === 'refund' ? 'Carte' : 'Wave / Carte',
+      status: kind,
+    };
+    setPayments(prev => [payment, ...prev]);
+    setNotice(`${payment.label} enregistre : ${money(Math.abs(amount))}.`);
+  };
+
+  const exportInvoice = () => {
+    if (!selectedFolio) return;
+    const row = folioRows.find(item => item.folio.id === selectedFolio.id);
+    const html = `
+      <html><head><title>Facture ${selectedFolio.id}</title>
+      <style>body{font-family:Arial;padding:32px;color:#111}h1{margin:0 0 8px}.line{display:flex;justify-content:space-between;border-bottom:1px solid #ddd;padding:8px 0}.total{font-size:22px;font-weight:800;margin-top:20px}</style></head>
+      <body>
+        <h1>Sartal OS Hospi</h1>
+        <p>Facture folio ${selectedFolio.id} - Chambre ${row?.room?.room_number || '-'}</p>
+        <p>Client : ${row?.guest?.first_name || ''} ${row?.guest?.last_name || ''}</p>
+        ${(row?.lines || []).map(line => `<div class="line"><span>${line.description}</span><strong>${money(line.amount)}</strong></div>`).join('')}
+        <p class="total">Total : ${money(selectedFolio.total_amount)}</p>
+      </body></html>`;
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+      win.print();
+    }
+    setNotice('Facture hotel generee pour impression/PDF.');
+  };
+
+  const createMaintenanceTicket = () => {
+    const room = roomsWithContext.find(row => row.room.status === 'maintenance') || roomsWithContext[0];
+    if (!room) return;
+    updateRoomStatus(room.room.id, 'maintenance');
+    setMaintenanceTickets(prev => [{ room: room.room.room_number, title: 'Ticket technique cree reception', owner: user?.name || 'Reception', priority: 'Haute', status: 'Ouvert' }, ...prev]);
+    setNotice(`Ticket technique cree et chambre ${room.room.room_number} bloquee.`);
   };
 
   const folioRows = openFolios.map(folio => {
@@ -215,6 +340,72 @@ export default function PMS() {
           <button onClick={() => addFolioCharge('room_service')} className="h-12 rounded-xl bg-orange/15 text-orange font-black text-[10px]">Room service</button>
         </div>
       </section>
+    </div>
+  );
+
+  const renderReservations = () => (
+    <div className="space-y-4">
+      <section className="glass-card-lg p-4">
+        <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-3">Nouvelle reservation</p>
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <input value={reservationForm.guestName} onChange={event => setReservationForm(prev => ({ ...prev, guestName: event.target.value }))} className="col-span-2 bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-sm outline-none" placeholder="Client" />
+          <select value={reservationForm.channel} onChange={event => setReservationForm(prev => ({ ...prev, channel: event.target.value }))} className="bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-sm outline-none">
+            {['Walk-in', 'Telephone', 'Booking', 'Expedia', 'Agence', 'Corporate', 'Site web'].map(channel => <option key={channel} className="bg-background">{channel}</option>)}
+          </select>
+          <select value={reservationForm.roomType} onChange={event => setReservationForm(prev => ({ ...prev, roomType: event.target.value }))} className="bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-sm outline-none">
+            {editableRates.map(rate => <option key={rate.roomType} className="bg-background">{rate.roomType}</option>)}
+          </select>
+          <input type="date" value={reservationForm.checkIn} onChange={event => setReservationForm(prev => ({ ...prev, checkIn: event.target.value }))} className="bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-sm outline-none" />
+          <input type="date" value={reservationForm.checkOut} onChange={event => setReservationForm(prev => ({ ...prev, checkOut: event.target.value }))} className="bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-sm outline-none" />
+          <input value={reservationForm.deposit} onChange={event => setReservationForm(prev => ({ ...prev, deposit: event.target.value }))} inputMode="numeric" className="col-span-2 bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-sm outline-none" placeholder="Acompte" />
+        </div>
+        <button onClick={createReservation} className="w-full h-12 rounded-2xl bg-purple text-white font-black text-sm">Creer reservation</button>
+      </section>
+
+      {demoReservations.map(reservation => (
+        <div key={reservation.id} className="glass-card p-4">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <p className="text-white font-black text-sm">{reservation.guestName}</p>
+              <p className="text-text-secondary text-xs">{reservation.channel} · {reservation.roomType} · {reservation.checkIn} → {reservation.checkOut}</p>
+            </div>
+            <span className="px-2.5 py-1 rounded-full bg-blue/10 text-blue text-[9px] font-black uppercase">{reservation.status}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="rounded-xl bg-white/5 p-3"><p className="text-text-tertiary text-[9px] font-black uppercase">Tarif</p><p className="text-white font-black text-xs">{money(reservation.rate)}</p></div>
+            <div className="rounded-xl bg-white/5 p-3"><p className="text-text-tertiary text-[9px] font-black uppercase">Acompte</p><p className="text-green font-black text-xs">{money(reservation.deposit)}</p></div>
+            <div className="rounded-xl bg-white/5 p-3"><p className="text-text-tertiary text-[9px] font-black uppercase">Canal</p><p className="text-white font-black text-xs">{reservation.channel}</p></div>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            <button onClick={() => markReservation(reservation.id, 'precheckin')} className="h-10 rounded-xl bg-white/5 text-white text-[9px] font-black">Pre-check</button>
+            <button onClick={() => markReservation(reservation.id, 'checkedin')} className="h-10 rounded-xl bg-green/10 text-green text-[9px] font-black">Check-in</button>
+            <button onClick={() => markReservation(reservation.id, 'noshow')} className="h-10 rounded-xl bg-orange/10 text-orange text-[9px] font-black">No-show</button>
+            <button onClick={() => markReservation(reservation.id, 'cancelled')} className="h-10 rounded-xl bg-red/10 text-red text-[9px] font-black">Annuler</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderAvailability = () => (
+    <div className="space-y-4">
+      <section className="glass-card-lg p-4">
+        <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-3">Disponibilite par periode</p>
+        <div className="grid grid-cols-2 gap-3">
+          {editableRates.map(rate => {
+            const total = roomsWithContext.filter(row => row.room.room_type === rate.roomType).length;
+            const free = roomsWithContext.filter(row => row.room.room_type === rate.roomType && row.room.status === 'available').length;
+            return (
+              <div key={rate.roomType} className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                <p className="text-white font-black text-sm">{rate.roomType}</p>
+                <p className="text-green font-black text-2xl mt-2">{free}/{total}</p>
+                <p className="text-text-secondary text-xs mt-1">libres · surbooking controle {free === 0 ? 'a valider' : 'inutile'}</p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+      <button onClick={() => setNotice('Recherche disponibilite : conflits, allotements et surbooking controles.')} className="w-full h-12 rounded-2xl bg-cyan-500/15 text-cyan-200 font-black text-sm">Verifier sur 2 dates</button>
     </div>
   );
 
@@ -302,6 +493,59 @@ export default function PMS() {
     </div>
   );
 
+  const renderPayments = () => (
+    <div className="space-y-4">
+      <section className="glass-card-lg p-4">
+        <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest mb-3">Paiements PMS</p>
+        <select value={selectedFolio?.id || ''} onChange={event => setSelectedFolioId(event.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-sm outline-none mb-3">
+          {folioRows.map(row => <option key={row.folio.id} value={row.folio.id} className="bg-background">Chambre {row.room?.room_number} · {money(row.folio.total_amount)}</option>)}
+        </select>
+        <div className="grid grid-cols-3 gap-2">
+          <button onClick={() => addPayment('deposit')} className="h-12 rounded-xl bg-blue/10 text-blue font-black text-[10px]">Acompte</button>
+          <button onClick={() => addPayment('paid')} className="h-12 rounded-xl bg-green/10 text-green font-black text-[10px]">Reglement</button>
+          <button onClick={() => addPayment('refund')} className="h-12 rounded-xl bg-orange/10 text-orange font-black text-[10px]">Remboursement</button>
+        </div>
+      </section>
+      {payments.map(payment => (
+        <div key={payment.id} className="glass-card p-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-white font-black text-sm">{payment.label}</p>
+            <p className="text-text-secondary text-xs">{payment.method} · {payment.folioId}</p>
+          </div>
+          <span className={`font-black ${payment.amount >= 0 ? 'text-green' : 'text-orange'}`}>{money(Math.abs(payment.amount))}</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderClients = () => (
+    <div className="space-y-3">
+      {guests.map(guest => {
+        const guestStays = stays.filter(stay => stay.guest_id === guest.id);
+        const guestFolios = folios.filter(folio => folio.guest_id === guest.id);
+        const total = guestFolios.reduce((sum, folio) => sum + folio.total_amount, 0);
+        const vip = total > 100000 || guest.last_name === 'Lee';
+        return (
+          <div key={guest.id} className="glass-card p-4">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <p className="text-white font-black text-sm">{guest.first_name} {guest.last_name}</p>
+                <p className="text-text-secondary text-xs">{guest.phone} · {guest.email}</p>
+              </div>
+              <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${vip ? 'bg-purple/20 text-purple' : 'bg-white/5 text-text-secondary'}`}>{vip ? 'VIP / Corporate' : 'Client'}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-xl bg-white/5 p-3"><p className="text-text-tertiary text-[9px] font-black uppercase">Sejours</p><p className="text-white font-black">{guestStays.length}</p></div>
+              <div className="rounded-xl bg-white/5 p-3"><p className="text-text-tertiary text-[9px] font-black uppercase">Total</p><p className="text-green font-black text-xs">{money(total)}</p></div>
+              <div className="rounded-xl bg-white/5 p-3"><p className="text-text-tertiary text-[9px] font-black uppercase">Pref.</p><p className="text-white font-black text-xs">{vip ? 'Etage calme' : 'Standard'}</p></div>
+            </div>
+            <p className="text-text-secondary text-xs mt-3">Notes internes : allergies, incidents, statut fidelite et preferences de chambre centralises.</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   const renderHousekeeping = () => (
     <div className="space-y-3">
       {roomsWithContext.map(row => (
@@ -332,17 +576,34 @@ export default function PMS() {
 
   const renderRates = () => (
     <div className="space-y-3">
-      {rateRows.map(row => (
+      {editableRates.map((row, rowIndex) => (
         <div key={row.roomType} className="glass-card p-4">
           <p className="text-white font-black text-sm mb-3">{row.roomType}</p>
           <div className="grid grid-cols-4 gap-2">
-            <div><p className="text-text-tertiary text-[9px] uppercase font-black">Ce soir</p><p className="text-green font-black text-xs">{money(row.tonight)}</p></div>
-            <div><p className="text-text-tertiary text-[9px] uppercase font-black">Week-end</p><p className="text-blue font-black text-xs">{money(row.weekend)}</p></div>
-            <div><p className="text-text-tertiary text-[9px] uppercase font-black">Haute</p><p className="text-orange font-black text-xs">{money(row.high)}</p></div>
-            <div><p className="text-text-tertiary text-[9px] uppercase font-black">Corporate</p><p className="text-purple font-black text-xs">{money(row.corporate)}</p></div>
+            {(['tonight', 'weekend', 'high', 'corporate'] as const).map(key => (
+              <label key={key} className="rounded-xl bg-white/5 p-2">
+                <p className="text-text-tertiary text-[9px] uppercase font-black">{key === 'tonight' ? 'Ce soir' : key === 'weekend' ? 'Week-end' : key === 'high' ? 'Haute' : 'Corporate'}</p>
+                <input
+                  value={row[key]}
+                  onChange={event => {
+                    const value = Number(event.target.value) || 0;
+                    setEditableRates(prev => prev.map((item, index) => index === rowIndex ? { ...item, [key]: value } : item));
+                  }}
+                  className="w-full bg-transparent text-white font-black text-xs outline-none mt-1"
+                  inputMode="numeric"
+                />
+              </label>
+            ))}
           </div>
         </div>
       ))}
+      <div className="glass-card p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Percent size={16} className="text-orange" />
+          <p className="text-white font-black text-sm">Taxes hotel</p>
+        </div>
+        <p className="text-text-secondary text-xs">TVA hebergement, taxe de sejour, TVA restauration et exonérations corporate sont separees au folio.</p>
+      </div>
       <button onClick={() => setNotice('Simulation tarifaire : prix ajuste selon occupation, saison et canal.')} className="w-full h-12 rounded-2xl bg-orange/10 text-orange font-black text-sm">
         Simuler prix dynamique
       </button>
@@ -351,7 +612,7 @@ export default function PMS() {
 
   const renderMaintenance = () => (
     <div className="space-y-3">
-      {maintenanceSeed.map(ticket => (
+      {maintenanceTickets.map(ticket => (
         <div key={`${ticket.room}-${ticket.title}`} className="glass-card p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -362,9 +623,48 @@ export default function PMS() {
           </div>
         </div>
       ))}
-      <button onClick={() => setNotice('Ticket maintenance cree et chambre bloquee si necessaire.')} className="w-full h-12 rounded-2xl bg-red/10 text-red font-black text-sm">
+      <button onClick={createMaintenanceTicket} className="w-full h-12 rounded-2xl bg-red/10 text-red font-black text-sm">
         Creer ticket technique
       </button>
+    </div>
+  );
+
+  const renderDocuments = () => (
+    <div className="space-y-3">
+      {[
+        { title: 'Facture hotel PDF', detail: 'Hebergement, extras POS, taxes, paiements, solde', action: exportInvoice },
+        { title: 'Confirmation reservation', detail: 'Dates, type chambre, acompte et conditions', action: () => setNotice('Confirmation de reservation generee.') },
+        { title: 'Recu acompte', detail: 'Recu paiement PMS avec moyen de paiement', action: () => setNotice('Recu acompte genere.') },
+        { title: 'Fiche police', detail: 'Document reception client et piece identite', action: () => setNotice('Fiche police preparee.') },
+        { title: 'Pro forma corporate', detail: 'Facture previsionnelle societe', action: () => setNotice('Facture pro forma generee.') },
+      ].map(doc => (
+        <button key={doc.title} onClick={doc.action} className="w-full glass-card p-4 flex items-center justify-between gap-3 text-left">
+          <div>
+            <p className="text-white font-black text-sm">{doc.title}</p>
+            <p className="text-text-secondary text-xs mt-1">{doc.detail}</p>
+          </div>
+          <Download size={18} className="text-blue" />
+        </button>
+      ))}
+    </div>
+  );
+
+  const renderAlerts = () => (
+    <div className="space-y-3">
+      {[
+        { title: 'Depart non solde', value: unpaidDepartures, tone: 'red', detail: 'Folios ouverts avec solde avant depart.' },
+        { title: 'Chambre sale avec arrivee', value: dirtyArrivals, tone: 'orange', detail: 'A prioriser par la gouvernante.' },
+        { title: 'VIP attendu', value: vipArrivals, tone: 'purple', detail: 'Preparer accueil, preference et rooming.' },
+        { title: 'Folio au-dessus plafond', value: openFolios.filter(folio => folio.total_amount > 120000).length, tone: 'blue', detail: 'Validation manager recommandee.' },
+      ].map(alert => (
+        <div key={alert.title} className="glass-card p-4 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-white font-black text-sm">{alert.title}</p>
+            <p className="text-text-secondary text-xs mt-1">{alert.detail}</p>
+          </div>
+          <span className="text-2xl font-black" style={{ color: alert.tone === 'red' ? '#EF4444' : alert.tone === 'orange' ? '#FF8A00' : alert.tone === 'purple' ? '#8B5CF6' : '#3B82F6' }}>{alert.value}</span>
+        </div>
+      ))}
     </div>
   );
 
@@ -438,12 +738,18 @@ export default function PMS() {
       </div>
 
       {tab === 'reception' && renderReception()}
+      {tab === 'reservations' && renderReservations()}
+      {tab === 'availability' && renderAvailability()}
       {tab === 'planning' && renderPlanning()}
       {tab === 'rooms' && renderRooms()}
       {tab === 'folios' && renderFolios()}
+      {tab === 'payments' && renderPayments()}
+      {tab === 'clients' && renderClients()}
       {tab === 'housekeeping' && renderHousekeeping()}
       {tab === 'rates' && renderRates()}
       {tab === 'maintenance' && renderMaintenance()}
+      {tab === 'documents' && renderDocuments()}
+      {tab === 'alerts' && renderAlerts()}
       {tab === 'reports' && renderReports()}
 
       <div className="glass-card p-4 mt-5 flex gap-3">
