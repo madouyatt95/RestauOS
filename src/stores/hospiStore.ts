@@ -1085,7 +1085,19 @@ interface HospiState {
   getOccupiedRoomsWithOpenFolios: () => { room: Room; guest: HotelGuest; stay: Stay; folio: Folio }[];
   getCustomerAccountBalance: (accountId: string) => number;
   settleCustomerAccount: (accountId: string, amount: number, method: PaymentMethod, createdBy: string) => CustomerLedgerEntry | null;
+  checkInGuest: (input: {
+    guestName: string;
+    roomType: string;
+    checkIn: string;
+    checkOut: string;
+    deposit: number;
+    rate: number;
+    channel?: string;
+    createdBy: string;
+    siteId?: string;
+  }) => { guest: HotelGuest; stay: Stay; folio: Folio; room: Room } | null;
   updateRoomStatus: (roomId: string, status: RoomStatus) => Room | null;
+  recordFolioPayment: (folioId: string, amount: number, method: PaymentMethod, createdBy: string) => CustomerLedgerEntry | null;
   addManualFolioCharge: (folioId: string, description: string, amount: number, createdBy: string) => FolioLine | null;
   closeFolio: (folioId: string, closedBy: string) => Folio | null;
   chargeOrderToRoom: (roomId: string, orderId: string, description: string, amount: number) => FolioLine | null;
@@ -2309,6 +2321,106 @@ export const useHospiStore = create<HospiState>()(
 
         return entry;
       },
+      checkInGuest: ({ guestName, roomType, checkIn, checkOut, deposit, rate, channel, createdBy, siteId }) => {
+        const state = get();
+        const preferredSiteId = siteId || state.sites[0]?.id;
+        const room = state.rooms.find(item =>
+          item.status === 'available' &&
+          item.room_type === roomType &&
+          (!preferredSiteId || item.site_id === preferredSiteId)
+        ) || state.rooms.find(item => item.status === 'available' && (!preferredSiteId || item.site_id === preferredSiteId));
+        if (!room) return null;
+
+        const createdAt = new Date().toISOString();
+        const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const nameParts = guestName.trim().split(/\s+/).filter(Boolean);
+        const firstName = nameParts[0] || 'Client';
+        const lastName = nameParts.slice(1).join(' ') || 'Walk-in';
+        const companyId = state.sites.find(site => site.id === room.site_id)?.company_id || state.companies[0]?.id || 'comp-sartal-demo';
+        const guest: HotelGuest = {
+          id: `guest-${suffix}`,
+          company_id: companyId,
+          first_name: firstName,
+          last_name: lastName,
+          phone: '',
+          email: '',
+          created_at: createdAt,
+        };
+        const stay: Stay = {
+          id: `stay-${suffix}`,
+          room_id: room.id,
+          guest_id: guest.id,
+          check_in_date: new Date(checkIn || createdAt).toISOString(),
+          check_out_date: new Date(checkOut || Date.now() + 86400000).toISOString(),
+          status: 'checked_in',
+          created_at: createdAt,
+        };
+        const nights = Math.max(1, Math.ceil((new Date(stay.check_out_date).getTime() - new Date(stay.check_in_date).getTime()) / 86400000));
+        const lodgingTotal = Math.max(0, nights * Math.max(0, rate));
+        const folio: Folio = {
+          id: `folio-${room.room_number}-${suffix}`,
+          stay_id: stay.id,
+          guest_id: guest.id,
+          room_id: room.id,
+          status: 'open',
+          total_amount: lodgingTotal,
+          created_at: createdAt,
+        };
+        const folioLine: FolioLine = {
+          id: `folio-line-lodging-${suffix}`,
+          folio_id: folio.id,
+          source_type: 'manual_charge',
+          source_id: stay.id,
+          description: `Hébergement ${nights} nuit(s) · ${channel || 'PMS'} · ${createdBy}`,
+          amount: lodgingTotal,
+          created_at: createdAt,
+        };
+        const account: CustomerAccount = {
+          id: `account-${suffix}`,
+          company_id: companyId,
+          display_name: `${firstName} ${lastName}`,
+          type: channel?.toLowerCase().includes('corporate') ? 'corporate' : 'guest',
+          hotel_guest_id: guest.id,
+          credit_limit: 500000,
+          balance: Math.max(0, lodgingTotal - Math.max(0, deposit)),
+          is_active: true,
+          created_at: createdAt,
+        };
+        const ledgerEntries: CustomerLedgerEntry[] = [
+          {
+            id: `ledger-lodging-${suffix}`,
+            account_id: account.id,
+            source_type: 'folio',
+            source_id: folio.id,
+            description: folioLine.description,
+            debit: lodgingTotal,
+            credit: 0,
+            created_at: createdAt,
+          },
+          ...(deposit > 0 ? [{
+            id: `ledger-deposit-${suffix}`,
+            account_id: account.id,
+            source_type: 'payment' as CustomerLedgerSource,
+            source_id: `deposit-${suffix}`,
+            description: `Acompte check-in par ${createdBy}`,
+            debit: 0,
+            credit: deposit,
+            created_at: createdAt,
+          }] : []),
+        ];
+
+        set({
+          guests: [guest, ...state.guests],
+          stays: [stay, ...state.stays],
+          folios: [folio, ...state.folios],
+          folioLines: [folioLine, ...state.folioLines],
+          rooms: state.rooms.map(item => item.id === room.id ? { ...item, status: 'occupied' } : item),
+          customerAccounts: [account, ...state.customerAccounts],
+          customerLedgerEntries: [...ledgerEntries, ...state.customerLedgerEntries],
+        });
+
+        return { guest, stay, folio, room: { ...room, status: 'occupied' } };
+      },
       updateRoomStatus: (roomId, status) => {
         const state = get();
         const room = state.rooms.find(item => item.id === roomId);
@@ -2321,6 +2433,35 @@ export const useHospiStore = create<HospiState>()(
         });
 
         return updatedRoom;
+      },
+      recordFolioPayment: (folioId, amount, method, createdBy) => {
+        const state = get();
+        const folio = state.folios.find(item => item.id === folioId);
+        if (!folio || amount === 0) return null;
+        const account = state.customerAccounts.find(item => item.hotel_guest_id === folio.guest_id && item.is_active);
+        if (!account) return null;
+
+        const createdAt = new Date().toISOString();
+        const entry: CustomerLedgerEntry = {
+          id: `ledger-payment-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          account_id: account.id,
+          source_type: 'payment',
+          source_id: `${method}-${folio.id}`,
+          description: `${amount > 0 ? 'Règlement' : 'Remboursement'} folio ${folio.id} par ${createdBy}`,
+          debit: amount < 0 ? Math.abs(amount) : 0,
+          credit: amount > 0 ? amount : 0,
+          created_at: createdAt,
+        };
+
+        set({
+          customerLedgerEntries: [entry, ...state.customerLedgerEntries],
+          customerAccounts: state.customerAccounts.map(item => item.id === account.id
+            ? { ...item, balance: Math.max(0, item.balance - amount) }
+            : item
+          ),
+        });
+
+        return entry;
       },
       addManualFolioCharge: (folioId, description, amount, createdBy) => {
         const state = get();

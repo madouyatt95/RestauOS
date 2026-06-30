@@ -13,6 +13,7 @@ import {
   LogOut,
   Moon,
   Palette,
+  RotateCcw,
   Settings,
   ShieldCheck,
   ShoppingBag,
@@ -59,6 +60,7 @@ export default function Plus() {
   const { notifications, markRead, markAllRead, getUnreadCount } = useNotificationStore();
   const { mode, accent, toggleMode, setAccent } = useThemeStore();
   const [activeSection, setActiveSection] = useState<Section>('profile');
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const company = companies[0];
   const activePOS = posList.find(pos => pos.id === activePOSId);
@@ -71,6 +73,30 @@ export default function Plus() {
     navigate('/');
   };
 
+  const handleResetDemo = () => {
+    const theme = localStorage.getItem('restauos-theme');
+    [
+      'restauos-auth',
+      'restauos-orders',
+      'restauos-stocks',
+      'sartal-hospi',
+      'restauos-clients',
+      'restauos-deliveries',
+      'restauos-planning',
+      'restauos-promos',
+      'sartal-business-rules',
+      'restauos-reviews',
+      'restauos-staff',
+      'restauos-reservations',
+      'restauos-waste',
+      'restauos-tables',
+      'restauos-broadcast',
+      'restauos-notifications',
+    ].forEach(key => localStorage.removeItem(key));
+    if (theme) localStorage.setItem('restauos-theme', theme);
+    window.location.href = '/';
+  };
+
   const profileLinks = [
     ...(isManager && canAccessRoute(user, '/settings') ? [
       { icon: Settings, label: 'Admin Hospi', description: 'Sites, POS, dépôts, prix, permissions', path: '/settings', color: '#8B5CF6' },
@@ -80,8 +106,10 @@ export default function Plus() {
       { icon: Building2, label: 'Modules métiers', description: 'Restaurant, hôtel, casino, spa, boutique', path: '/modules', color: '#06B6D4' },
     ] : []),
     { icon: Calendar, label: 'Planning & équipe', description: 'Présences, rôles et services', path: '/personnel', color: '#EC4899' },
-    { icon: HelpCircle, label: 'Parcours de démo', description: 'Profils, scénario et ordre de présentation', path: '/demo-guide', color: '#F59E0B' },
-  ];
+    ...(isManager ? [
+      { icon: HelpCircle, label: 'Parcours de démo', description: 'Profils, scénario et ordre de présentation', path: '/demo-guide', color: '#F59E0B' },
+    ] : []),
+  ].filter(item => canAccessRoute(user, item.path));
 
   return (
     <div className="page-content pt-14 pb-28">
@@ -187,6 +215,16 @@ export default function Plus() {
             Déconnexion
           </button>
 
+          {isManager && (
+            <button
+              onClick={() => setShowResetConfirm(true)}
+              className="w-full py-4 rounded-2xl bg-orange/10 border border-orange/20 flex items-center justify-center gap-2 text-orange font-bold text-sm active:bg-orange/15 transition-colors"
+            >
+              <RotateCcw size={17} />
+              Réinitialiser la démo
+            </button>
+          )}
+
           <p className="text-center text-text-tertiary text-[10px]">Sártal OS Hospi · Cockpit holding</p>
         </div>
       )}
@@ -274,6 +312,26 @@ export default function Plus() {
                   {accent === color && <Check size={20} className="text-white mx-auto" />}
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showResetConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end px-4 pb-6">
+          <div className="w-full glass-card-lg p-5">
+            <p className="text-orange text-[10px] font-black uppercase tracking-[0.18em] mb-2">Remise à zéro locale</p>
+            <h3 className="text-white font-black text-lg">Recharger les données de démo ?</h3>
+            <p className="text-text-secondary text-sm mt-2">
+              Les ventes, stocks, profils et réglages gardés dans ce navigateur seront remplacés par les données de démonstration actuelles.
+            </p>
+            <div className="grid grid-cols-2 gap-3 mt-5">
+              <button onClick={() => setShowResetConfirm(false)} className="h-12 rounded-2xl bg-white/5 text-white font-black text-sm">
+                Annuler
+              </button>
+              <button onClick={handleResetDemo} className="h-12 rounded-2xl bg-orange text-white font-black text-sm">
+                Réinitialiser
+              </button>
             </div>
           </div>
         </div>

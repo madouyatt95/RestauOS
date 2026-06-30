@@ -3,10 +3,15 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PRODUCTS, useOrderStore, type CartItem } from '../stores/orderStore';
 import { useNotificationStore } from '../stores/notificationStore';
+import { useHospiStore } from '../stores/hospiStore';
 import { Search, ChefHat, Plus, Minus, ArrowRight, Check } from 'lucide-react';
 
 const CATEGORIES = ['Toutes', 'Plats', 'Entrées', 'Desserts', 'Boissons'];
 const fmt = (n: number) => n.toLocaleString('fr-FR');
+const LEGACY_TO_HOSPI_PRODUCT: Record<string, string> = {
+  p1: 'prod-thieboudienne',
+  p10: 'prod-coca-33',
+};
 
 export default function ClientOrder() {
   const [searchParams] = useSearchParams();
@@ -45,21 +50,27 @@ export default function ClientOrder() {
         type: 'order',
         targetRole: 'Serveur'
       });
-      // Synchronisation directe avec le panier en cours du serveur (pour la démo locale)
-      useOrderStore.getState().addToCart(product);
     }
   };
 
   const updateQty = (id: string, delta: number) => {
     setCart(prev => prev.map(i => i.product.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i).filter(i => i.quantity > 0));
-    // For demo purposes, we do not decrement the global store here to avoid complex state sync logic without websockets
   };
 
   const confirmOrder = () => {
     if (cart.length === 0) return;
+    const hospi = useHospiStore.getState();
+    const restaurantPOS = hospi.posList.find(pos => pos.id === hospi.activePOSId && pos.type === 'restaurant')
+      || hospi.posList.find(pos => pos.type === 'restaurant');
+    const hospiLines = cart.flatMap(item => {
+      const productId = LEGACY_TO_HOSPI_PRODUCT[item.product.id];
+      return productId ? [{ productId, quantity: item.quantity }] : [];
+    });
     const newOrder = {
       id: `o${Date.now()}`,
       tableId: tableId || undefined,
+      posId: restaurantPOS?.id,
+      hospiLines,
       type: tableId ? 'sur_place' : 'emporter',
       items: cart,
       total: cartTotal,
@@ -73,6 +84,9 @@ export default function ClientOrder() {
     } as any;
     
     useOrderStore.setState(s => ({ orders: [...s.orders, newOrder] }));
+    if (restaurantPOS && hospiLines.length > 0) {
+      hospi.recordSale(newOrder.id, hospiLines, 'Commande QR', restaurantPOS.id);
+    }
     setShowCart(false);
     setShowSuccess(true);
     setTimeout(() => {

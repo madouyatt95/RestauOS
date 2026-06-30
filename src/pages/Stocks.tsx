@@ -608,7 +608,7 @@ export default function Stocks() {
           ['inventaire-guide', 'Inventaire'],
           ['mouvements', 'Mouvements'],
           ['pertes', 'Pertes'],
-          ['inventaire', 'Ancien stock'],
+          ['inventaire', 'Archive RestauOS'],
         ] as const).map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${tab === key
@@ -1309,6 +1309,9 @@ export default function Stocks() {
         </div>
       ) : tab === 'inventaire' ? (
         <>
+          <div className="rounded-2xl bg-blue/10 border border-blue/20 text-blue px-4 py-3 text-xs font-bold mb-4">
+            Archive de l'ancien stock RestauOS. Le stock opérationnel du complexe se pilote dans Pilotage, Dépôts, Achats, Inventaire et Mouvements.
+          </div>
           <div className="space-y-3 mb-6">
             {filtered.map(item => {
               const badge = getStockBadge(item);

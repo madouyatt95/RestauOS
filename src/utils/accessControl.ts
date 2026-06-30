@@ -30,11 +30,15 @@ const ROUTE_MODULES: Array<{ prefix: string; modules: BusinessModule[]; managers
   { prefix: '/modules', modules: ['direction', 'restaurant', 'hotel', 'casino', 'spa', 'boutique'], managersOnly: true },
   { prefix: '/settings', modules: ['direction', 'restaurant', 'hotel', 'casino', 'spa', 'boutique', 'stock'], managersOnly: true },
   { prefix: '/rapports', modules: ['direction', 'restaurant', 'hotel', 'casino', 'spa', 'boutique', 'stock'], managersOnly: true },
+  { prefix: '/demo-guide', modules: ['direction', 'restaurant', 'hotel', 'casino', 'spa', 'boutique', 'stock', 'delivery'], managersOnly: true },
+  { prefix: '/whatsapp-bot', modules: ['direction', 'restaurant', 'hotel', 'delivery'], managersOnly: true },
+  { prefix: '/pos-metier', modules: ['restaurant', 'hotel', 'casino', 'spa', 'boutique'] },
   { prefix: '/commandes', modules: ['restaurant', 'hotel', 'casino', 'spa', 'boutique'] },
   { prefix: '/caisse', modules: ['restaurant', 'hotel', 'casino', 'spa', 'boutique'] },
   { prefix: '/cuisine', modules: ['restaurant'] },
   { prefix: '/stocks', modules: ['stock', 'restaurant', 'hotel', 'casino', 'spa', 'boutique'] },
   { prefix: '/pms', modules: ['hotel'] },
+  { prefix: '/personnel', modules: ['direction', 'restaurant', 'hotel', 'casino', 'spa', 'boutique', 'stock', 'delivery'] },
   { prefix: '/livraisons', modules: ['delivery', 'hotel', 'restaurant'] },
   { prefix: '/fidelite', modules: ['restaurant', 'hotel', 'casino', 'spa', 'boutique'] },
   { prefix: '/menu-builder', modules: ['restaurant', 'casino', 'spa', 'boutique'], managersOnly: true },
@@ -93,7 +97,7 @@ export function canAccessRoute(user: UserProfile | null | undefined, pathname: s
   if (pathname.startsWith('/settings') && user.accessLevel === 'pos_manager') return false;
 
   const route = ROUTE_MODULES.find(item => pathname.startsWith(item.prefix));
-  if (!route) return true;
+  if (!route) return false;
   if (route.managersOnly && !isManagerScope(user)) return false;
   return route.modules.some(module => canAccessModule(user, module));
 }

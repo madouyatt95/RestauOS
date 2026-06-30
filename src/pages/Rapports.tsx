@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { useOrderStore } from '../stores/orderStore';
+import { useOrderStore, type Order } from '../stores/orderStore';
+import { useAuthStore } from '../stores/authStore';
 import { useReviewStore } from '../stores/reviewStore';
 import { useWasteStore } from '../stores/wasteStore';
 import { useHospiStore } from '../stores/hospiStore';
+import { canAccessModule, getVisiblePOS, getVisibleSites } from '../utils/accessControl';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, ShoppingBag, DollarSign, Award, Download, Star, Users, Trash2, Clock, Flame, Sun, Moon, Building2, BedDouble, Warehouse, Store, ReceiptText, LockKeyhole, UnlockKeyhole } from 'lucide-react';
 import { buildCashSessionTicket, summarizeCashSession } from '../services/cashSession';
@@ -11,19 +13,59 @@ import { buildCashSessionTicket, summarizeCashSession } from '../services/cashSe
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 const DONUT_COLORS = ['#FF8A00', '#8B5CF6', '#3B82F6'];
 const HEAT_COLORS = ['#1a1a2e', '#2d1f4e', '#4c1d95', '#7c3aed', '#a78bfa', '#FF8A00', '#ef4444'];
+const PAID_STATUSES: Order['status'][] = ['payee', 'terminee', 'servie'];
 
 export default function Rapports() {
-  const { orders, getCAByDay, getOrderCount, getTypeDistribution, getTopProducts } = useOrderStore();
+  const { orders: allOrders } = useOrderStore();
+  const { user } = useAuthStore();
   const { sites, posList, warehouses, products, stockLevels, stockMovements, folios, folioLines, rooms, guests, stays, cashSessions, getRegisterForPOS } = useHospiStore();
   const { reviews, getAverage } = useReviewStore();
   const { getWeekTotal } = useWasteStore();
   const [activeTab, setActiveTab] = useState<'ca' | 'hospi' | 'caisse' | 'analytics' | 'avis'>('ca');
 
-  const caByDay = getCAByDay();
+  const visibleSites = getVisibleSites(user, sites);
+  const visibleSiteIds = new Set(visibleSites.map(site => site.id));
+  const visiblePOS = getVisiblePOS(user, posList);
+  const visiblePOSIds = new Set(visiblePOS.map(pos => pos.id));
+  const isRootScope = user?.accessLevel === 'direction' || user?.role === 'Admin';
+  const canSeeLegacyRestaurant = canAccessModule(user, 'restaurant') && visiblePOS.some(pos => pos.type === 'restaurant');
+  const scopedOrders = allOrders.filter(order => {
+    if (isRootScope) return true;
+    if (order.posId) return visiblePOSIds.has(order.posId);
+    return canSeeLegacyRestaurant;
+  });
+  const caByDay = Array.from({ length: 7 }, (_, index) => {
+    const daysAgo = 6 - index;
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+    const dayStr = date.toISOString().split('T')[0];
+    const ca = scopedOrders
+      .filter(order => order.date.startsWith(dayStr) && PAID_STATUSES.includes(order.status))
+      .reduce((sum, order) => sum + order.total, 0);
+    return { day: date.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', ''), ca };
+  });
   const weekCA = caByDay.reduce((s, d) => s + d.ca, 0);
-  const dist = getTypeDistribution();
-  const topProducts = getTopProducts();
-  const totalOrders = Array.from({ length: 7 }, (_, i) => getOrderCount(i)).reduce((a, b) => a + b, 0);
+  const paidScopedOrders = scopedOrders.filter(order => PAID_STATUSES.includes(order.status));
+  const distTotal = paidScopedOrders.length || 1;
+  const dist = {
+    sur_place: Math.round(paidScopedOrders.filter(order => order.type === 'sur_place').length / distTotal * 100),
+    emporter: Math.round(paidScopedOrders.filter(order => order.type === 'emporter').length / distTotal * 100),
+    livraison: Math.round(paidScopedOrders.filter(order => order.type === 'livraison').length / distTotal * 100),
+  };
+  const topProducts = Object.values(paidScopedOrders.reduce<Record<string, { name: string; image: string; sales: number; revenue: number }>>((acc, order) => {
+    order.items.forEach(item => {
+      if (!acc[item.product.id]) {
+        acc[item.product.id] = { name: item.product.name, image: item.product.image, sales: 0, revenue: 0 };
+      }
+      acc[item.product.id].sales += item.quantity;
+      acc[item.product.id].revenue += item.product.price * item.quantity;
+    });
+    return acc;
+  }, {})).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - 6);
+  weekStart.setHours(0, 0, 0, 0);
+  const totalOrders = paidScopedOrders.filter(order => new Date(order.date) >= weekStart).length;
   const avgRating = getAverage();
   const weekWaste = getWeekTotal();
 
@@ -48,8 +90,8 @@ export default function Rapports() {
     { name: 'Livraison', value: dist.livraison },
   ];
 
-  const hospiPaidOrders = orders.filter(order => ['payee', 'terminee', 'servie'].includes(order.status));
-  const revenueByPOS = posList.map(pos => {
+  const hospiPaidOrders = paidScopedOrders;
+  const revenueByPOS = visiblePOS.map(pos => {
     const posOrders = hospiPaidOrders.filter(order => order.posId === pos.id);
     const revenue = posOrders.reduce((sum, order) => sum + order.total, 0);
     const roomCharge = posOrders
@@ -63,11 +105,15 @@ export default function Rapports() {
     .reduce((sum, order) => sum + order.total, 0);
   const totalRoomCharge = folioLines.reduce((sum, line) => sum + line.amount, 0);
   const openFolioTotal = folios.filter(folio => folio.status === 'open').reduce((sum, folio) => sum + folio.total_amount, 0);
-  const lowHospiStocks = stockLevels.filter(level => level.quantity <= level.alert_threshold);
-  const cashReports = cashSessions.map(session => {
+  const visibleWarehouses = warehouses.filter(warehouse => isRootScope || visibleSiteIds.has(warehouse.site_id));
+  const lowHospiStocks = stockLevels.filter(level => {
+    const warehouse = warehouses.find(item => item.id === level.warehouse_id);
+    return level.quantity <= level.alert_threshold && (!!warehouse && (isRootScope || visibleSiteIds.has(warehouse.site_id)));
+  });
+  const cashReports = cashSessions.filter(session => visiblePOSIds.has(session.pos_id) || isRootScope).map(session => {
     const pos = posList.find(item => item.id === session.pos_id);
     const register = getRegisterForPOS(session.pos_id);
-    const summary = summarizeCashSession(session, orders);
+    const summary = summarizeCashSession(session, scopedOrders);
     return { session, pos, register, summary };
   }).sort((a, b) => new Date(b.session.closed_at || b.session.opened_at).getTime() - new Date(a.session.closed_at || a.session.opened_at).getTime());
   const openCashReports = cashReports.filter(report => report.session.status === 'open');
@@ -229,7 +275,7 @@ export default function Rapports() {
               </div>
               <div>
                 <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Site consolidé</p>
-                <h2 className="text-white font-black text-lg">{sites[0]?.name || 'Complexe hôtelier'}</h2>
+                <h2 className="text-white font-black text-lg">{visibleSites[0]?.name || 'Complexe hôtelier'}</h2>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -243,7 +289,7 @@ export default function Rapports() {
               </div>
               <div className="rounded-2xl bg-white/5 p-4">
                 <p className="text-text-tertiary text-[9px] font-black uppercase">Dépôts</p>
-                <p className="text-white font-black text-xl">{warehouses.length}</p>
+                <p className="text-white font-black text-xl">{visibleWarehouses.length}</p>
               </div>
               <div className="rounded-2xl bg-white/5 p-4">
                 <p className="text-text-tertiary text-[9px] font-black uppercase">Alertes stock</p>
@@ -282,7 +328,7 @@ export default function Rapports() {
           <div className="glass-card-lg p-5 mb-5">
             <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2"><Warehouse size={16} className="text-green" /> Stock par dépôt</h3>
             <div className="space-y-3">
-              {warehouses.map(warehouse => {
+              {visibleWarehouses.map(warehouse => {
                 const levels = stockLevels.filter(level => level.warehouse_id === warehouse.id);
                 return (
                   <div key={warehouse.id} className="rounded-2xl bg-white/5 p-4">

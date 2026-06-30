@@ -73,7 +73,7 @@ export default function BusinessModules() {
 
   const openPOS = (pos: POS, target: 'sales' | 'cash' | 'stock' | 'settings') => {
     setActivePOS(pos.id);
-    if (target === 'sales') navigate('/commandes');
+    if (target === 'sales') navigate(pos.type === 'restaurant' ? '/commandes' : '/pos-metier');
     if (target === 'cash') navigate('/caisse');
     if (target === 'stock') navigate('/stocks');
     if (target === 'settings') navigate('/settings');

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { useOrderStore } from '../stores/orderStore';
+import { useOrderStore, type Order } from '../stores/orderStore';
 import { useAuthStore } from '../stores/authStore';
 import { useHospiStore } from '../stores/hospiStore';
 import { ShoppingBag, Users, Receipt, ArrowDown, Bell, ChevronRight, ShieldAlert, Store, BedDouble, Dice5, Sparkles, Package } from 'lucide-react';
@@ -8,24 +8,66 @@ import { useNavigate } from 'react-router-dom';
 import { canAccessModule, getAccessSummary, getVisiblePOS, getVisibleSites } from '../utils/accessControl';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
+const PAID_STATUSES: Order['status'][] = ['payee', 'terminee', 'servie'];
+
+const getDayKey = (daysAgo: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() - daysAgo);
+  return date.toISOString().split('T')[0];
+};
+
+const getScopedOrders = (orders: Order[], visiblePOSIds: Set<string>, canSeeLegacyRestaurant: boolean, isRootScope: boolean) => (
+  orders.filter(order => {
+    if (isRootScope) return true;
+    if (order.posId) return visiblePOSIds.has(order.posId);
+    return canSeeLegacyRestaurant;
+  })
+);
 
 export default function Dashboard() {
-  const { getCA, getOrderCount, getClientCount, getAvgTicket, getTopProducts, getCAByDay } = useOrderStore();
+  const { orders: allOrders } = useOrderStore();
   const { user } = useAuthStore();
   const { sites, posList, rooms, folios, warehouses, setActivePOS } = useHospiStore();
   const navigate = useNavigate();
 
-  const ca = getCA(0);
-  const caYesterday = getCA(1);
-  const caChange = caYesterday > 0 ? ((ca - caYesterday) / caYesterday * 100).toFixed(1) : '0';
-  const orders = getOrderCount(0);
-  const clients = getClientCount(0);
-  const avgTicket = getAvgTicket(0);
-  const topProducts = getTopProducts();
-  const caByDay = getCAByDay();
   const visibleSites = getVisibleSites(user, sites);
   const visibleSiteIds = visibleSites.map(site => site.id);
   const visiblePOS = getVisiblePOS(user, posList);
+  const visiblePOSIds = new Set(visiblePOS.map(pos => pos.id));
+  const isRootScope = user?.accessLevel === 'direction' || user?.role === 'Admin';
+  const canSeeLegacyRestaurant = canAccessModule(user, 'restaurant') && visiblePOS.some(pos => pos.type === 'restaurant');
+  const scopedOrders = getScopedOrders(allOrders, visiblePOSIds, canSeeLegacyRestaurant, isRootScope);
+  const todayOrders = scopedOrders.filter(order => order.date.startsWith(getDayKey(0)) && PAID_STATUSES.includes(order.status));
+  const yesterdayOrders = scopedOrders.filter(order => order.date.startsWith(getDayKey(1)) && PAID_STATUSES.includes(order.status));
+  const ca = todayOrders.reduce((sum, order) => sum + order.total, 0);
+  const caYesterday = yesterdayOrders.reduce((sum, order) => sum + order.total, 0);
+  const caChange = caYesterday > 0 ? ((ca - caYesterday) / caYesterday * 100).toFixed(1) : '0';
+  const orders = todayOrders.length;
+  const knownClients = new Set(todayOrders.flatMap(order => [order.clientId, order.loyaltyClientId, order.roomId].filter(Boolean) as string[]));
+  const clients = knownClients.size || Math.floor(orders * 0.75);
+  const avgTicket = orders > 0 ? Math.round(ca / orders) : 0;
+  const caByDay = Array.from({ length: 7 }, (_, index) => {
+    const daysAgo = 6 - index;
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+    const dayStr = date.toISOString().split('T')[0];
+    const dayCA = scopedOrders
+      .filter(order => order.date.startsWith(dayStr) && PAID_STATUSES.includes(order.status))
+      .reduce((sum, order) => sum + order.total, 0);
+    return { day: date.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', ''), ca: dayCA };
+  });
+  const topProducts = Object.values(scopedOrders
+    .filter(order => PAID_STATUSES.includes(order.status))
+    .reduce<Record<string, { name: string; image: string; sales: number; revenue: number }>>((acc, order) => {
+      order.items.forEach(item => {
+        if (!acc[item.product.id]) {
+          acc[item.product.id] = { name: item.product.name, image: item.product.image, sales: 0, revenue: 0 };
+        }
+        acc[item.product.id].sales += item.quantity;
+        acc[item.product.id].revenue += item.product.price * item.quantity;
+      });
+      return acc;
+    }, {})).sort((a, b) => b.revenue - a.revenue);
   const visibleRooms = rooms.filter(room => visibleSiteIds.includes(room.site_id));
   const visibleRoomIds = visibleRooms.map(room => room.id);
   const occupiedRooms = visibleRooms.filter(room => room.status === 'occupied').length;
@@ -51,7 +93,7 @@ export default function Dashboard() {
     }[module];
     if (posByModule) {
       setActivePOS(posByModule.id);
-      navigate('/commandes');
+      navigate(posByModule.type === 'restaurant' ? '/commandes' : '/pos-metier');
       return;
     }
     navigate('/modules');

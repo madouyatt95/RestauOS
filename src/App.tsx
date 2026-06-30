@@ -26,6 +26,7 @@ import WhatsAppBot from './pages/WhatsAppBot';
 import HospiSettings from './pages/HospiSettings';
 import PMS from './pages/PMS';
 import BusinessModules from './pages/BusinessModules';
+import BusinessPOS from './pages/BusinessPOS';
 import DemoGuide from './pages/DemoGuide';
 import { useThemeStore } from './stores/themeStore';
 import { useEffect } from 'react';
@@ -59,6 +60,9 @@ function AppContent() {
           } />
           <Route path="/pms" element={
             <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier']}><PMS /></ProtectedRoute>
+          } />
+          <Route path="/pos-metier" element={
+            <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier', 'Serveur']}><BusinessPOS /></ProtectedRoute>
           } />
           <Route path="/personnel" element={
             <ProtectedRoute allowedRoles={['Admin', 'Gérant', 'Caissier', 'Serveur', 'Chef cuisine', 'Livreur']}><Personnel /></ProtectedRoute>

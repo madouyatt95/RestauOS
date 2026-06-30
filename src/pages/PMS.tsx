@@ -140,7 +140,9 @@ export default function PMS() {
     warehouses,
     posList,
     updateRoomStatus,
+    checkInGuest,
     addManualFolioCharge,
+    recordFolioPayment,
     closeFolio,
     recordSale,
   } = useHospiStore();
@@ -181,7 +183,6 @@ export default function PMS() {
   const occupancyRate = visibleRooms.length ? Math.round((occupied / visibleRooms.length) * 100) : 0;
   const adr = occupied ? Math.round(revenueOpen / occupied) : 0;
   const revPar = visibleRooms.length ? Math.round(revenueOpen / visibleRooms.length) : 0;
-  const availableRooms = roomsWithContext.filter(row => row.room.status === 'available');
   const dirtyArrivals = demoReservations.filter(res => res.status !== 'cancelled').length && roomsWithContext.filter(row => row.room.status === 'cleaning').length;
   const vipArrivals = demoReservations.filter(res => res.guestName.toLowerCase().includes('societe') || res.roomType === 'Suite').length;
   const unpaidDepartures = openFolios.filter(folio => folio.total_amount > 0).length;
@@ -227,9 +228,23 @@ export default function PMS() {
     setDemoReservations(prev => prev.map(res => res.id === reservationId ? { ...res, status } : res));
     const reservation = demoReservations.find(res => res.id === reservationId);
     if (reservation && status === 'checkedin') {
-      const room = availableRooms.find(row => row.room.room_type === reservation.roomType) || availableRooms[0];
-      if (room) updateRoomStatus(room.room.id, 'occupied');
-      setNotice(`Check-in de ${reservation.guestName} confirme${room ? ` en chambre ${room.room.room_number}` : ''}. Folio ouvert en demonstration.`);
+      const result = checkInGuest({
+        guestName: reservation.guestName,
+        roomType: reservation.roomType,
+        checkIn: reservation.checkIn,
+        checkOut: reservation.checkOut,
+        deposit: reservation.deposit,
+        rate: reservation.rate,
+        channel: reservation.channel,
+        createdBy: user?.name || 'Reception',
+        siteId: visibleSites[0]?.id,
+      });
+      if (result) {
+        setSelectedFolioId(result.folio.id);
+        setNotice(`Check-in confirme en chambre ${result.room.room_number}. Séjour, folio, hébergement et compte client créés.`);
+      } else {
+        setNotice(`Aucune chambre ${reservation.roomType} libre pour ${reservation.guestName}.`);
+      }
     } else if (reservation) {
       setNotice(`${reservation.guestName} : statut ${status}.`);
     }
@@ -246,8 +261,12 @@ export default function PMS() {
       method: kind === 'refund' ? 'Carte' : 'Wave / Carte',
       status: kind,
     };
+    const ledgerEntry = recordFolioPayment(selectedFolio.id, amount, kind === 'refund' ? 'carte' : 'wave', user?.name || 'Reception');
     setPayments(prev => [payment, ...prev]);
-    setNotice(`${payment.label} enregistre : ${money(Math.abs(amount))}.`);
+    setNotice(ledgerEntry
+      ? `${payment.label} enregistré : ${money(Math.abs(amount))}. Solde client mis à jour.`
+      : `${payment.label} enregistré en liste, mais aucun compte client n'a été trouvé pour ce folio.`
+    );
   };
 
   const exportInvoice = () => {
