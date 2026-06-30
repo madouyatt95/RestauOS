@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { useOrderStore, type Order } from '../stores/orderStore';
 import { useAuthStore } from '../stores/authStore';
 import { useHospiStore } from '../stores/hospiStore';
-import { ShoppingBag, Users, Receipt, ArrowDown, Bell, ChevronRight, ShieldAlert, Store, BedDouble, Dice5, Sparkles, Package } from 'lucide-react';
+import { ShoppingBag, Users, Receipt, ArrowDown, Bell, ChevronRight, ShieldAlert, Store, BedDouble, Dice5, Sparkles, Package, Warehouse } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import { canAccessModule, getAccessSummary, getVisiblePOS, getVisibleSites } from '../utils/accessControl';
@@ -27,7 +27,7 @@ const getScopedOrders = (orders: Order[], visiblePOSIds: Set<string>, canSeeLega
 export default function Dashboard() {
   const { orders: allOrders } = useOrderStore();
   const { user } = useAuthStore();
-  const { sites, posList, rooms, folios, warehouses, setActivePOS } = useHospiStore();
+  const { sites, posList, rooms, folios, warehouses, stockLevels, setActivePOS } = useHospiStore();
   const navigate = useNavigate();
 
   const visibleSites = getVisibleSites(user, sites);
@@ -73,8 +73,19 @@ export default function Dashboard() {
   const occupiedRooms = visibleRooms.filter(room => room.status === 'occupied').length;
   const openFolios = folios.filter(folio => folio.status === 'open' && visibleRoomIds.includes(folio.room_id)).length;
   const visibleWarehouses = warehouses.filter(warehouse => visibleSiteIds.includes(warehouse.site_id));
+  const visibleWarehouseIds = new Set(visibleWarehouses.map(warehouse => warehouse.id));
+  const lowStockAlerts = stockLevels.filter(level => visibleWarehouseIds.has(level.warehouse_id) && level.quantity <= level.alert_threshold);
   const restaurantPOS = visiblePOS.find(pos => pos.type === 'restaurant');
   const casinoPOS = visiblePOS.find(pos => pos.type === 'bar' || pos.type === 'casino');
+  const roleScopeLabel = user?.accessLevel === 'direction'
+    ? 'Toute l’entreprise'
+    : user?.accessLevel === 'site_manager'
+      ? 'Votre site'
+      : user?.accessLevel === 'business_manager'
+        ? 'Votre métier'
+        : user?.accessLevel === 'pos_manager'
+          ? 'Vos points de vente'
+          : 'Votre service';
 
   const openBusinessModule = (module: 'restaurant' | 'hotel' | 'casino' | 'spa' | 'boutique') => {
     if (!canAccessModule(user, module)) {
@@ -107,8 +118,9 @@ export default function Dashboard() {
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-start mb-6">
         <div>
-          <h1 className="text-xl font-black text-white">Bonjour, {user?.name.split(' ')[0] || 'Cheikh'} ! 👋</h1>
-          <p className="text-text-secondary text-xs mt-1">{user?.demoTitle || user?.role || 'Gérant'}</p>
+          <p className="text-text-tertiary text-xs font-bold mb-1">{roleScopeLabel}</p>
+          <h1 className="text-2xl font-black text-white">Vue Direction</h1>
+          <p className="text-text-secondary text-sm mt-1">{user?.demoTitle || user?.role || 'Gérant'} · {user?.name || 'Utilisateur'}</p>
         </div>
         <button className="w-10 h-10 rounded-full glass-card flex items-center justify-center relative" onClick={() => navigate('/plus')}>
           <Bell size={18} className="text-text-secondary" />
@@ -126,6 +138,52 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="glass-card-lg p-4 mb-6">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <p className="text-text-tertiary text-xs font-bold">À faire maintenant</p>
+            <h2 className="text-white font-black text-lg">Priorités du complexe</h2>
+          </div>
+          <button onClick={() => navigate('/rapports')} className="text-blue text-xs font-black mt-1">Voir les rapports</button>
+        </div>
+        <div className="space-y-2">
+          {[
+            {
+              title: lowStockAlerts.length ? `${lowStockAlerts.length} référence(s) sous seuil` : 'Stocks sous contrôle',
+              detail: lowStockAlerts.length ? 'Commander, transférer ou corriger depuis le module Stock.' : 'Aucune alerte critique sur le périmètre visible.',
+              icon: Warehouse,
+              color: lowStockAlerts.length ? '#F59E0B' : '#22C55E',
+              action: () => navigate('/stocks'),
+            },
+            {
+              title: `${openFolios} compte(s) chambre ouverts`,
+              detail: 'Contrôler les imputations restaurant, bar, spa et boutique.',
+              icon: BedDouble,
+              color: '#06B6D4',
+              action: () => navigate('/pms'),
+            },
+            {
+              title: `${visiblePOS.length} point(s) de vente actif(s)`,
+              detail: 'Entrer dans un métier pour vendre, encaisser ou vérifier le dépôt.',
+              icon: Store,
+              color: '#8B5CF6',
+              action: () => navigate('/modules'),
+            },
+          ].map(item => (
+            <button key={item.title} onClick={item.action} className="w-full rounded-2xl bg-white/5 border border-white/10 p-3 flex items-center gap-3 text-left active:scale-[0.99] transition-transform">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${item.color}20`, color: item.color }}>
+                <item.icon size={18} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-white font-black text-sm">{item.title}</p>
+                <p className="text-text-secondary text-xs mt-0.5">{item.detail}</p>
+              </div>
+              <ChevronRight size={16} className="text-text-tertiary" />
+            </button>
+          ))}
+        </div>
+      </motion.section>
+
       {/* Business Overview */}
       <motion.section
         initial={{ opacity: 0, y: 16 }}
@@ -135,12 +193,12 @@ export default function Dashboard() {
       >
         <div className="flex items-center justify-between mb-3">
           <div>
-            <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Vue rapide</p>
-            <h2 className="text-white font-black text-lg">Activité par métier</h2>
+            <p className="text-text-tertiary text-xs font-bold">Entrer dans un métier</p>
+            <h2 className="text-white font-black text-lg">Restaurant, hôtel, casino, spa</h2>
           </div>
           <button onClick={() => navigate('/modules')} className="h-10 px-3 rounded-xl bg-white/5 border border-white/10 text-text-secondary flex items-center justify-center gap-2">
             <Store size={16} />
-            <span className="text-[10px] font-black uppercase tracking-widest">Gérer</span>
+            <span className="text-xs font-black">Choisir</span>
           </button>
         </div>
 

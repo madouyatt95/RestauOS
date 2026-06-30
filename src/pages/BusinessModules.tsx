@@ -21,7 +21,7 @@ import { canAccessModule, canAccessRoute, getVisiblePOS, getVisibleSites } from 
 const businessGroups = [
   {
     key: 'restaurant',
-    title: 'Restaurant',
+    title: 'Restaurant / RestauOS',
     description: 'RestauOS complet : salle, tables, commandes, caisse, cuisine, réservations.',
     types: ['restaurant'],
     icon: Store,
@@ -29,8 +29,8 @@ const businessGroups = [
   },
   {
     key: 'bars-casino',
-    title: 'Bars & Casino',
-    description: 'Points de vente casino, bars, night-club, tarifs et caisses séparées.',
+    title: 'Casino, bars & night-club',
+    description: 'Ventes casino, bars, night-club, tarifs, caisses et dépôts séparés.',
     types: ['bar', 'nightclub', 'casino'],
     icon: Dice5,
     color: '#8B5CF6',
@@ -45,8 +45,8 @@ const businessGroups = [
   },
   {
     key: 'boutique',
-    title: 'Boutique',
-    description: 'Ventes comptoir, stock boutique, reçus et tarifs dédiés.',
+    title: 'Boutique hôtel',
+    description: 'Ventes comptoir, retours, stock boutique, reçus et tarifs dédiés.',
     types: ['boutique'],
     icon: Package,
     color: '#EC4899',
@@ -87,9 +87,9 @@ export default function BusinessModules() {
     <div className="page-content pt-14 pb-28">
       <div className="flex items-start justify-between gap-3 mb-5">
         <div>
-          <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Activités du complexe</p>
-          <h1 className="text-white font-black text-2xl">Restaurant, hôtel, casino, spa</h1>
-          <p className="text-text-secondary text-xs mt-1">Entrer dans un métier, choisir son point de vente, puis ouvrir ses ventes, sa caisse, son stock ou ses réglages.</p>
+          <p className="text-text-tertiary text-xs font-bold">Métiers du complexe</p>
+          <h1 className="text-white font-black text-2xl">Choisir une activité</h1>
+          <p className="text-text-secondary text-sm mt-1">Chaque métier garde ses écrans métier. Les chiffres remontent ensuite dans la vue Direction.</p>
         </div>
         {canAccessRoute(user, '/settings') && (
           <button
@@ -115,8 +115,8 @@ export default function BusinessModules() {
                 <BedDouble size={22} />
               </div>
               <div>
-                <h2 className="text-white font-black text-base">Hôtel / PMS</h2>
-                <p className="text-text-secondary text-xs">Chambres, folios, réception, imputations POS.</p>
+                <h2 className="text-white font-black text-base">Hôtel</h2>
+                <p className="text-text-secondary text-xs">Réception, chambres, comptes chambre, paiements et ménage.</p>
               </div>
             </div>
             <ChevronRight size={17} className="text-text-tertiary mt-3" />
@@ -127,7 +127,7 @@ export default function BusinessModules() {
               <p className="text-white font-black">{occupiedRooms}/{visibleRooms.length}</p>
             </div>
             <div className="rounded-xl bg-white/5 p-3">
-              <p className="text-text-tertiary text-[9px] font-black uppercase">Folios ouverts</p>
+              <p className="text-text-tertiary text-[9px] font-black uppercase">Comptes chambre</p>
               <p className="text-white font-black">{openFolios}</p>
             </div>
             <div className="rounded-xl bg-white/5 p-3">
@@ -140,7 +140,7 @@ export default function BusinessModules() {
             onClick={() => navigate('/pms')}
             className="w-full h-12 rounded-2xl bg-cyan-500/15 border border-cyan-400/20 text-cyan-200 font-black text-sm"
           >
-            Ouvrir le module hôtel
+            Ouvrir l’hôtel
           </button>
         </motion.section>
       )}
@@ -184,10 +184,11 @@ export default function BusinessModules() {
                           {lowStock ? `${lowStock} alerte(s)` : 'OK'}
                         </span>
                       </div>
+                      <p className="text-text-tertiary text-[10px] font-black mb-2">Actions principales</p>
                       <div className="grid grid-cols-4 gap-2">
                         <button type="button" onClick={() => openPOS(pos, 'sales')} className="h-12 rounded-xl bg-white/5 text-white flex flex-col items-center justify-center gap-1 text-[10px] font-black">
                           <ShoppingBag size={15} style={{ color: group.color }} />
-                          Ventes
+                          Vendre
                         </button>
                         <button type="button" onClick={() => openPOS(pos, 'cash')} className="h-12 rounded-xl bg-white/5 text-white flex flex-col items-center justify-center gap-1 text-[10px] font-black">
                           <CreditCard size={15} style={{ color: group.color }} />
@@ -195,7 +196,7 @@ export default function BusinessModules() {
                         </button>
                         <button type="button" onClick={() => openPOS(pos, 'stock')} className="h-12 rounded-xl bg-white/5 text-white flex flex-col items-center justify-center gap-1 text-[10px] font-black">
                           <Warehouse size={15} style={{ color: group.color }} />
-                          Stock
+                          Dépôt
                         </button>
                         {canAccessRoute(user, '/settings') && (
                           <button type="button" onClick={() => openPOS(pos, 'settings')} className="h-12 rounded-xl bg-white/5 text-white flex flex-col items-center justify-center gap-1 text-[10px] font-black">
@@ -231,8 +232,8 @@ export default function BusinessModules() {
           <Building2 size={18} />
         </div>
         <div>
-          <p className="text-white font-black text-sm">Configuration globale</p>
-          <p className="text-text-secondary text-xs mt-1">Les sites, points de vente, dépôts, produits, prix et affectations restent modifiables depuis Admin.</p>
+          <p className="text-white font-black text-sm">Réglages du complexe</p>
+          <p className="text-text-secondary text-xs mt-1">Sites, activités, points de vente, dépôts, produits, prix et affectations sont centralisés ici.</p>
           {canAccessRoute(user, '/settings') && (
             <button type="button" onClick={() => navigate('/settings')} className="mt-3 text-blue font-black text-xs">
               Ouvrir les paramètres

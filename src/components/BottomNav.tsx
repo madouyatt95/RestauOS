@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, ShoppingBag, Package, Users, MoreHorizontal, Truck, ChefHat, Calendar, Wallet, Grid2X2, BarChart3, Settings } from 'lucide-react';
+import { Home, ShoppingBag, Package, Users, MoreHorizontal, Truck, ChefHat, Calendar, Wallet, Grid2X2, Settings, BedDouble } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { usePlanningStore } from '../stores/planningStore';
 import { canAccessRoute } from '../utils/accessControl';
@@ -20,12 +20,12 @@ export default function BottomNav() {
     case 'Admin':
     case 'Gérant':
       navItems = [
-        { path: '/dashboard', icon: Home, label: 'Accueil' },
-        { path: '/modules', icon: Grid2X2, label: 'Activités' },
-        { path: '/commandes', icon: ShoppingBag, label: 'Opérations' },
-        { path: '/rapports', icon: BarChart3, label: 'Rapports' },
-        { path: '/settings', icon: Settings, label: 'Admin' },
-        { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
+        { path: '/dashboard', icon: Home, label: 'Direction' },
+        { path: '/modules', icon: Grid2X2, label: 'Métiers' },
+        { path: '/commandes', icon: ShoppingBag, label: 'Restaurant' },
+        { path: '/pms', icon: BedDouble, label: 'Hôtel' },
+        { path: '/stocks', icon: Package, label: 'Stocks' },
+        { path: '/settings', icon: Settings, label: 'Réglages' },
       ];
 
 
@@ -35,7 +35,7 @@ export default function BottomNav() {
         { path: '/caisse', icon: ShoppingBag, label: 'Encaissement' },
         { path: '/fidelite', icon: Users, label: 'Fidélité' },
         { path: '/personnel', icon: Calendar, label: 'Planning' },
-        { path: '/plus', icon: MoreHorizontal, label: 'Plus' },
+        { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
       ];
       break;
     case 'Serveur':
@@ -44,7 +44,7 @@ export default function BottomNav() {
         { path: '/caisse', icon: Wallet, label: 'Caisse' },
         { path: '/fidelite', icon: Users, label: 'Fidélité' },
         { path: '/personnel', icon: Calendar, label: 'Planning' },
-        { path: '/plus', icon: MoreHorizontal, label: 'Plus' },
+        { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
       ];
       break;
     case 'Chef cuisine':
@@ -52,14 +52,14 @@ export default function BottomNav() {
         { path: '/cuisine', icon: ChefHat, label: 'Cuisine' },
         { path: '/stocks', icon: Package, label: 'Stocks' },
         { path: '/personnel', icon: Calendar, label: 'Planning' },
-        { path: '/plus', icon: MoreHorizontal, label: 'Plus' },
+        { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
       ];
       break;
     case 'Livreur':
       navItems = [
         { path: '/livraisons', icon: Truck, label: 'Livraisons' },
         { path: '/personnel', icon: Calendar, label: 'Planning' },
-        { path: '/plus', icon: MoreHorizontal, label: 'Plus' },
+        { path: '/plus', icon: MoreHorizontal, label: 'Profil' },
       ];
       break;
     case 'Client':

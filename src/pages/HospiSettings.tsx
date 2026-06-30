@@ -182,25 +182,25 @@ export default function HospiSettings() {
   });
 
   const adminViews: Array<{ key: AdminView; label: string; icon: typeof Sparkles }> = [
-    { key: 'assistant', label: 'Assistant', icon: Sparkles },
-    { key: 'modules', label: 'Modules métier', icon: Boxes },
-    { key: 'pos', label: 'POS & dépôts', icon: Store },
-    { key: 'health', label: 'Santé', icon: AlertTriangle },
-    { key: 'advanced', label: 'Avancé', icon: Settings2 },
+    { key: 'assistant', label: 'Guide', icon: Sparkles },
+    { key: 'modules', label: 'Métiers', icon: Boxes },
+    { key: 'pos', label: 'Vente & dépôts', icon: Store },
+    { key: 'health', label: 'Contrôles', icon: AlertTriangle },
+    { key: 'advanced', label: 'Plus', icon: Settings2 },
   ];
 
   const advancedViews: Array<{ key: AdminView; label: string; detail: string; icon: typeof Sparkles }> = [
-    { key: 'architecture', label: 'Architecture', detail: 'Sites, POS, dépôts et liens visibles.', icon: Network },
-    { key: 'permissions', label: 'Permissions', detail: 'Rôles terrain et droits métier.', icon: KeyRound },
+    { key: 'architecture', label: 'Entreprise & sites', detail: 'Sites, points de vente, dépôts et liens visibles.', icon: Network },
+    { key: 'permissions', label: 'Rôles & accès', detail: 'Qui voit quoi selon son métier.', icon: KeyRound },
     { key: 'rules', label: 'Règles métier', detail: 'Stock, validations, remises et annulations.', icon: Settings2 },
-    { key: 'imports', label: 'Imports', detail: 'Importer produits, prix et données terrain.', icon: Upload },
+    { key: 'imports', label: 'Reprise de données', detail: 'Importer produits, prix et données terrain.', icon: Upload },
     { key: 'audit', label: 'Audit', detail: 'Actions sensibles et traces.', icon: ShieldCheck },
-    { key: 'simulation', label: 'Simulation', detail: 'Tester POS, prix, stock et caisse.', icon: PlayCircle },
-    { key: 'drafts', label: 'Brouillons', detail: 'Tester puis publier une configuration.', icon: Layers },
+    { key: 'simulation', label: 'Tester une vente', detail: 'Vérifier prix, dépôt, stock et caisse.', icon: PlayCircle },
+    { key: 'drafts', label: 'Préparer un changement', detail: 'Tester puis publier une configuration.', icon: Layers },
     { key: 'history', label: 'Historique', detail: 'Voir les modifications publiées.', icon: History },
-    { key: 'packs', label: 'Packs métier', detail: 'Créer un métier complet rapidement.', icon: PackageCheck },
-    { key: 'priceMatrix', label: 'Matrice prix', detail: 'Prix par produit et par POS.', icon: Table2 },
-    { key: 'permissionMatrix', label: 'Matrice droits', detail: 'Autoriser, bloquer ou exiger manager.', icon: KeyRound },
+    { key: 'packs', label: 'Créer un métier', detail: 'Créer un point de vente complet rapidement.', icon: PackageCheck },
+    { key: 'priceMatrix', label: 'Prix par point de vente', detail: 'Un produit, plusieurs tarifs selon l’activité.', icon: Table2 },
+    { key: 'permissionMatrix', label: 'Droits par rôle', detail: 'Autoriser, bloquer ou exiger manager.', icon: KeyRound },
     { key: 'backup', label: 'Sauvegarde', detail: 'Sauvegarder et restaurer la configuration.', icon: RotateCcw },
     { key: 'approvals', label: 'Validations', detail: 'Demandes manager à approuver.', icon: UserCheck },
   ];
@@ -209,10 +209,10 @@ export default function HospiSettings() {
     { title: 'Entreprise', done: companies.length > 0, detail: companies[0]?.name || 'Créer la société' },
     { title: 'Sites', done: sites.length > 0, detail: `${sites.length} site(s) configuré(s)` },
     { title: 'Modules métier', done: posList.some(pos => ['restaurant', 'spa', 'casino', 'boutique', 'room_service'].includes(pos.type)), detail: 'Restaurant, hôtel, casino, spa, boutique' },
-    { title: 'POS', done: posList.length > 0, detail: `${posList.length} point(s) de vente` },
+    { title: 'Points de vente', done: posList.length > 0, detail: `${posList.length} point(s) de vente` },
     { title: 'Dépôts', done: warehouses.length > 0, detail: `${warehouses.length} dépôt(s)` },
     { title: 'Catalogue', done: products.length > 0, detail: `${products.length} produit(s)` },
-    { title: 'Prix par POS', done: posProductPrices.length > 0, detail: `${posProductPrices.length} tarif(s)` },
+    { title: 'Prix par point de vente', done: posProductPrices.length > 0, detail: `${posProductPrices.length} tarif(s)` },
     { title: 'Contrôles', done: auditLogs.length > 0 || stockLevels.length > 0, detail: 'Stock, audit et règles prêts' },
   ];
 
@@ -788,8 +788,9 @@ export default function HospiSettings() {
   return (
     <div className="page-content pt-14 pb-28">
       <div className="mb-6">
-        <h1 className="text-white font-black text-2xl">Administration Hospi</h1>
-        <p className="text-text-secondary text-xs uppercase tracking-widest font-bold mt-1">RestauOS Hospitality ERP</p>
+        <p className="text-text-tertiary text-xs font-bold mb-1">Réglages du complexe</p>
+        <h1 className="text-white font-black text-2xl">Configurer Sártal OS</h1>
+        <p className="text-text-secondary text-sm mt-1">Entreprise, sites, métiers, points de vente, dépôts, produits, prix et droits.</p>
       </div>
 
       <div className="glass-card-lg p-5 mb-5">
@@ -804,7 +805,7 @@ export default function HospiSettings() {
         </div>
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-xl bg-white/5 p-3">
-            <p className="text-text-tertiary text-[9px] font-black uppercase">POS</p>
+            <p className="text-text-tertiary text-[9px] font-black uppercase">Points de vente</p>
             <p className="text-white font-black">{posList.length}</p>
           </div>
           <div className="rounded-xl bg-white/5 p-3">
@@ -852,8 +853,8 @@ export default function HospiSettings() {
           <div className="glass-card-lg p-5">
             <div className="flex items-start justify-between gap-3 mb-4">
               <div>
-                <h3 className="text-white font-black text-base">Assistant de configuration</h3>
-                <p className="text-text-secondary text-xs mt-1">Le parcours pour ouvrir un nouveau complexe sans oublier les liens critiques.</p>
+                <h3 className="text-white font-black text-base">Guide de configuration</h3>
+                <p className="text-text-secondary text-xs mt-1">Le parcours pour ouvrir un complexe sans oublier les liens critiques.</p>
               </div>
               <Sparkles size={20} className="text-orange" />
             </div>
@@ -866,10 +867,10 @@ export default function HospiSettings() {
                     if (step.title === 'Entreprise') openAdminView('architecture');
                     if (step.title === 'Sites') openQuickConfig('site');
                     if (step.title === 'Modules métier') openAdminView('modules');
-                    if (step.title === 'POS') openQuickConfig('pos');
+                    if (step.title === 'Points de vente') openQuickConfig('pos');
                     if (step.title === 'Dépôts') openQuickConfig('warehouse');
                     if (step.title === 'Catalogue') openQuickConfig('product');
-                    if (step.title === 'Prix par POS') openQuickConfig('price');
+                    if (step.title === 'Prix par point de vente') openQuickConfig('price');
                     if (step.title === 'Contrôles') openAdminView('simulation');
                   }}
                   className="w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3 flex items-center gap-3 text-left"

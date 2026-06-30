@@ -586,8 +586,9 @@ export default function Stocks() {
     <div className="page-content pt-14 pb-28">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl font-black text-white">Stocks & dépôts</h1>
-          <p className="text-text-tertiary text-xs mt-1">Piloter le stock réel du complexe, par dépôt et par point de vente.</p>
+          <p className="text-text-tertiary text-xs font-bold mb-1">Stocks & achats</p>
+          <h1 className="text-2xl font-black text-white">Que faut-il faire ?</h1>
+          <p className="text-text-secondary text-sm mt-1">Ajouter, commander, transférer ou compter le stock réel.</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -607,15 +608,15 @@ export default function Stocks() {
       {/* Tabs */}
       <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-none">
         {([
-          ['pilotage', 'Pilotage'],
-          ['moteur', 'Moteur métier'],
-          ['reappro', 'Réappro'],
+          ['pilotage', 'Vue simple'],
+          ['moteur', 'Règles auto'],
+          ['reappro', 'À commander'],
           ['depots', 'Dépôts'],
-          ['achats', 'Achats'],
+          ['achats', 'Achats fournisseurs'],
           ['inventaire-guide', 'Inventaire'],
-          ['mouvements', 'Mouvements'],
+          ['mouvements', 'Historique'],
           ['pertes', 'Pertes'],
-          ['inventaire', 'Archive RestauOS'],
+          ['inventaire', 'Ancien stock'],
         ] as const).map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${tab === key
@@ -629,7 +630,7 @@ export default function Stocks() {
       {/* Search */}
       <div className="relative mb-4">
         <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary" />
-        <input type="text" placeholder="Rechercher un produit ou un article..."
+        <input type="text" placeholder="Rechercher un produit, un dépôt, une famille..."
           value={search} onChange={e => setSearch(e.target.value)}
           className="w-full pl-11 pr-4 py-3 glass-card text-sm text-white placeholder-text-tertiary bg-transparent border-none" />
       </div>
@@ -658,6 +659,47 @@ export default function Stocks() {
           </div>
         </div>
       </div>
+
+      <section className="grid grid-cols-2 gap-3 mb-5">
+        {[
+          {
+            title: 'Ajouter / corriger',
+            detail: 'Mettre la quantité réelle',
+            icon: Plus,
+            color: '#22C55E',
+            action: () => setShowAdjustment(true),
+          },
+          {
+            title: 'Commander',
+            detail: 'Créer un achat fournisseur',
+            icon: Truck,
+            color: '#3B82F6',
+            action: () => { resetPurchaseForm(); setShowPurchaseForm(true); setTab('achats'); },
+          },
+          {
+            title: 'Transférer',
+            detail: 'Déplacer entre dépôts',
+            icon: RefreshCcw,
+            color: '#8B5CF6',
+            action: () => setShowTransfer(true),
+          },
+          {
+            title: 'Inventaire',
+            detail: 'Compter un dépôt',
+            icon: ClipboardCheck,
+            color: '#FF8A00',
+            action: () => setTab('inventaire-guide'),
+          },
+        ].map(action => (
+          <button key={action.title} onClick={action.action} className="glass-card p-4 text-left active:scale-[0.98] transition-transform">
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center mb-3" style={{ background: `${action.color}20`, color: action.color }}>
+              <action.icon size={20} />
+            </div>
+            <p className="text-white font-black text-sm">{action.title}</p>
+            <p className="text-text-secondary text-xs mt-1">{action.detail}</p>
+          </button>
+        ))}
+      </section>
 
       <div className="grid grid-cols-2 gap-2 mb-4">
         <select value={warehouseFilter} onChange={e => setWarehouseFilter(e.target.value)}
@@ -703,13 +745,13 @@ export default function Stocks() {
           </div>
 
           <div className="grid grid-cols-3 gap-3">
-            <button onClick={() => setShowTransfer(true)} className="py-3 rounded-2xl bg-blue/10 border border-blue/20 text-blue font-black text-[10px] uppercase tracking-widest">
+            <button onClick={() => setShowTransfer(true)} className="py-3 rounded-2xl bg-blue/10 border border-blue/20 text-blue font-black text-xs">
               Transférer
             </button>
-            <button onClick={() => setShowAdjustment(true)} className="py-3 rounded-2xl bg-orange/10 border border-orange/20 text-orange font-black text-[10px] uppercase tracking-widest">
+            <button onClick={() => setShowAdjustment(true)} className="py-3 rounded-2xl bg-orange/10 border border-orange/20 text-orange font-black text-xs">
               Inventaire
             </button>
-            <button onClick={() => setShowLoss(true)} className="py-3 rounded-2xl bg-red/10 border border-red/20 text-red font-black text-[10px] uppercase tracking-widest">
+            <button onClick={() => setShowLoss(true)} className="py-3 rounded-2xl bg-red/10 border border-red/20 text-red font-black text-xs">
               Perte
             </button>
           </div>
@@ -717,7 +759,7 @@ export default function Stocks() {
           <section className="glass-card-lg p-4">
             <div className="flex items-start justify-between gap-3 mb-4">
               <div>
-                <h3 className="text-white font-black text-sm">À traiter maintenant</h3>
+                <h3 className="text-white font-black text-base">À traiter maintenant</h3>
                 <p className="text-text-secondary text-xs">{pendingPurchaseOrders.length} réception(s) fournisseur • {lowHospiStocks.length} alerte(s) stock</p>
               </div>
               <button type="button" onClick={() => setTab('achats')} className="text-blue text-xs font-black">
@@ -758,7 +800,7 @@ export default function Stocks() {
           </section>
 
           <section className="glass-card-lg p-4">
-            <h3 className="text-white font-black text-sm mb-3">Alertes intelligentes</h3>
+            <h3 className="text-white font-black text-base mb-3">Alertes automatiques</h3>
             <div className="space-y-2">
               {smartAlerts.slice(0, 5).map(alert => (
                 <div key={alert.id} className={`rounded-xl px-3 py-2 border ${alert.tone === 'red' ? 'bg-red/10 border-red/15' : 'bg-orange/10 border-orange/15'}`}>
@@ -776,7 +818,7 @@ export default function Stocks() {
                 <ShieldCheck size={18} />
               </div>
               <div>
-                <h3 className="text-white font-black text-sm">Permissions stock</h3>
+              <h3 className="text-white font-black text-sm">Droits sur le stock</h3>
                 <p className="text-text-secondary text-xs mt-1">
                   {user?.role === 'Admin' || user?.role === 'Gérant'
                     ? 'Vous pouvez transférer, corriger, déclarer des pertes et configurer les dépôts.'
@@ -800,7 +842,7 @@ export default function Stocks() {
 
           <section className="glass-card-lg p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white font-black text-sm">Catalogue multi-dépôts</h3>
+              <h3 className="text-white font-black text-base">Produits par dépôt</h3>
               <button type="button" onClick={() => setTab('depots')} className="text-blue text-xs font-black">Détails</button>
             </div>
             <div className="space-y-2">

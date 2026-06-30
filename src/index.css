@@ -81,9 +81,12 @@
   border-radius: 24px;
   display: flex;
   align-items: center;
-  justify-content: space-around;
-  padding: 8px 4px;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 8px;
   z-index: 9999;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .bottom-nav-item {
@@ -91,17 +94,22 @@
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 6px 12px;
+  min-width: 72px;
+  padding: 8px 10px;
   color: var(--color-text-secondary);
   text-decoration: none;
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 11px;
+  line-height: 1.1;
+  font-weight: 700;
   transition: color 0.2s;
   position: relative;
+  border-radius: 18px;
+  white-space: nowrap;
 }
 
 .bottom-nav-item.active {
   color: var(--color-orange);
+  background: rgba(255, 138, 0, 0.1);
 }
 
 .bottom-nav-center {

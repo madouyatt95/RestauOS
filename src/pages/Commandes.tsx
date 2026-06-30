@@ -367,9 +367,9 @@ export default function Commandes() {
       <div className="page-content pt-8 pb-32 h-screen flex flex-col overflow-hidden bg-[#0a0c10]">
         <div className="flex items-center justify-between mb-4 px-4">
           <div>
-            <h1 className="text-white font-black text-2xl mb-1">Plan de Salle</h1>
-            <p className="text-text-secondary text-xs">
-              {designMode ? 'Studio Mode : Configurez vos zones' : assigningRes ? `Attribuer à ${assigningRes.clientName}` : activePOS?.name || 'Gérez vos tables en temps réel'}
+            <h1 className="text-white font-black text-2xl mb-1">RestauOS</h1>
+            <p className="text-text-secondary text-sm">
+              {designMode ? 'Modifier le plan de salle' : assigningRes ? `Attribuer à ${assigningRes.clientName}` : activePOS?.name || 'Salle, tables, commandes et caisse'}
             </p>
           </div>
           <div className="flex gap-2">
@@ -397,7 +397,7 @@ export default function Commandes() {
           <div className="rounded-2xl bg-white/5 border border-white/10 px-3 py-2">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-text-tertiary text-[9px] font-black uppercase tracking-widest">POS actif</p>
+                <p className="text-text-tertiary text-[10px] font-black">Restaurant ou bar actif</p>
                 <h2 className="text-white font-black text-sm mt-0.5">{activePOS?.name || 'POS non sélectionné'}</h2>
               </div>
               <select
@@ -412,10 +412,10 @@ export default function Commandes() {
             </div>
             <div className="mt-2 flex gap-2 overflow-x-auto scrollbar-none pb-1">
               {[
-                { label: activeWarehouse?.name || 'Dépôt non configuré', icon: Warehouse, color: 'text-green' },
-                { label: activePOS?.payment_methods.join(', ') || 'Espèces', icon: CreditCard, color: 'text-blue' },
+                { label: `Dépôt : ${activeWarehouse?.name || 'non configuré'}`, icon: Warehouse, color: 'text-green' },
+                { label: `Paiements : ${activePOS?.payment_methods.join(', ') || 'Espèces'}`, icon: CreditCard, color: 'text-blue' },
                 { label: activePOS?.tax_profile || 'TVA standard', icon: Percent, color: 'text-orange' },
-                { label: `${activePOSRevenue.toLocaleString('fr-FR')} F`, icon: Store, color: 'text-purple' },
+                { label: `CA : ${activePOSRevenue.toLocaleString('fr-FR')} F`, icon: Store, color: 'text-purple' },
               ].map(item => (
                 <span key={item.label} className="shrink-0 rounded-full bg-black/20 border border-white/5 px-2.5 py-1.5 text-[10px] font-bold text-text-secondary flex items-center gap-1.5">
                   <item.icon size={12} className={item.color} />

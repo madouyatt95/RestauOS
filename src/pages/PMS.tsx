@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -21,6 +21,7 @@ import {
   Sparkles,
   UserRound,
   Wrench,
+  X,
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useHospiStore } from '../stores/hospiStore';
@@ -56,17 +57,17 @@ const roomTileClass: Record<RoomStatus, string> = {
 type HotelTab = 'reception' | 'reservations' | 'availability' | 'planning' | 'rooms' | 'folios' | 'payments' | 'clients' | 'housekeeping' | 'rates' | 'maintenance' | 'documents' | 'alerts' | 'reports';
 
 const tabs: Array<{ id: HotelTab; label: string; icon: LucideIcon }> = [
-  { id: 'reception', label: 'Reception', icon: DoorOpen },
-  { id: 'reservations', label: 'Reservations', icon: CalendarDays },
-  { id: 'availability', label: 'Disponibilite', icon: Hotel },
+  { id: 'reception', label: 'Réception', icon: DoorOpen },
+  { id: 'reservations', label: 'Réservations', icon: CalendarDays },
+  { id: 'availability', label: 'Disponibilités', icon: Hotel },
   { id: 'planning', label: 'Planning', icon: CalendarDays },
   { id: 'rooms', label: 'Chambres', icon: BedDouble },
-  { id: 'folios', label: 'Folios', icon: ReceiptText },
+  { id: 'folios', label: 'Comptes chambre', icon: ReceiptText },
   { id: 'payments', label: 'Paiements', icon: Banknote },
   { id: 'clients', label: 'Clients', icon: UserRound },
-  { id: 'housekeeping', label: 'Menage', icon: Sparkles },
-  { id: 'rates', label: 'Tarifs', icon: CreditCard },
-  { id: 'maintenance', label: 'Technique', icon: Wrench },
+  { id: 'housekeeping', label: 'Ménage', icon: Sparkles },
+  { id: 'rates', label: 'Prix chambres', icon: CreditCard },
+  { id: 'maintenance', label: 'Maintenance', icon: Wrench },
   { id: 'documents', label: 'Documents', icon: Download },
   { id: 'alerts', label: 'Alertes', icon: Bell },
   { id: 'reports', label: 'Rapports', icon: FileText },
@@ -130,6 +131,7 @@ export default function PMS() {
   const [chargeAmount, setChargeAmount] = useState('3700');
   const [notice, setNotice] = useState('');
   const [activeFloor, setActiveFloor] = useState('Tous');
+  const [selectedRoomId, setSelectedRoomId] = useState('');
   const [reservationForm, setReservationForm] = useState(createInitialReservationForm);
   const [demoReservations, setDemoReservations] = useState<DemoReservation[]>(createInitialReservations);
   const [payments, setPayments] = useState<DemoPayment[]>([]);
@@ -181,6 +183,7 @@ export default function PMS() {
     const matchesFloor = activeFloor === 'Tous' || row.floor === activeFloor;
     return matchesSearch && matchesFloor;
   });
+  const selectedRoomContext = selectedRoomId ? roomsWithContext.find(row => row.room.id === selectedRoomId) : undefined;
 
   const occupied = roomsWithContext.filter(row => row.room.status === 'occupied').length;
   const departuresToday = roomsWithContext.filter(row => row.stay && new Date(row.stay.check_out_date).toDateString() === new Date(runtimeDateOffset(1)).toDateString()).length;
@@ -484,7 +487,7 @@ export default function PMS() {
       </div>
       <div className="grid grid-cols-3 gap-3">
         {filteredRooms.map(({ room }) => (
-          <motion.button key={room.id} layout onClick={() => updateRoomStatus(room.id, room.status === 'available' ? 'occupied' : room.status === 'occupied' ? 'cleaning' : room.status === 'cleaning' ? 'available' : 'maintenance')} className={`aspect-square rounded-2xl p-4 text-left shadow-lg ${roomTileClass[room.status]}`}>
+          <motion.button key={room.id} layout onClick={() => setSelectedRoomId(room.id)} className={`aspect-square rounded-2xl p-4 text-left shadow-lg ${roomTileClass[room.status]}`}>
             <p className="text-2xl font-black leading-none">{room.room_number}</p>
             <p className="text-sm font-bold mt-3 opacity-90">{statusLabel[room.status]}</p>
           </motion.button>
@@ -504,7 +507,7 @@ export default function PMS() {
         <div key={row.folio.id} className="glass-card p-4">
           <div className="flex items-start justify-between gap-3 mb-3">
             <div>
-              <p className="text-white font-black text-base">Folio chambre {row.room?.room_number}</p>
+              <p className="text-white font-black text-base">Compte chambre {row.room?.room_number}</p>
               <p className="text-text-secondary text-xs">{row.guest?.first_name} {row.guest?.last_name} · split hebergement / extras / societe</p>
             </div>
             <span className="text-white font-black">{money(row.folio.total_amount)}</span>
@@ -746,8 +749,8 @@ export default function PMS() {
           <Menu size={22} />
         </button>
         <div className="text-center">
-          <p className="text-text-tertiary text-[9px] font-black uppercase tracking-widest">PMS Hotel</p>
-          <h1 className="text-white font-black text-xl">Reception & sejour</h1>
+          <p className="text-text-tertiary text-xs font-bold">Module hôtel</p>
+          <h1 className="text-white font-black text-xl">Réception & chambres</h1>
         </div>
         <button onClick={() => navigate(canAccessRoute(user, '/settings') ? '/settings' : '/plus')} className="w-10 h-10 rounded-xl bg-white/5 text-white flex items-center justify-center" aria-label="Reglages hotel">
           <SlidersHorizontal size={20} />
@@ -762,12 +765,32 @@ export default function PMS() {
 
       <div className="relative mb-4">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary" size={18} />
-        <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Chambre, client, folio..." className="w-full h-12 rounded-2xl bg-white/5 border border-white/10 pl-11 pr-4 text-white text-sm outline-none placeholder:text-text-tertiary" />
+        <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Chambre, client, compte chambre..." className="w-full h-12 rounded-2xl bg-white/5 border border-white/10 pl-11 pr-4 text-white text-sm outline-none placeholder:text-text-tertiary" />
       </div>
+
+      <section className="grid grid-cols-2 gap-3 mb-5">
+        {[
+          { label: 'Arrivées', value: arrivalsToday, detail: 'check-in', tab: 'reservations' as HotelTab, color: '#22C55E', icon: DoorOpen },
+          { label: 'Départs', value: departuresToday, detail: 'check-out', tab: 'folios' as HotelTab, color: '#F59E0B', icon: ReceiptText },
+          { label: 'Chambres', value: `${occupied}/${visibleRooms.length}`, detail: 'occupation', tab: 'rooms' as HotelTab, color: '#8B5CF6', icon: BedDouble },
+          { label: 'Ménage', value: roomsWithContext.filter(row => row.room.status === 'cleaning').length, detail: 'à nettoyer', tab: 'housekeeping' as HotelTab, color: '#06B6D4', icon: Sparkles },
+        ].map(item => (
+          <button key={item.label} onClick={() => setTab(item.tab)} className="glass-card p-4 text-left active:scale-[0.98] transition-transform">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: `${item.color}20`, color: item.color }}>
+                <item.icon size={20} />
+              </div>
+              <span className="text-white font-black text-lg">{item.value}</span>
+            </div>
+            <p className="text-white font-black text-sm">{item.label}</p>
+            <p className="text-text-secondary text-xs mt-1">{item.detail}</p>
+          </button>
+        ))}
+      </section>
 
       <div className="flex gap-2 overflow-x-auto pb-2 mb-5">
         {tabs.map(item => (
-          <button key={item.id} onClick={() => setTab(item.id)} className={`h-11 px-4 rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase whitespace-nowrap ${tab === item.id ? 'bg-purple text-white shadow-purple-glow' : 'bg-white/5 text-text-secondary border border-white/10'}`}>
+          <button key={item.id} onClick={() => setTab(item.id)} className={`h-11 px-4 rounded-2xl flex items-center gap-2 text-xs font-black whitespace-nowrap ${tab === item.id ? 'bg-purple text-white shadow-purple-glow' : 'bg-white/5 text-text-secondary border border-white/10'}`}>
             <item.icon size={14} />
             {item.label}
           </button>
@@ -789,10 +812,70 @@ export default function PMS() {
       {tab === 'alerts' && renderAlerts()}
       {tab === 'reports' && renderReports()}
 
+      <AnimatePresence>
+        {selectedRoomContext && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setSelectedRoomId('')}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={event => event.stopPropagation()}>
+              <div className="modal-handle" />
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <p className="text-text-tertiary text-xs font-bold">Chambre {selectedRoomContext.room.room_type}</p>
+                  <h3 className="text-white font-black text-2xl">Chambre {selectedRoomContext.room.room_number}</h3>
+                  <p className="text-text-secondary text-sm mt-1">
+                    {selectedRoomContext.guest ? `${selectedRoomContext.guest.first_name} ${selectedRoomContext.guest.last_name}` : 'Disponible à la vente'}
+                  </p>
+                </div>
+                <button onClick={() => setSelectedRoomId('')} className="w-9 h-9 rounded-xl bg-white/5 text-text-secondary flex items-center justify-center">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="rounded-2xl bg-white/5 p-4">
+                  <p className="text-text-tertiary text-[10px] font-black">Statut</p>
+                  <p className="text-white font-black mt-1">{statusLabel[selectedRoomContext.room.status]}</p>
+                </div>
+                <div className="rounded-2xl bg-white/5 p-4">
+                  <p className="text-text-tertiary text-[10px] font-black">Compte chambre</p>
+                  <p className="text-white font-black mt-1">{selectedRoomContext.folio ? money(selectedRoomContext.folio.total_amount) : 'Aucun'}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { status: 'available' as RoomStatus, label: 'Marquer libre' },
+                  { status: 'occupied' as RoomStatus, label: 'Marquer occupée' },
+                  { status: 'cleaning' as RoomStatus, label: 'À nettoyer' },
+                  { status: 'maintenance' as RoomStatus, label: 'Hors service' },
+                ].map(action => (
+                  <button
+                    key={action.label}
+                    onClick={() => {
+                      updateRoomStatus(selectedRoomContext.room.id, action.status);
+                      setNotice(`Chambre ${selectedRoomContext.room.room_number} : ${action.label}.`);
+                      setSelectedRoomId('');
+                    }}
+                    className="h-12 rounded-2xl bg-white/5 border border-white/10 text-white text-xs font-black"
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+              {selectedRoomContext.folio && (
+                <button
+                  onClick={() => { setSelectedFolioId(selectedRoomContext.folio?.id || ''); setSelectedRoomId(''); setTab('folios'); }}
+                  className="w-full h-12 rounded-2xl bg-purple text-white text-sm font-black mt-4"
+                >
+                  Ouvrir le compte chambre
+                </button>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="glass-card p-4 mt-5 flex gap-3">
         <AlertTriangle size={18} className="text-orange shrink-0 mt-0.5" />
         <p className="text-text-secondary text-xs leading-relaxed">
-          Demo connectee : les charges folio utilisent le PMS, le mini-bar et room service declenchent aussi le moteur POS/stock, et les droits restent limites par le profil connecte.
+          Démo connectée : les comptes chambre utilisent le module hôtel, le mini-bar et room service déclenchent aussi le moteur POS/stock, et les droits restent limités par le profil connecté.
         </p>
       </div>
     </div>
