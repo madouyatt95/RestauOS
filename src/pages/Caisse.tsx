@@ -11,7 +11,8 @@ import { useBusinessRulesStore } from '../stores/businessRulesStore';
 import { Check, CreditCard, Smartphone, Banknote, Wallet, Wifi, CloudUpload, ClipboardList, Clock, User, Edit2, Gift, Shield, BedDouble, ReceiptText, LockKeyhole, UnlockKeyhole, Download, Percent, Ban } from 'lucide-react';
 import { syncOrderToERP } from '../services/erpConnector';
 import { buildCashSessionTicket, summarizeCashSession } from '../services/cashSession';
-import { canAccessPOS, getVisiblePOS } from '../utils/accessControl';
+import { canAccessPOS, getVisiblePOS, isManagerScope } from '../utils/accessControl';
+import { getCashierActionCards, getProfileWorkspace, workspaceToneClasses } from '../utils/profileWorkspace';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
@@ -76,6 +77,10 @@ export default function Caisse() {
   const activeRegister = getRegisterForPOS(activePOS?.id);
   const openSession = getOpenCashSession(activePOS?.id);
   const cashSummary = summarizeCashSession(openSession, orders);
+  const workspace = getProfileWorkspace(user, activePOS);
+  const workspaceTone = workspaceToneClasses[workspace.tone];
+  const cashierCards = getCashierActionCards(activePOS, Boolean(openSession), pendingOrders.length);
+  const posSwitchPath = isManagerScope(user) ? '/modules' : '/pos-metier';
   const closedSessions = cashSessions
     .filter(session => session.pos_id === activePOS?.id && session.status === 'closed')
     .sort((a, b) => new Date(b.closed_at || b.opened_at).getTime() - new Date(a.closed_at || a.opened_at).getTime());
@@ -368,14 +373,43 @@ export default function Caisse() {
     <div className="page-content pt-8 pb-32">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-white font-black text-2xl mb-1">Encaissement</h1>
-          <p className="text-text-secondary text-sm">Tickets en attente de règlement</p>
+          <h1 className="text-white font-black text-2xl mb-1">Caisse & paiements</h1>
+          <p className="text-text-secondary text-sm">Encaissements du périmètre autorisé</p>
         </div>
         <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-blue relative">
           <ClipboardList size={22} />
           <span className="absolute -top-1 -right-1 w-5 h-5 bg-blue rounded-full text-[10px] text-white font-bold flex items-center justify-center border-2 border-[#070A0F]">
             {pendingOrders.length}
           </span>
+        </div>
+      </div>
+
+      <div className={`rounded-[1.75rem] border p-5 mb-5 ${workspaceTone.bg} ${workspaceTone.border}`}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className={`text-[10px] font-black uppercase tracking-widest ${workspaceTone.text}`}>{workspace.eyebrow}</p>
+            <h2 className="text-white font-black text-xl mt-1">{workspace.title}</h2>
+            <p className="text-text-secondary text-xs mt-1 leading-snug">{workspace.subtitle}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(posSwitchPath)}
+            className="shrink-0 h-10 px-3 rounded-2xl bg-white/10 border border-white/10 text-white text-[10px] font-black"
+          >
+            Voir POS
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-2 mt-4">
+          {cashierCards.map(card => {
+            const tone = workspaceToneClasses[card.tone];
+            return (
+              <div key={`${card.label}-${card.value}`} className="rounded-2xl bg-black/15 border border-white/10 p-3">
+                <p className={`text-[9px] font-black uppercase tracking-widest ${tone.text}`}>{card.label}</p>
+                <p className="text-white font-black text-sm mt-1">{card.value}</p>
+                <p className="text-text-tertiary text-[10px] leading-tight mt-0.5">{card.detail}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
 

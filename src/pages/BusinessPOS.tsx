@@ -6,20 +6,11 @@ import { useAuthStore } from '../stores/authStore';
 import { useHospiStore, type POSProduct } from '../stores/hospiStore';
 import { useBusinessOperationsStore } from '../stores/businessOperationsStore';
 import { canAccessPOS } from '../utils/accessControl';
+import { getPOSActionCards, getPOSTypeLabel, getProfileWorkspace, workspaceToneClasses } from '../utils/profileWorkspace';
 import { completePOSSale } from '../services/posTransaction';
 import { runtimeDateOffset } from '../utils/runtime';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
-
-const typeLabels: Record<string, string> = {
-  bar: 'Bar & casino',
-  nightclub: 'Night club',
-  casino: 'Casino',
-  room_service: 'Room service',
-  spa: 'Spa',
-  boutique: 'Boutique',
-  other: 'Point de vente',
-};
 
 export default function BusinessPOS() {
   const navigate = useNavigate();
@@ -51,6 +42,9 @@ export default function BusinessPOS() {
   const posSpaAppointments = activePOS ? spaAppointments.filter(item => item.posId === activePOS.id) : [];
   const posCasinoSessions = activePOS ? casinoSessions.filter(item => item.posId === activePOS.id) : [];
   const posBoutiqueReturns = activePOS ? boutiqueReturns.filter(item => item.posId === activePOS.id) : [];
+  const workspace = getProfileWorkspace(user, activePOS);
+  const workspaceTone = workspaceToneClasses[workspace.tone];
+  const actionCards = activePOS ? getPOSActionCards(activePOS, rooms.length) : [];
 
   const sellNow = (row: POSProduct) => {
     if (!activePOS) return;
@@ -156,8 +150,16 @@ export default function BusinessPOS() {
       </div>
 
       <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="glass-card-lg p-5 mb-4">
-        <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">{typeLabels[activePOS.type] || 'Point de vente'}</p>
-        <h1 className="text-white font-black text-2xl mt-1">{activePOS.name}</h1>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className={`text-[10px] font-black uppercase tracking-widest ${workspaceTone.text}`}>{workspace.eyebrow}</p>
+            <h1 className="text-white font-black text-2xl mt-1">{workspace.title}</h1>
+            <p className="text-text-secondary text-xs mt-1 leading-snug">{workspace.subtitle}</p>
+          </div>
+          <span className={`shrink-0 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase ${workspaceTone.bg} ${workspaceTone.border} ${workspaceTone.text}`}>
+            {getPOSTypeLabel(activePOS.type)}
+          </span>
+        </div>
         <div className="grid grid-cols-3 gap-2 mt-4">
           <div className="rounded-2xl bg-white/5 p-3">
             <Package size={16} className="text-orange mb-2" />
@@ -175,12 +177,66 @@ export default function BusinessPOS() {
             <p className="text-white font-black text-sm">{activePOS.payment_methods.length}</p>
           </div>
         </div>
+        <div className="grid grid-cols-3 gap-2 mt-3">
+          {actionCards.map(card => {
+            const tone = workspaceToneClasses[card.tone];
+            return (
+              <div key={`${card.label}-${card.value}`} className={`rounded-2xl border p-3 ${tone.bg} ${tone.border}`}>
+                <p className={`text-[9px] font-black uppercase tracking-widest ${tone.text}`}>{card.label}</p>
+                <p className="text-white font-black text-sm mt-1">{card.value}</p>
+                <p className="text-text-tertiary text-[10px] mt-0.5 leading-tight">{card.detail}</p>
+              </div>
+            );
+          })}
+        </div>
       </motion.div>
 
       {notice && (
         <button onClick={() => setNotice('')} className="w-full rounded-2xl bg-green/10 border border-green/20 text-green text-xs font-bold px-4 py-3 text-left mb-4">
           {notice}
         </button>
+      )}
+
+      {activePOS.type === 'room_service' && (
+        <section className="glass-card-lg p-4 mb-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <p className="text-cyan-300 text-[10px] font-black uppercase tracking-widest">Room service</p>
+              <h2 className="text-white font-black text-lg">Chambres à servir</h2>
+              <p className="text-text-secondary text-xs mt-1">Chaque vente peut être encaissée ou imputée au folio de la chambre.</p>
+            </div>
+            <button onClick={() => navigate('/pms')} className="h-10 px-3 rounded-2xl bg-cyan-500/15 border border-cyan-400/20 text-cyan-200 text-xs font-black flex items-center gap-2">
+              <BedDouble size={15} /> PMS
+            </button>
+          </div>
+          <div className="space-y-2">
+            {rooms.slice(0, 4).map(row => {
+              const quickProduct = products[0];
+              return (
+                <div key={row.room.id} className="rounded-2xl bg-white/5 border border-white/10 p-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-white font-black text-sm">Chambre {row.room.room_number}</p>
+                    <p className="text-text-secondary text-xs mt-1">{row.guest.first_name} {row.guest.last_name} · folio ouvert</p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!quickProduct}
+                    onClick={() => quickProduct && chargeRoom(quickProduct)}
+                    className="h-9 px-3 rounded-xl bg-blue/10 text-blue text-[10px] font-black disabled:opacity-40"
+                  >
+                    Imputer
+                  </button>
+                </div>
+              );
+            })}
+            {rooms.length === 0 && (
+              <div className="rounded-2xl bg-white/5 border border-dashed border-white/10 p-4 text-center">
+                <p className="text-white font-bold text-sm">Aucune chambre occupée avec folio ouvert</p>
+                <p className="text-text-secondary text-xs mt-1">Le room charge sera disponible dès qu’un séjour sera actif.</p>
+              </div>
+            )}
+          </div>
+        </section>
       )}
 
       {activePOS.type === 'spa' && (

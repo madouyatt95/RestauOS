@@ -5,6 +5,7 @@ import { useOrderStore } from '../stores/orderStore';
 import { useAuthStore } from '../stores/authStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { MapPin, Clock, Truck, Check, ChefHat, Phone, Navigation, Wallet, X, Link2 } from 'lucide-react';
+import { getDeliveryActionCards, getProfileWorkspace, workspaceToneClasses } from '../utils/profileWorkspace';
 
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -44,6 +45,10 @@ export default function Livraisons() {
 
   const enCours = filteredDeliveries.filter(d => d.status !== 'livre');
   const terminees = filteredDeliveries.filter(d => d.status === 'livre');
+  const cashToReturn = terminees.filter(d => d.paymentMethod === 'especes').reduce((sum, delivery) => sum + delivery.amount, 0);
+  const workspace = getProfileWorkspace(user);
+  const workspaceTone = workspaceToneClasses[workspace.tone];
+  const deliveryCards = getDeliveryActionCards(enCours.length, terminees.length, cashToReturn, isGerant);
 
   const handleOptimize = () => {
     setIsOptimizing(true);
@@ -132,6 +137,26 @@ export default function Livraisons() {
             {poolingMode ? 'Annuler' : '🛣️ Mutualiser'}
           </button>
         )}
+      </div>
+
+      <div className="px-4 mb-6">
+        <div className={`rounded-[1.75rem] border p-5 ${workspaceTone.bg} ${workspaceTone.border}`}>
+          <p className={`text-[10px] font-black uppercase tracking-widest ${workspaceTone.text}`}>{workspace.eyebrow}</p>
+          <h2 className="text-white font-black text-xl mt-1">{workspace.title}</h2>
+          <p className="text-text-secondary text-xs mt-1 leading-snug">{workspace.subtitle}</p>
+          <div className="grid grid-cols-3 gap-2 mt-4">
+            {deliveryCards.map(card => {
+              const tone = workspaceToneClasses[card.tone];
+              return (
+                <div key={card.label} className="rounded-2xl bg-black/15 border border-white/10 p-3">
+                  <p className={`text-[9px] font-black uppercase tracking-widest ${tone.text}`}>{card.label}</p>
+                  <p className="text-white font-black text-sm mt-1">{card.value}</p>
+                  <p className="text-text-tertiary text-[10px] leading-tight mt-0.5">{card.detail}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Map Preview */}

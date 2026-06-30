@@ -29,6 +29,7 @@ import type { RoomStatus } from '../stores/hospiStore';
 import { canAccessRoute, getVisibleSites } from '../utils/accessControl';
 import type { LucideIcon } from 'lucide-react';
 import { runtimeDateOffset, runtimeId } from '../utils/runtime';
+import { getProfileWorkspace, workspaceToneClasses, type ProfileWorkspace, type WorkspaceCard } from '../utils/profileWorkspace';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 const money = (n: number) => `${fmt(n)} FCFA`;
@@ -195,6 +196,21 @@ export default function PMS() {
   const dirtyArrivals = demoReservations.filter(res => res.status !== 'cancelled').length && roomsWithContext.filter(row => row.room.status === 'cleaning').length;
   const vipArrivals = demoReservations.filter(res => res.guestName.toLowerCase().includes('societe') || res.roomType === 'Suite').length;
   const unpaidDepartures = openFolios.filter(folio => folio.total_amount > 0).length;
+  const pmsWorkspace: ProfileWorkspace = user?.accessLevel === 'direction' || user?.accessLevel === 'site_manager'
+    ? {
+      eyebrow: user?.demoTitle || 'Module hôtel',
+      title: 'Pilotage PMS hôtel',
+      subtitle: 'Réception, chambres, comptes clients, folios, ménage et paiements connectés aux POS.',
+      tone: 'cyan',
+    }
+    : getProfileWorkspace(user, roomServicePOS);
+  const pmsTone = workspaceToneClasses[pmsWorkspace.tone];
+  const pmsCards: WorkspaceCard[] = [
+    { label: 'Chambres', value: `${occupied}/${visibleRooms.length}`, detail: 'occupation', tone: 'purple' },
+    { label: 'Arrivées', value: String(arrivalsToday), detail: 'à traiter', tone: 'green' },
+    { label: 'Départs', value: String(departuresToday), detail: 'folios à solder', tone: unpaidDepartures ? 'orange' : 'green' },
+    { label: 'Room charge', value: money(revenueOpen), detail: 'comptes ouverts', tone: 'cyan' },
+  ];
 
   const addFolioCharge = (kind: 'manual' | 'minibar' | 'room_service') => {
     if (!selectedFolio) return;
@@ -756,6 +772,35 @@ export default function PMS() {
           <SlidersHorizontal size={20} />
         </button>
       </header>
+
+      <section className={`rounded-[1.75rem] border p-5 mb-5 ${pmsTone.bg} ${pmsTone.border}`}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className={`text-[10px] font-black uppercase tracking-widest ${pmsTone.text}`}>{pmsWorkspace.eyebrow}</p>
+            <h2 className="text-white font-black text-xl mt-1">{pmsWorkspace.title}</h2>
+            <p className="text-text-secondary text-xs mt-1 leading-snug">{pmsWorkspace.subtitle}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setTab('reception')}
+            className="shrink-0 h-10 px-3 rounded-2xl bg-white/10 border border-white/10 text-white text-[10px] font-black"
+          >
+            Réception
+          </button>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+          {pmsCards.map(card => {
+            const tone = workspaceToneClasses[card.tone];
+            return (
+              <button key={card.label} type="button" onClick={() => setTab(card.label === 'Chambres' ? 'rooms' : card.label === 'Départs' ? 'folios' : 'reception')} className="rounded-2xl bg-black/15 border border-white/10 p-3 text-left active:scale-[0.98] transition-transform">
+                <p className={`text-[9px] font-black uppercase tracking-widest ${tone.text}`}>{card.label}</p>
+                <p className="text-white font-black text-sm mt-1">{card.value}</p>
+                <p className="text-text-tertiary text-[10px] leading-tight mt-0.5">{card.detail}</p>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {notice && (
         <button onClick={() => setNotice('')} className="w-full mb-4 rounded-2xl bg-green/10 border border-green/20 text-green text-xs font-black px-4 py-3 text-left">

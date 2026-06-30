@@ -5,8 +5,10 @@ import { useDeliveryStore } from '../stores/deliveryStore';
 import { useTableStore } from '../stores/tableStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useWasteStore, type WasteEntry } from '../stores/wasteStore';
+import { useAuthStore } from '../stores/authStore';
 import { Check, Clock, ChefHat, Bell, Trash2, AlertTriangle, Plus, CheckCircle2, Circle } from 'lucide-react';
 import { runtimeTimestamp } from '../utils/runtime';
+import { getKitchenActionCards, getProfileWorkspace, workspaceToneClasses } from '../utils/profileWorkspace';
 
 const getWaitMinutes = (dateString: string) => Math.floor((Date.now() - new Date(dateString).getTime()) / 60000);
 
@@ -34,6 +36,7 @@ export default function Cuisine() {
   const { tables } = useTableStore();
   const { addNotification } = useNotificationStore();
   const { entries: wasteEntries, addEntry: addWaste, getWeekTotal } = useWasteStore();
+  const { user } = useAuthStore();
   const [, setTick] = useState(0);
   const [activeTab, setActiveTab] = useState<'tickets' | 'gaspillage'>('tickets');
   const [posteFilter, setPosteFilter] = useState('Tous');
@@ -54,6 +57,9 @@ export default function Cuisine() {
   activeOrders.forEach(o => o.items.forEach(it => { summary[it.product.name] = (summary[it.product.name] || 0) + it.quantity; }));
 
   const weekWaste = getWeekTotal();
+  const workspace = getProfileWorkspace(user);
+  const workspaceTone = workspaceToneClasses[workspace.tone];
+  const kitchenCards = getKitchenActionCards(activeOrders.length, weekWaste);
 
   const handleMarkReady = (order: typeof orders[0]) => {
     updateOrderStatus(order.id, 'prete');
@@ -135,6 +141,24 @@ export default function Cuisine() {
         </h1>
         <div className="glass-card px-3 py-1.5 text-xs text-text-secondary">
           {activeOrders.length} tickets
+        </div>
+      </div>
+
+      <div className={`rounded-[1.75rem] border p-5 mb-5 ${workspaceTone.bg} ${workspaceTone.border}`}>
+        <p className={`text-[10px] font-black uppercase tracking-widest ${workspaceTone.text}`}>{workspace.eyebrow}</p>
+        <h2 className="text-white font-black text-xl mt-1">{workspace.title}</h2>
+        <p className="text-text-secondary text-xs mt-1 leading-snug">{workspace.subtitle}</p>
+        <div className="grid grid-cols-3 gap-2 mt-4">
+          {kitchenCards.map(card => {
+            const tone = workspaceToneClasses[card.tone];
+            return (
+              <div key={card.label} className="rounded-2xl bg-black/15 border border-white/10 p-3">
+                <p className={`text-[9px] font-black uppercase tracking-widest ${tone.text}`}>{card.label}</p>
+                <p className="text-white font-black text-sm mt-1">{card.value}</p>
+                <p className="text-text-tertiary text-[10px] leading-tight mt-0.5">{card.detail}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
 
