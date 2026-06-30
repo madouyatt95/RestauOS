@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type PanInfo } from 'framer-motion';
 import { useOrderStore, PRODUCTS } from '../stores/orderStore';
 import { useTableStore, type Table, type TableStatus } from '../stores/tableStore';
 import { useAuthStore } from '../stores/authStore';
@@ -114,7 +114,11 @@ export default function Commandes() {
   const [assigningRes, setAssigningRes] = useState<Reservation | null>(null);
   const [showTableOptions, setShowTableOptions] = useState<string | null>(null);
   const [tableToDeleteId, setTableToDeleteId] = useState<string | null>(null);
+  const [tableToReleaseId, setTableToReleaseId] = useState<string | null>(null);
   const [showQR, setShowQR] = useState<string | null>(null);
+  const [quickTableAction, setQuickTableAction] = useState<{ type: 'walkin' | 'reservation'; tableId: string } | null>(null);
+  const [quickGuestName, setQuickGuestName] = useState('Client téléphone');
+  const [quickGuestCount, setQuickGuestCount] = useState('2');
   
   const [selectedFloor, setSelectedFloor] = useState('RDC');
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
@@ -129,8 +133,10 @@ export default function Commandes() {
     if (tableId) {
       const table = tables.find(t => t.id === tableId);
       if (table) {
-        setSelectedTableId(tableId);
-        setShowCart(true);
+        queueMicrotask(() => {
+          setSelectedTableId(tableId);
+          setShowCart(true);
+        });
       }
     }
   }, [location.search, tables]);
@@ -142,9 +148,8 @@ export default function Commandes() {
   }, [tables, selectedFloor]);
 
   // Set default zone if none selected
-  if (!selectedZone && zones.length > 0) setSelectedZone(zones[0]);
-
-  const floorTables = tables.filter(t => t.floor === selectedFloor && t.zone === selectedZone);
+  const activeZone = selectedZone || zones[0] || null;
+  const floorTables = tables.filter(t => t.floor === selectedFloor && t.zone === activeZone);
   const allZones = Array.from(new Set(tables.map(t => t.zone)));
 
   useEffect(() => {
@@ -221,19 +226,30 @@ export default function Commandes() {
   };
 
   const handleInstallWalkIn = (tableId: string) => {
-    const g = prompt("Nombre de personnes ?", "2");
-    if (!g) return;
-    updateTableStatus(tableId, 'occupee');
-    setSelectedTableId(tableId);
+    setQuickTableAction({ type: 'walkin', tableId });
+    setQuickGuestName('Client sur place');
+    setQuickGuestCount('2');
     setShowTableOptions(null);
   };
 
   const handleManualReservation = (tableId: string) => {
-    const name = prompt("Nom du client ?") || "Client Téléphone";
-    const guests = parseInt(prompt("Nombre de personnes ?", "2") || "2");
-    
+    setQuickTableAction({ type: 'reservation', tableId });
+    setQuickGuestName('Client téléphone');
+    setQuickGuestCount('2');
+    setShowTableOptions(null);
+  };
+
+  const confirmQuickTableAction = () => {
+    if (!quickTableAction) return;
+    const guests = Math.max(1, Number(quickGuestCount) || 1);
+    if (quickTableAction.type === 'walkin') {
+      updateTableStatus(quickTableAction.tableId, 'occupee');
+      setSelectedTableId(quickTableAction.tableId);
+      setQuickTableAction(null);
+      return;
+    }
     addReservation({
-      clientName: name,
+      clientName: quickGuestName.trim() || 'Client téléphone',
       clientPhone: '000000000',
       status: 'pending',
       notes: '',
@@ -244,9 +260,9 @@ export default function Commandes() {
     setTimeout(() => {
       const state = useReservationStore.getState();
       const newRes = state.reservations[state.reservations.length - 1];
-      if (newRes) updateStatus(newRes.id, 'confirmed', tableId);
-      updateTableStatus(tableId, 'reservee');
-      setShowTableOptions(null);
+      if (newRes) updateStatus(newRes.id, 'confirmed', quickTableAction.tableId);
+      updateTableStatus(quickTableAction.tableId, 'reservee');
+      setQuickTableAction(null);
     }, 100);
   };
 
@@ -436,8 +452,8 @@ export default function Commandes() {
             ))}
             {designMode && (
               <button onClick={() => {
-                const newZone = prompt("Nom de la nouvelle salle ?");
-                if (newZone) setSelectedZone(newZone);
+                const newZone = `Salle ${allZones.length + 1}`;
+                setSelectedZone(newZone);
               }} className="px-3 py-2 rounded-xl bg-white/5 border border-dashed border-white/20 text-white/40"><Plus size={14} /></button>
             )}
           </div>
@@ -473,10 +489,10 @@ export default function Commandes() {
                 key={t.id}
                 drag={designMode}
                 dragMomentum={false}
-                onDragEnd={(event: any, info: any) => {
+                onDragEnd={(_event, info: PanInfo) => {
                   const rect = canvasRef.current?.getBoundingClientRect();
                   if (rect) {
-                    const point = info?.point || event;
+                    const point = info.point;
                     const x = ((point.x - rect.left) / rect.width) * 100;
                     const y = ((point.y - rect.top) / rect.height) * 100;
                     updateTablePosition(t.id, x, y);
@@ -790,6 +806,30 @@ export default function Commandes() {
               </motion.div>
             </motion.div>
           )}
+
+          {quickTableAction && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setQuickTableAction(null)}>
+              <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
+                <div className="modal-handle" />
+                <h3 className="text-white font-black text-xl text-center mb-2">
+                  {quickTableAction.type === 'walkin' ? 'Installer un client' : 'Réserver cette table'}
+                </h3>
+                <p className="text-text-secondary text-sm text-center mb-5">
+                  Table {tables.find(t => t.id === quickTableAction.tableId)?.number}
+                </p>
+                <div className="space-y-3 mb-5">
+                  {quickTableAction.type === 'reservation' && (
+                    <input value={quickGuestName} onChange={event => setQuickGuestName(event.target.value)} className="w-full h-12 rounded-2xl bg-white/5 border border-white/10 px-4 text-white outline-none" placeholder="Nom du client" />
+                  )}
+                  <input value={quickGuestCount} onChange={event => setQuickGuestCount(event.target.value)} inputMode="numeric" className="w-full h-12 rounded-2xl bg-white/5 border border-white/10 px-4 text-white outline-none" placeholder="Nombre de personnes" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => setQuickTableAction(null)} className="py-4 rounded-2xl bg-white/5 text-white font-black text-sm">Annuler</button>
+                  <button onClick={confirmQuickTableAction} className="py-4 rounded-2xl bg-orange text-white font-black text-sm">Valider</button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
     );
@@ -808,12 +848,7 @@ export default function Commandes() {
             <div className="flex items-center gap-3">
               <h1 className="text-white font-black text-2xl tracking-tight">Table {currentTable?.number}</h1>
               <button onClick={() => setShowQR(currentTable!.id)} className="w-8 h-8 rounded-lg bg-blue/10 text-blue flex items-center justify-center active:scale-95 transition-transform"><QrCode size={16} /></button>
-              <button onClick={() => {
-                if(confirm("Libérer cette table ? Les commandes en cours ne seront pas effacées.")) {
-                  updateTableStatus(currentTable!.id, 'libre');
-                  setSelectedTableId(null);
-                }
-              }} className="px-2 py-1 rounded-lg bg-red/10 text-red text-[9px] font-black uppercase tracking-widest active:scale-95 transition-transform">Libérer</button>
+              <button onClick={() => setTableToReleaseId(currentTable!.id)} className="px-2 py-1 rounded-lg bg-red/10 text-red text-[9px] font-black uppercase tracking-widest active:scale-95 transition-transform">Libérer</button>
             </div>
             <p className="text-text-secondary text-xs font-bold uppercase tracking-wider">{currentRes ? `Réservée : ${currentRes.clientName}` : 'Prise de commande'}</p>
           </div>
@@ -826,6 +861,21 @@ export default function Commandes() {
             </span>
           )}
         </button>
+        <AnimatePresence>
+          {tableToReleaseId && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setTableToReleaseId(null)}>
+              <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
+                <div className="modal-handle" />
+                <h3 className="text-white font-black text-xl text-center mb-2">Libérer la table {currentTable?.number}</h3>
+                <p className="text-text-secondary text-sm text-center mb-6">Les commandes en cours restent conservées dans l’historique et la caisse.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => setTableToReleaseId(null)} className="py-4 rounded-2xl bg-white/5 text-white font-black text-sm">Annuler</button>
+                  <button onClick={() => { if (tableToReleaseId) updateTableStatus(tableToReleaseId, 'libre'); setTableToReleaseId(null); setSelectedTableId(null); }} className="py-4 rounded-2xl bg-red text-white font-black text-sm">Libérer</button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="space-y-4 mb-8 px-4">

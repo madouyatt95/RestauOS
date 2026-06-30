@@ -7,6 +7,7 @@ export default function MenuBuilder() {
   const [items, setItems] = useState<Product[]>(PRODUCTS);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
   const handleAdd = () => {
     const newItem: Product = {
@@ -23,15 +24,20 @@ export default function MenuBuilder() {
     setEditingId(newItem.id);
   };
 
-  const handleUpdate = (id: string, field: keyof Product, value: any) => {
+  const handleUpdate = <K extends keyof Product>(id: string, field: K, value: Product[K]) => {
     setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Supprimer ce produit ?")) {
-      setItems(items.filter(i => i.id !== id));
-      setNotice('Produit supprimé de la carte.');
-    }
+    const product = items.find(item => item.id === id);
+    if (product) setProductToDelete(product);
+  };
+
+  const confirmDelete = () => {
+    if (!productToDelete) return;
+    setItems(items.filter(i => i.id !== productToDelete.id));
+    setNotice(`${productToDelete.name} supprimé de la carte.`);
+    setProductToDelete(null);
   };
 
   return (
@@ -80,7 +86,7 @@ export default function MenuBuilder() {
                 </div>
                 <div className="flex gap-2">
                   <input type="number" value={item.price} onChange={e => handleUpdate(item.id, 'price', Number(e.target.value))} className="w-1/2 bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm" placeholder="Prix" />
-                  <select value={item.category} onChange={e => handleUpdate(item.id, 'category', e.target.value)} className="w-1/2 bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm">
+                  <select value={item.category} onChange={e => handleUpdate(item.id, 'category', e.target.value as Product['category'])} className="w-1/2 bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm">
                     <option value="plats" className="bg-[#0a0c10]">Plats</option>
                     <option value="boissons" className="bg-[#0a0c10]">Boissons</option>
                     <option value="desserts" className="bg-[#0a0c10]">Desserts</option>
@@ -113,6 +119,23 @@ export default function MenuBuilder() {
           <Save size={18} /> Sauvegarder
         </button>
       </div>
+
+      {productToDelete && (
+        <div className="modal-overlay">
+          <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} className="modal-sheet">
+            <div className="modal-handle" />
+            <div className="w-14 h-14 rounded-2xl bg-red/10 text-red flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={26} />
+            </div>
+            <h3 className="text-white font-black text-xl text-center mb-2">Supprimer {productToDelete.name}</h3>
+            <p className="text-text-secondary text-sm text-center mb-6">L'article sera retiré de la carte visible dans le POS de démonstration.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setProductToDelete(null)} className="py-4 rounded-2xl bg-white/5 text-white font-black text-sm">Annuler</button>
+              <button onClick={confirmDelete} className="py-4 rounded-2xl bg-red text-white font-black text-sm">Supprimer</button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

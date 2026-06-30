@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStockStore } from '../stores/stockStore';
 import { useHospiStore } from '../stores/hospiStore';
@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
 import { getVisibleSites } from '../utils/accessControl';
 import { Search, Plus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Package, Settings, Warehouse, Truck, Activity, CreditCard, X, Store, ReceiptText, Download, ShieldCheck, ClipboardCheck, Printer, ChefHat, Scale, Boxes, RefreshCcw, Ban, CircleDollarSign, BookmarkCheck, Gift } from 'lucide-react';
+import { runtimeDateOffset, runtimeTimestamp } from '../utils/runtime';
 
 const purchaseStatusLabels: Record<string, string> = {
   draft: 'Brouillon',
@@ -124,7 +125,7 @@ export default function Stocks() {
     const product = products.find(item => item.id === level.product_id);
     return sum + level.quantity * (product?.average_purchase_price || 0);
   }, 0);
-  const stockProducts = useMemo(() => products
+  const stockProducts = products
     .map(product => {
       const levels = siteStockLevels.filter(level => level.product_id === product.id);
       const total = levels.reduce((sum, level) => sum + level.quantity, 0);
@@ -146,9 +147,7 @@ export default function Stocks() {
     .filter(row => !search.trim() || [row.product.name, row.product.sku, row.product.category_id, row.locations.join(' ')]
       .join(' ')
       .toLowerCase()
-      .includes(search.trim().toLowerCase())),
-    [products, search, siteStockLevels, warehouses, warehouseFilter, familyFilter, statusFilter]
-  );
+      .includes(search.trim().toLowerCase()));
   const families = Array.from(new Set(products.map(product => product.category_id))).filter(Boolean);
   const filteredSiteStockMovements = siteStockMovements
     .filter(move => movementFilter === 'all' || move.movement_type === movementFilter)
@@ -475,7 +474,7 @@ export default function Stocks() {
       supplier_id: supplierId,
       warehouse_id: warehouseId,
       ordered_by: user?.name || 'Système',
-      expected_at: new Date(Date.now() + 86400000 * 2).toISOString(),
+      expected_at: runtimeDateOffset(2),
       lines: [{ product_id: productId, quantity_ordered: quantity, unit_cost: unitCost }],
     });
     if (order) {
@@ -591,7 +590,15 @@ export default function Stocks() {
           <p className="text-text-tertiary text-xs mt-1">Piloter le stock réel du complexe, par dépôt et par point de vente.</p>
         </div>
         <div className="flex gap-2">
-          <button className="w-9 h-9 glass-card flex items-center justify-center rounded-full">
+          <button
+            onClick={() => {
+              setTab('pilotage');
+              setStatusFilter('alert');
+              setStockNotice(`${lowHospiStocks.length} référence(s) sous seuil affichée(s). Ouvre une fiche produit pour ajuster, transférer ou commander.`);
+            }}
+            className="w-9 h-9 glass-card flex items-center justify-center rounded-full"
+            aria-label="Voir les alertes stock"
+          >
             <AlertTriangle size={16} className="text-orange" />
           </button>
         </div>
@@ -1618,7 +1625,7 @@ export default function Stocks() {
 	                <div className="space-y-2">
 	                  {selectedProductLots.map(lot => {
 	                    const warehouse = warehouses.find(item => item.id === lot.warehouse_id);
-	                    const expiresSoon = lot.expires_at && new Date(lot.expires_at).getTime() < Date.now() + 86400000 * 30;
+	                    const expiresSoon = lot.expires_at && new Date(lot.expires_at).getTime() < runtimeTimestamp() + 86400000 * 30;
 	                    return (
 	                      <div key={lot.id} className={`rounded-xl px-3 py-2 flex items-center justify-between gap-3 ${expiresSoon ? 'bg-orange/10 border border-orange/15' : 'bg-white/5'}`}>
 	                        <div>

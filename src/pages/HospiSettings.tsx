@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion';
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Building2, Store, Warehouse, BedDouble, ReceiptText, ShieldCheck, ChefHat, Truck, Users, CreditCard, Plus, Edit2, Trash2, X, Search, Network, Upload, PlayCircle, AlertTriangle, CheckCircle2, KeyRound, Settings2, Boxes, Landmark, Sparkles, History, Copy, Table2, RotateCcw, UserCheck, Layers, PackageCheck } from 'lucide-react';
 import { useHospiStore, type POSType, type WarehouseType } from '../stores/hospiStore';
 import { useBusinessRulesStore } from '../stores/businessRulesStore';
+import SystemDiagnostics from '../components/SystemDiagnostics';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 const warehouseTypeLabels: Record<string, string> = {
@@ -98,7 +99,7 @@ export default function HospiSettings() {
   const [settingsSearch, setSettingsSearch] = useState('');
   const [settingsSiteId, setSettingsSiteId] = useState('all');
   const [productFilter, setProductFilter] = useState<'all' | 'active' | 'inactive' | 'stockable' | 'recipes'>('all');
-  const [importKind, setImportKind] = useState<'products' | 'prices'>('products');
+  const [importKind, setImportKind] = useState<'products' | 'prices' | 'stock' | 'suppliers' | 'rooms' | 'customers'>('products');
   const [showQuickConfig, setShowQuickConfig] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const [configNotice, setConfigNotice] = useState<{ tone: 'success' | 'warning'; message: string } | null>(null);
@@ -158,16 +159,16 @@ export default function HospiSettings() {
   });
   const normalizedSearch = settingsSearch.trim().toLowerCase();
   const matchesSearch = (values: Array<string | undefined>) => !normalizedSearch || values.some(value => value?.toLowerCase().includes(normalizedSearch));
-  const visiblePOS = useMemo(() => posList.filter(pos => {
+  const visiblePOS = posList.filter(pos => {
     const warehouse = warehouses.find(item => item.id === pos.default_warehouse_id);
     return (settingsSiteId === 'all' || pos.site_id === settingsSiteId)
       && matchesSearch([pos.name, pos.type, warehouse?.name, pos.tax_profile]);
-  }), [normalizedSearch, posList, settingsSiteId, warehouses]);
-  const visibleWarehouses = useMemo(() => warehouses.filter(warehouse =>
+  });
+  const visibleWarehouses = warehouses.filter(warehouse =>
     (settingsSiteId === 'all' || warehouse.site_id === settingsSiteId)
     && matchesSearch([warehouse.name, warehouse.type])
-  ), [normalizedSearch, settingsSiteId, warehouses]);
-  const visibleProducts = useMemo(() => products.filter(product => {
+  );
+  const visibleProducts = products.filter(product => {
     const productStock = stockLevels
       .filter(level => level.product_id === product.id)
       .reduce((sum, level) => sum + level.quantity, 0);
@@ -178,7 +179,7 @@ export default function HospiSettings() {
       || (productFilter === 'stockable' && product.is_stockable && productStock > 0)
       || (productFilter === 'recipes' && productHasRecipe);
     return filterMatch && matchesSearch([product.name, product.sku, product.category_id, product.unit]);
-  }), [normalizedSearch, productFilter, products, recipes, stockLevels]);
+  });
 
   const adminViews: Array<{ key: AdminView; label: string; icon: typeof Sparkles }> = [
     { key: 'assistant', label: 'Assistant', icon: Sparkles },
@@ -590,7 +591,7 @@ export default function HospiSettings() {
     const report = importAdminCsv(importKind, csv, 'Admin');
     setConfigNotice({
       tone: report.errors.length ? 'warning' : 'success',
-      message: `Import ${importKind === 'products' ? 'produits' : 'prix'} : ${report.imported} ligne(s), ${report.errors.length} erreur(s).`,
+      message: `Import ${importKind} : ${report.imported} ligne(s), ${report.errors.length} erreur(s).`,
     });
   };
 
@@ -1115,6 +1116,7 @@ export default function HospiSettings() {
               ))}
               {healthAlerts.length === 0 && <p className="text-text-tertiary text-sm text-center py-6">Configuration saine.</p>}
             </div>
+            <SystemDiagnostics />
           </div>
         )}
 
@@ -1170,20 +1172,23 @@ export default function HospiSettings() {
               }}
             />
             <div className="grid grid-cols-2 gap-2 mt-4">
-              <button
-                type="button"
-                onClick={() => setImportKind('products')}
-                className={`h-10 rounded-xl text-xs font-black ${importKind === 'products' ? 'bg-blue text-white' : 'bg-white/5 text-text-secondary'}`}
-              >
-                Produits
-              </button>
-              <button
-                type="button"
-                onClick={() => setImportKind('prices')}
-                className={`h-10 rounded-xl text-xs font-black ${importKind === 'prices' ? 'bg-green text-white' : 'bg-white/5 text-text-secondary'}`}
-              >
-                Prix par POS
-              </button>
+              {([
+                ['products', 'Produits'],
+                ['prices', 'Prix POS'],
+                ['stock', 'Stock'],
+                ['suppliers', 'Fournisseurs'],
+                ['rooms', 'Chambres'],
+                ['customers', 'Clients'],
+              ] as const).map(([kind, label]) => (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => setImportKind(kind)}
+                  className={`h-10 rounded-xl text-xs font-black ${importKind === kind ? 'bg-blue text-white' : 'bg-white/5 text-text-secondary'}`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
             <button
               type="button"
@@ -1667,15 +1672,15 @@ export default function HospiSettings() {
           </div>
         </div>
         <div className="grid grid-cols-4 gap-2 mb-4">
-          {[
+          {([
             ['site', 'Site'],
             ['pos', 'POS'],
             ['warehouse', 'Dépôt'],
             ['product', 'Produit'],
             ['price', 'Prix POS'],
             ['recipe', 'Recette'],
-          ].map(([key, label]) => (
-            <button key={key} type="button" onClick={() => { setShowQuickConfig(true); setConfigPanel(key as any); }}
+          ] as const).map(([key, label]) => (
+            <button key={key} type="button" onClick={() => { setShowQuickConfig(true); setConfigPanel(key); }}
               className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${configPanel === key ? 'bg-orange text-white' : 'bg-white/5 text-text-secondary'}`}>
               {label}
             </button>

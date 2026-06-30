@@ -23,6 +23,7 @@ import {
   User,
   Wallet,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useHospiStore } from '../stores/hospiStore';
 import { useNotificationStore } from '../stores/notificationStore';
@@ -31,7 +32,7 @@ import { canAccessRoute, getAccessSummary } from '../utils/accessControl';
 
 const ACCENT_COLORS = ['#FF8A00', '#EF4444', '#8B5CF6', '#3B82F6', '#22C55E', '#EC4899', '#06B6D4', '#F59E0B'];
 
-const NOTIF_ICONS: Record<string, { icon: any; color: string }> = {
+const NOTIF_ICONS: Record<string, { icon: LucideIcon; color: string }> = {
   order: { icon: ShoppingBag, color: '#3B82F6' },
   swap: { icon: Calendar, color: '#F59E0B' },
   stock: { icon: AlertCircle, color: '#EF4444' },

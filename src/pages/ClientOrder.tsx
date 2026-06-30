@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PRODUCTS, useOrderStore, type CartItem } from '../stores/orderStore';
+import { PRODUCTS, useOrderStore, type CartItem, type Order } from '../stores/orderStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useHospiStore } from '../stores/hospiStore';
 import { Search, ChefHat, Plus, Minus, ArrowRight, Check } from 'lucide-react';
+import { runtimeId, runtimeIso } from '../utils/runtime';
 
 const CATEGORIES = ['Toutes', 'Plats', 'Entrées', 'Desserts', 'Boissons'];
 const fmt = (n: number) => n.toLocaleString('fr-FR');
@@ -66,8 +67,8 @@ export default function ClientOrder() {
       const productId = LEGACY_TO_HOSPI_PRODUCT[item.product.id];
       return productId ? [{ productId, quantity: item.quantity }] : [];
     });
-    const newOrder = {
-      id: `o${Date.now()}`,
+    const newOrder: Order = {
+      id: runtimeId('qr'),
       tableId: tableId || undefined,
       posId: restaurantPOS?.id,
       hospiLines,
@@ -76,12 +77,12 @@ export default function ClientOrder() {
       total: cartTotal,
       status: 'en_preparation',
       payment: 'especes',
-      date: new Date().toISOString(),
+      date: runtimeIso(),
       serveurName: 'Commande QR',
       paidAmount: 0,
       payments: [],
       itemsReady: {},
-    } as any;
+    };
     
     useOrderStore.setState(s => ({ orders: [...s.orders, newOrder] }));
     if (restaurantPOS && hospiLines.length > 0) {

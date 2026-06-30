@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useReviewStore } from '../stores/reviewStore';
 import { Star, Check, MessageSquare } from 'lucide-react';
+import { runtimeId, runtimeIso } from '../utils/runtime';
+
+type RatingKey = 'cuisine' | 'service' | 'ambiance' | 'rapport';
 
 export default function Review() {
   const navigate = useNavigate();
@@ -16,9 +19,9 @@ export default function Review() {
 
   const handleSubmit = () => {
     addReview({
-      orderId: `o${Date.now()}`,
+      orderId: runtimeId('review-order'),
       clientName: name || 'Client Anonyme',
-      date: new Date().toISOString(),
+      date: runtimeIso(),
       rating: overall,
       ...ratings,
       comment
@@ -45,15 +48,15 @@ export default function Review() {
           <p className="text-text-secondary text-sm text-center mb-10">Votre avis nous aide à nous améliorer</p>
 
           <div className="space-y-8 mb-10">
-            {[
+            {([
               { key: 'cuisine', label: 'Cuisine & Boissons' },
               { key: 'service', label: 'Service & Accueil' },
               { key: 'ambiance', label: 'Ambiance & Cadre' },
               { key: 'rapport', label: 'Rapport Qualité/Prix' },
-            ].map(cat => (
+            ] as Array<{ key: RatingKey; label: string }>).map(cat => (
               <div key={cat.key} className="flex flex-col items-center">
                 <span className="text-white font-bold text-sm mb-3">{cat.label}</span>
-                <StarRating value={(ratings as any)[cat.key]} onChange={v => setRatings({ ...ratings, [cat.key]: v })} />
+                <StarRating value={ratings[cat.key]} onChange={v => setRatings({ ...ratings, [cat.key]: v })} />
               </div>
             ))}
           </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOrderStore } from '../stores/orderStore';
 import { useDeliveryStore } from '../stores/deliveryStore';
@@ -6,6 +6,7 @@ import { useTableStore } from '../stores/tableStore';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useWasteStore, type WasteEntry } from '../stores/wasteStore';
 import { Check, Clock, ChefHat, Bell, Trash2, AlertTriangle, Plus, CheckCircle2, Circle } from 'lucide-react';
+import { runtimeTimestamp } from '../utils/runtime';
 
 const getWaitMinutes = (dateString: string) => Math.floor((Date.now() - new Date(dateString).getTime()) / 60000);
 
@@ -52,7 +53,7 @@ export default function Cuisine() {
   const summary: Record<string, number> = {};
   activeOrders.forEach(o => o.items.forEach(it => { summary[it.product.name] = (summary[it.product.name] || 0) + it.quantity; }));
 
-  const weekWaste = useMemo(() => getWeekTotal(), [wasteEntries]);
+  const weekWaste = getWeekTotal();
 
   const handleMarkReady = (order: typeof orders[0]) => {
     updateOrderStatus(order.id, 'prete');
@@ -112,6 +113,20 @@ export default function Cuisine() {
     }
   };
 
+  const handleCallService = (order: typeof orders[0]) => {
+    const tableNum = order.tableId ? tables.find(t => t.id === order.tableId)?.number : null;
+    addNotification({
+      type: 'order',
+      title: 'Relance cuisine',
+      message: tableNum
+        ? `Table T${tableNum} - besoin d'un passage côté cuisine`
+        : `Commande #${order.id.slice(-4)} - besoin d'un passage côté cuisine`,
+      targetRole: 'Serveur',
+      orderId: order.id,
+      actionUrl: order.tableId ? `/commandes?tableId=${order.tableId}` : undefined,
+    });
+  };
+
   return (
     <div className="page-content pt-14 pb-28 min-h-screen bg-[#070A0F]">
       <div className="flex items-center justify-between mb-4 px-1">
@@ -125,11 +140,11 @@ export default function Cuisine() {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-5">
-        {[
+        {([
           { id: 'tickets', label: 'Tickets', icon: ChefHat, badge: activeOrders.length },
           { id: 'gaspillage', label: 'Pertes', icon: Trash2, badge: 0 },
-        ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
+        ] as const).map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`flex-1 py-3 rounded-2xl flex items-center justify-center gap-2 transition-all border text-[10px] font-black uppercase tracking-wider ${activeTab === tab.id ? 'bg-white/10 border-white/20 text-white' : 'bg-transparent border-transparent text-text-tertiary'}`}>
             <tab.icon size={14} /> {tab.label}
             {tab.badge > 0 && <span className="w-5 h-5 rounded-full bg-red text-white text-[9px] font-black flex items-center justify-center">{tab.badge}</span>}
@@ -199,7 +214,7 @@ export default function Cuisine() {
                           {/* Timer with visual urgency */}
                           <div className={`flex items-center gap-1.5 font-black text-sm px-3 py-1 rounded-lg ${ts.pulse ? 'animate-pulse' : ''}`} style={{ color: ts.color, background: ts.bg }}>
                             <Clock size={14} />
-                            {waitMins}:{String(Math.floor((Date.now() - new Date(order.date).getTime()) / 1000) % 60).padStart(2, '0')}
+                            {waitMins}:{String(Math.floor((runtimeTimestamp() - new Date(order.date).getTime()) / 1000) % 60).padStart(2, '0')}
                           </div>
                           <span className="text-[8px] font-black uppercase tracking-widest mt-1 block" style={{ color: ts.color }}>{ts.label}</span>
                         </div>
@@ -266,7 +281,7 @@ export default function Cuisine() {
                           className="flex-1 py-4 rounded-xl bg-gradient-to-r from-green to-emerald-600 text-white font-black text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg shadow-green/10">
                           <Check size={20} /> TOUT PRÊT
                         </button>
-                        <button className="w-14 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-orange active:scale-95 transition-transform">
+                        <button onClick={() => handleCallService(order)} className="w-14 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-orange active:scale-95 transition-transform" title="Appeler le service">
                           <Bell size={18} />
                         </button>
                       </div>

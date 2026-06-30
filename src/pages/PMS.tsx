@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -26,6 +26,8 @@ import { useAuthStore } from '../stores/authStore';
 import { useHospiStore } from '../stores/hospiStore';
 import type { RoomStatus } from '../stores/hospiStore';
 import { canAccessRoute, getVisibleSites } from '../utils/accessControl';
+import type { LucideIcon } from 'lucide-react';
+import { runtimeDateOffset, runtimeId } from '../utils/runtime';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 const money = (n: number) => `${fmt(n)} FCFA`;
@@ -53,7 +55,7 @@ const roomTileClass: Record<RoomStatus, string> = {
 
 type HotelTab = 'reception' | 'reservations' | 'availability' | 'planning' | 'rooms' | 'folios' | 'payments' | 'clients' | 'housekeeping' | 'rates' | 'maintenance' | 'documents' | 'alerts' | 'reports';
 
-const tabs: Array<{ id: HotelTab; label: string; icon: any }> = [
+const tabs: Array<{ id: HotelTab; label: string; icon: LucideIcon }> = [
   { id: 'reception', label: 'Reception', icon: DoorOpen },
   { id: 'reservations', label: 'Reservations', icon: CalendarDays },
   { id: 'availability', label: 'Disponibilite', icon: Hotel },
@@ -104,6 +106,20 @@ type DemoPayment = {
   status: 'paid' | 'deposit' | 'refund';
 };
 
+const createInitialReservationForm = () => ({
+  guestName: 'Mame Diarra',
+  channel: 'Walk-in',
+  roomType: 'Deluxe',
+  checkIn: runtimeDateOffset(1).slice(0, 10),
+  checkOut: runtimeDateOffset(3).slice(0, 10),
+  deposit: '50000',
+});
+
+const createInitialReservations = (): DemoReservation[] => [
+  { id: 'res-demo-1', guestName: 'Mame Diarra', channel: 'Telephone', roomType: 'Deluxe', checkIn: runtimeDateOffset(1).slice(0, 10), checkOut: runtimeDateOffset(3).slice(0, 10), status: 'booked', deposit: 50000, rate: 95000 },
+  { id: 'res-demo-2', guestName: 'Societe Baobab', channel: 'Corporate', roomType: 'Suite', checkIn: runtimeDateOffset(2).slice(0, 10), checkOut: runtimeDateOffset(6).slice(0, 10), status: 'precheckin', deposit: 180000, rate: 145000 },
+];
+
 export default function PMS() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -114,18 +130,8 @@ export default function PMS() {
   const [chargeAmount, setChargeAmount] = useState('3700');
   const [notice, setNotice] = useState('');
   const [activeFloor, setActiveFloor] = useState('Tous');
-  const [reservationForm, setReservationForm] = useState({
-    guestName: 'Mame Diarra',
-    channel: 'Walk-in',
-    roomType: 'Deluxe',
-    checkIn: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
-    checkOut: new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 10),
-    deposit: '50000',
-  });
-  const [demoReservations, setDemoReservations] = useState<DemoReservation[]>([
-    { id: 'res-demo-1', guestName: 'Mame Diarra', channel: 'Telephone', roomType: 'Deluxe', checkIn: new Date(Date.now() + 86400000).toISOString().slice(0, 10), checkOut: new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 10), status: 'booked', deposit: 50000, rate: 95000 },
-    { id: 'res-demo-2', guestName: 'Societe Baobab', channel: 'Corporate', roomType: 'Suite', checkIn: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10), checkOut: new Date(Date.now() + 86400000 * 6).toISOString().slice(0, 10), status: 'precheckin', deposit: 180000, rate: 145000 },
-  ]);
+  const [reservationForm, setReservationForm] = useState(createInitialReservationForm);
+  const [demoReservations, setDemoReservations] = useState<DemoReservation[]>(createInitialReservations);
   const [payments, setPayments] = useState<DemoPayment[]>([]);
   const [editableRates, setEditableRates] = useState(rateRows);
   const [maintenanceTickets, setMaintenanceTickets] = useState(maintenanceSeed);
@@ -159,7 +165,7 @@ export default function PMS() {
     .filter(level => warehouses.find(warehouse => warehouse.id === level.warehouse_id)?.id === 'wh-minibar')
     .reduce((sum, level) => sum + level.quantity, 0);
 
-  const roomsWithContext = useMemo(() => visibleRooms.map(room => {
+  const roomsWithContext = visibleRooms.map(room => {
     const stay = stays.find(item => item.room_id === room.id && item.status === 'checked_in');
     const guest = stay ? guests.find(item => item.id === stay.guest_id) : undefined;
     const folio = stay ? folios.find(item => item.stay_id === stay.id && item.status === 'open') : undefined;
@@ -167,7 +173,7 @@ export default function PMS() {
     const floor = room.room_number.startsWith('1') ? '1er' : room.room_number.startsWith('2') ? '2e' : room.room_number.startsWith('3') ? '3e' : 'RDC';
     const nights = stay ? Math.max(1, Math.ceil((new Date(stay.check_out_date).getTime() - new Date(stay.check_in_date).getTime()) / 86400000)) : 0;
     return { room, stay, guest, folio, lines, floor, nights };
-  }), [visibleRooms, stays, guests, folios, folioLines]);
+  });
 
   const filteredRooms = roomsWithContext.filter(row => {
     const q = search.toLowerCase();
@@ -177,7 +183,7 @@ export default function PMS() {
   });
 
   const occupied = roomsWithContext.filter(row => row.room.status === 'occupied').length;
-  const departuresToday = roomsWithContext.filter(row => row.stay && new Date(row.stay.check_out_date).toDateString() === new Date(Date.now() + 86400000).toDateString()).length;
+  const departuresToday = roomsWithContext.filter(row => row.stay && new Date(row.stay.check_out_date).toDateString() === new Date(runtimeDateOffset(1)).toDateString()).length;
   const arrivalsToday = Math.max(2, roomsWithContext.filter(row => row.room.status === 'available').length);
   const revenueOpen = openFolios.reduce((sum, folio) => sum + folio.total_amount, 0);
   const occupancyRate = visibleRooms.length ? Math.round((occupied / visibleRooms.length) * 100) : 0;
@@ -193,13 +199,13 @@ export default function PMS() {
     const label = kind === 'minibar' ? 'Mini-bar chambre' : kind === 'room_service' ? 'Room service chambre' : chargeDescription;
     const line = addManualFolioCharge(selectedFolio.id, label, amount, user?.name || 'Reception');
     if (line && kind === 'minibar' && minibarPOS) {
-      recordSale(`minibar-${Date.now()}`, [
+      recordSale(runtimeId('minibar'), [
         { productId: 'prod-eau-minibar', quantity: 1 },
         { productId: 'prod-snack-minibar', quantity: 1 },
       ], user?.name || 'Reception', minibarPOS.id);
     }
     if (line && kind === 'room_service' && roomServicePOS) {
-      recordSale(`room-service-${Date.now()}`, [
+      recordSale(runtimeId('room-service'), [
         { productId: 'prod-thieboudienne', quantity: 1 },
       ], user?.name || 'Reception', roomServicePOS.id);
     }
@@ -210,7 +216,7 @@ export default function PMS() {
   const createReservation = () => {
     const rate = editableRates.find(row => row.roomType === reservationForm.roomType)?.tonight || 75000;
     const reservation: DemoReservation = {
-      id: `res-${Date.now()}`,
+      id: runtimeId('reservation'),
       guestName: reservationForm.guestName.trim() || 'Client walk-in',
       channel: reservationForm.channel,
       roomType: reservationForm.roomType,
@@ -254,7 +260,7 @@ export default function PMS() {
     if (!selectedFolio) return;
     const amount = kind === 'refund' ? -25000 : kind === 'deposit' ? 50000 : Math.min(selectedFolio.total_amount, 75000);
     const payment: DemoPayment = {
-      id: `pay-${Date.now()}`,
+      id: runtimeId('payment'),
       folioId: selectedFolio.id,
       label: kind === 'refund' ? 'Remboursement garantie' : kind === 'deposit' ? 'Acompte reservation' : 'Reglement folio',
       amount,
@@ -267,6 +273,18 @@ export default function PMS() {
       ? `${payment.label} enregistré : ${money(Math.abs(amount))}. Solde client mis à jour.`
       : `${payment.label} enregistré en liste, mais aucun compte client n'a été trouvé pour ce folio.`
     );
+  };
+
+  const applyDynamicPricing = () => {
+    const demand = occupancyRate >= 85 ? 1.18 : occupancyRate >= 70 ? 1.1 : occupancyRate <= 40 ? 0.92 : 1;
+    setEditableRates(rateRows.map(row => ({
+      roomType: row.roomType,
+      tonight: Math.round((row.tonight * demand) / 500) * 500,
+      weekend: Math.round((row.weekend * demand * 1.08) / 500) * 500,
+      high: Math.round((row.high * demand * 1.15) / 500) * 500,
+      corporate: Math.round((row.corporate * Math.min(demand, 1.06)) / 500) * 500,
+    })));
+    setNotice(`Prix dynamiques appliqués selon ${occupancyRate}% d'occupation, week-end, haute saison et corporate.`);
   };
 
   const exportInvoice = () => {
@@ -623,8 +641,8 @@ export default function PMS() {
         </div>
         <p className="text-text-secondary text-xs">TVA hebergement, taxe de sejour, TVA restauration et exonérations corporate sont separees au folio.</p>
       </div>
-      <button onClick={() => setNotice('Simulation tarifaire : prix ajuste selon occupation, saison et canal.')} className="w-full h-12 rounded-2xl bg-orange/10 text-orange font-black text-sm">
-        Simuler prix dynamique
+      <button onClick={applyDynamicPricing} className="w-full h-12 rounded-2xl bg-orange/10 text-orange font-black text-sm">
+        Appliquer prix dynamique
       </button>
     </div>
   );

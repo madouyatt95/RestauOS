@@ -14,6 +14,7 @@ import {
   Warehouse,
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import type { UserProfile } from '../stores/authStore';
 import { useHospiStore, type POS } from '../stores/hospiStore';
 import { canAccessModule, canAccessRoute, getVisiblePOS, getVisibleSites } from '../utils/accessControl';
 
@@ -145,7 +146,7 @@ export default function BusinessModules() {
       )}
 
       <div className="space-y-4">
-        {businessGroups.filter(group => canAccessModule(user, group.key === 'bars-casino' ? 'casino' : group.key as any)).map((group, index) => {
+        {businessGroups.filter(group => canAccessModule(user, (group.key === 'bars-casino' ? 'casino' : group.key) as NonNullable<UserProfile['businessModules']>[number])).map((group, index) => {
           const GroupIcon = group.icon;
           const groupPOS = visiblePOS.filter(pos => group.types.includes(pos.type));
           return (

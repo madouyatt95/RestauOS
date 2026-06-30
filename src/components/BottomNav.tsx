@@ -3,6 +3,9 @@ import { Home, ShoppingBag, Package, Users, MoreHorizontal, Truck, ChefHat, Cale
 import { useAuthStore } from '../stores/authStore';
 import { usePlanningStore } from '../stores/planningStore';
 import { canAccessRoute } from '../utils/accessControl';
+import type { LucideIcon } from 'lucide-react';
+
+type NavItem = { path: string; icon: LucideIcon; label: string };
 
 export default function BottomNav() {
   const { pathname } = useLocation();
@@ -11,7 +14,7 @@ export default function BottomNav() {
   const hiddenPaths = ['/', '/landing', '/whatsapp-bot'];
   if (hiddenPaths.includes(pathname)) return null;
 
-  let navItems = [];
+  let navItems: NavItem[];
 
   switch (user?.role) {
     case 'Admin':

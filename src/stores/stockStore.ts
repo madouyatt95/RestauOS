@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { CartItem } from './orderStore';
 
 export interface StockItem {
   id: string;
@@ -27,7 +28,7 @@ interface StockState {
   updateStock: (id: string, quantity: number) => void;
   addMovement: (movement: Omit<StockMovement, 'id'>) => void;
   getLowStockItems: () => StockItem[];
-  consumeStockForOrder: (items: any[], orderId: string) => void;
+  consumeStockForOrder: (items: CartItem[], orderId: string) => void;
 }
 
 export const useStockStore = create<StockState>()(
@@ -81,12 +82,12 @@ export const useStockStore = create<StockState>()(
       consumeStockForOrder: (orderItems, orderId) => {
         const state = get();
         const newMovements: StockMovement[] = [];
-        let updatedItems = [...state.items];
+        const updatedItems = [...state.items];
 
         orderItems.forEach(cartItem => {
           const product = cartItem.product;
           if (product.recipe && product.recipe.length > 0) {
-            product.recipe.forEach((ingredient: any) => {
+            product.recipe.forEach((ingredient) => {
               const totalAmount = ingredient.amount * cartItem.quantity;
               
               const stockItemIndex = updatedItems.findIndex(i => i.id === ingredient.stockItemId);

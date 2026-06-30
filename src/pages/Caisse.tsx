@@ -32,7 +32,7 @@ export default function Caisse() {
     cashSessions,
   } = useHospiStore();
   const { tables, updateTableStatus } = useTableStore();
-  const { clients, usePoints } = useClientStore();
+  const { clients, usePoints: spendPoints } = useClientStore();
   const { addNotification } = useNotificationStore();
   const { canPerform, requiresManagerApproval, recordAudit } = useBusinessRulesStore();
   
@@ -45,6 +45,7 @@ export default function Caisse() {
   const [customAmount, setCustomAmount] = useState('');
   const [showSoftPOS, setShowSoftPOS] = useState(false);
   const [isSyncingERP, setIsSyncingERP] = useState(false);
+  const [erpNotice, setErpNotice] = useState('');
   const [showLoyalty, setShowLoyalty] = useState(false);
   const [loyaltyPoints, setLoyaltyPoints] = useState('');
   const [showOTP, setShowOTP] = useState(false);
@@ -138,8 +139,12 @@ export default function Caisse() {
     }
 
     setIsSyncingERP(true);
-    await syncOrderToERP(activeOrder.id, amount, activeOrder.items);
+    const synced = await syncOrderToERP(activeOrder.id, amount, activeOrder.items);
     setIsSyncingERP(false);
+    setErpNotice(synced
+      ? 'Ticket transmis à la comptabilité externe.'
+      : 'Connecteur comptable non branché : le ticket reste bien enregistré dans Sártal OS.'
+    );
 
     setShowPayment(false);
     setShowSuccess(true);
@@ -336,7 +341,7 @@ export default function Caisse() {
     if (!activeOrder || !loyaltyClient || otpCode.length < 4) return;
     const pts = Number(loyaltyPoints);
     const reduction = pts * 5;
-    usePoints(loyaltyClient.id, pts, `Réduction ${fmt(reduction)} FCFA — Commande #${activeOrder.id.slice(-4)}`);
+    spendPoints(loyaltyClient.id, pts, `Réduction ${fmt(reduction)} FCFA — Commande #${activeOrder.id.slice(-4)}`);
     addPayment(activeOrder.id, reduction, 'especes');
     addNotification({
       type: 'loyalty',
@@ -475,7 +480,7 @@ export default function Caisse() {
                   <div className="text-right">
                     <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${sl.bg}`}>{sl.label}</span>
                     <div className="text-text-tertiary text-[10px] mt-1 flex items-center gap-1 justify-end">
-                      <Clock size={10} /> {Math.floor((Date.now() - new Date(o.date).getTime()) / 60000)} min
+                      <Clock size={10} /> {Math.max(0, Math.floor((new Date().getTime() - new Date(o.date).getTime()) / 60000))} min
                     </div>
                   </div>
                 </div>
@@ -581,8 +586,8 @@ export default function Caisse() {
                   <span className="text-white text-sm font-bold">Division de l'addition</span>
                 </div>
                 <div className="flex gap-2 mb-4 p-1 bg-white/5 rounded-xl">
-                  {[{ id: 'egal', label: 'Égale' }, { id: 'item', label: 'Par article' }, { id: 'custom', label: 'Montant libre' }].map(m => (
-                    <button key={m.id} onClick={() => setSplitMode(m.id as any)}
+                  {([{ id: 'egal', label: 'Égale' }, { id: 'item', label: 'Par article' }, { id: 'custom', label: 'Montant libre' }] as const).map(m => (
+                    <button key={m.id} onClick={() => setSplitMode(m.id)}
                       className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${splitMode === m.id ? 'bg-orange text-white shadow-lg' : 'text-text-tertiary'}`}>
                       {m.label}
                     </button>
@@ -928,8 +933,20 @@ export default function Caisse() {
           <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }}
             className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[10005] bg-bg-card border border-blue/30 px-6 py-3 rounded-full flex items-center gap-3 shadow-2xl">
             <CloudUpload size={20} className="text-blue animate-bounce" />
-            <span className="text-white font-bold text-sm">Synchronisation Odoo...</span>
+            <span className="text-white font-bold text-sm">Vérification comptabilité...</span>
           </motion.div>
+        )}
+        {erpNotice && (
+          <motion.button
+            onClick={() => setErpNotice('')}
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[10004] bg-bg-card border border-white/10 px-5 py-3 rounded-2xl flex items-center gap-3 shadow-2xl text-left max-w-[calc(100vw-2rem)]"
+          >
+            <CloudUpload size={18} className="text-blue shrink-0" />
+            <span className="text-white font-bold text-xs">{erpNotice}</span>
+          </motion.button>
         )}
       </AnimatePresence>
     </div>

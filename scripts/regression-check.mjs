@@ -1,186 +1,153 @@
 import assert from 'node:assert/strict';
 
-const state = {
-  pos: { id: 'pos-restaurant-jardin', default_warehouse_id: 'wh-restaurant', name: 'Restaurant Le Jardin' },
-  stockLevels: [
-    { product_id: 'prod-coca-33', warehouse_id: 'wh-restaurant', quantity: 10 },
-    { product_id: 'prod-coca-33', warehouse_id: 'wh-bar-casino', quantity: 8 },
-  ],
-  lots: [
-    { product_id: 'prod-coca-33', warehouse_id: 'wh-restaurant', quantity: 4, expires_at: '2026-07-10' },
-    { product_id: 'prod-coca-33', warehouse_id: 'wh-restaurant', quantity: 6, expires_at: '2026-09-10' },
-  ],
-  folio: { id: 'folio-101', room_id: 'room-101', total_amount: 0, status: 'open' },
-  purchaseLine: { id: 'line-1', product_id: 'prod-coca-33', quantity_ordered: 12, quantity_received: 0, unit_cost: 400 },
-  configDrafts: [],
-  configHistory: [],
-  permissionPolicies: [],
-  taxProfiles: [{ id: 'tax-restaurant', name: 'Restaurant', rate: 18 }],
-  approvals: [{ id: 'approval-1', status: 'pending' }],
-  snapshots: [],
-  sites: [{ id: 'site-dakar', name: 'Site Dakar' }],
-  posList: [{ id: 'pos-restaurant-jardin', name: 'Restaurant Le Jardin', type: 'restaurant', default_warehouse_id: 'wh-restaurant' }],
-  warehouses: [{ id: 'wh-restaurant', name: 'Dépôt Restaurant', type: 'restaurant', site_id: 'site-dakar' }],
+const storage = new Map();
+globalThis.localStorage = {
+  getItem: key => storage.get(key) ?? null,
+  setItem: (key, value) => storage.set(key, String(value)),
+  removeItem: key => storage.delete(key),
+  clear: () => storage.clear(),
+  key: index => [...storage.keys()][index] ?? null,
+  get length() { return storage.size; },
+};
+globalThis.window = globalThis;
+globalThis.window.localStorage = globalThis.localStorage;
+
+const [{ useHospiStore }, { useOrderStore }, { useBusinessOperationsStore }, { completePOSSale }, { canAccessRoute }, { DEMO_USERS }] = await Promise.all([
+  import('../src/stores/hospiStore.ts'),
+  import('../src/stores/orderStore.ts'),
+  import('../src/stores/businessOperationsStore.ts'),
+  import('../src/services/posTransaction.ts'),
+  import('../src/utils/accessControl.ts'),
+  import('../src/stores/authStore.ts'),
+]);
+
+const resetStores = () => {
+  useHospiStore.setState(useHospiStore.getInitialState(), true);
+  useOrderStore.setState(useOrderStore.getInitialState(), true);
+  useBusinessOperationsStore.setState(useBusinessOperationsStore.getInitialState(), true);
 };
 
-function recordSale(productId, quantity) {
-  const level = state.stockLevels.find(item => item.product_id === productId && item.warehouse_id === state.pos.default_warehouse_id);
-  assert.ok(level, 'stock level exists for POS warehouse');
-  level.quantity = Math.max(0, level.quantity - quantity);
+resetStores();
 
-  let remaining = quantity;
-  state.lots
-    .filter(lot => lot.product_id === productId && lot.warehouse_id === state.pos.default_warehouse_id)
-    .sort((a, b) => new Date(a.expires_at) - new Date(b.expires_at))
-    .forEach(lot => {
-      const consumed = Math.min(lot.quantity, remaining);
-      lot.quantity -= consumed;
-      remaining -= consumed;
-    });
-}
+const initial = useHospiStore.getState();
+const cocaLevel = initial.stockLevels.find(level => level.product_id === 'prod-coca-33' && level.warehouse_id === 'wh-restaurant');
+assert.ok(cocaLevel, 'restaurant Coca stock exists');
+const cocaBefore = cocaLevel.quantity;
 
-function chargeOrderToRoom(amount) {
-  assert.equal(state.folio.status, 'open', 'folio must be open');
-  state.folio.total_amount += amount;
-}
+useHospiStore.setState(state => ({
+  stockLots: [
+    { id: 'test-lot-early', warehouse_id: 'wh-restaurant', product_id: 'prod-coca-33', lot_number: 'EARLY', expires_at: '2026-07-10', quantity: 2, unit_cost: 400, received_at: '2026-06-01' },
+    { id: 'test-lot-late', warehouse_id: 'wh-restaurant', product_id: 'prod-coca-33', lot_number: 'LATE', expires_at: '2026-09-10', quantity: 5, unit_cost: 420, received_at: '2026-06-02' },
+    ...state.stockLots,
+  ],
+}));
 
-function receivePartial(quantity) {
-  const received = Math.min(quantity, state.purchaseLine.quantity_ordered - state.purchaseLine.quantity_received);
-  state.purchaseLine.quantity_received += received;
-  const level = state.stockLevels.find(item => item.product_id === state.purchaseLine.product_id && item.warehouse_id === 'wh-restaurant');
-  level.quantity += received;
-  return state.purchaseLine.quantity_received === state.purchaseLine.quantity_ordered ? 'received' : 'partially_received';
-}
+const saleMovements = useHospiStore.getState().recordSale(
+  'regression-coca-sale',
+  [{ productId: 'prod-coca-33', quantity: 3 }],
+  'Regression',
+  'pos-restaurant-jardin',
+);
+assert.equal(saleMovements.length, 1, 'real POS sale creates a stock movement');
+assert.equal(useHospiStore.getState().getStockLevel('prod-coca-33', 'wh-restaurant')?.quantity, cocaBefore - 3, 'real POS sale decrements its linked warehouse');
+assert.equal(useHospiStore.getState().stockLots.find(lot => lot.id === 'test-lot-early')?.quantity, 0, 'FIFO consumes earliest lot first');
+assert.equal(useHospiStore.getState().stockLots.find(lot => lot.id === 'test-lot-late')?.quantity, 4, 'FIFO continues on the following lot');
 
-function createDraft(title, beforeValue, afterValue) {
-  const draft = { id: `draft-${state.configDrafts.length + 1}`, title, before_value: beforeValue, after_value: afterValue, status: 'draft' };
-  state.configDrafts.unshift(draft);
-  return draft;
-}
+const folioBefore = useHospiStore.getState().folios.find(folio => folio.id === 'folio-105-open')?.total_amount;
+const boutiqueStockBefore = useHospiStore.getState().getStockLevel('prod-peignoir', 'wh-boutique')?.quantity;
+const roomSale = completePOSSale({
+  posId: 'pos-boutique-hotel',
+  productId: 'prod-peignoir',
+  payment: 'room_charge',
+  actor: 'Regression',
+  roomId: 'room-105',
+});
+assert.equal(roomSale.order.status, 'payee', 'room charge settles the POS ticket');
+assert.equal(roomSale.order.paidAmount, 18000, 'room charge records the paid amount on the POS ticket');
+assert.ok(roomSale.folioLineId, 'room charge creates a real folio line');
+assert.equal(useHospiStore.getState().getStockLevel('prod-peignoir', 'wh-boutique')?.quantity, (boutiqueStockBefore || 0) - 1, 'business POS sale decrements business warehouse');
+assert.equal(useHospiStore.getState().folios.find(folio => folio.id === 'folio-105-open')?.total_amount, (folioBefore || 0) + 18000, 'business POS sale increases the room folio');
+assert.equal(useOrderStore.getState().orders[0].id, roomSale.order.id, 'transaction writes the real order store');
 
-function publishDraft(id) {
-  const draft = state.configDrafts.find(item => item.id === id);
-  assert.ok(draft, 'draft exists before publish');
-  if (state.criticalAlert && draft.type !== 'fix') return false;
-  draft.status = 'published';
-  state.configHistory.unshift({ title: draft.title, before_value: draft.before_value, after_value: draft.after_value });
-  return true;
-}
+const purchase = useHospiStore.getState().addPurchaseOrder({
+  supplier_id: 'sup-touba-distribution',
+  warehouse_id: 'wh-restaurant',
+  ordered_by: 'Regression',
+  lines: [{ product_id: 'prod-coca-33', quantity_ordered: 12, unit_cost: 400, lot_number: 'RECEIPT-TEST', expires_at: '2027-01-01' }],
+});
+assert.ok(purchase, 'real purchase order is created');
+const purchaseLine = useHospiStore.getState().purchaseOrderLines.find(line => line.purchase_order_id === purchase.id);
+assert.ok(purchaseLine, 'real purchase line is created');
+const stockBeforeReceipt = useHospiStore.getState().getStockLevel('prod-coca-33', 'wh-restaurant')?.quantity || 0;
+const receipt = useHospiStore.getState().receivePurchaseOrderLines(purchase.id, 'Regression', { [purchaseLine.id]: 3 });
+assert.ok(receipt, 'partial supplier receipt is recorded');
+assert.equal(useHospiStore.getState().purchaseOrders.find(order => order.id === purchase.id)?.status, 'partially_received', 'partial receipt keeps order open');
+assert.equal(useHospiStore.getState().getStockLevel('prod-coca-33', 'wh-restaurant')?.quantity, stockBeforeReceipt + 3, 'partial receipt increases real stock');
+assert.equal(useHospiStore.getState().stockLots.some(lot => lot.lot_number === 'RECEIPT-TEST' && lot.quantity === 3), true, 'partial receipt creates the supplier lot');
 
-function setPermission(role, action, mode) {
-  const existing = state.permissionPolicies.find(item => item.role === role && item.action === action);
-  if (existing) existing.mode = mode;
-  else state.permissionPolicies.push({ role, action, mode });
-}
+const draft = useHospiStore.getState().createConfigDraft({
+  title: 'Prix test', module: 'POS', change_type: 'price', before_value: '1500', after_value: '1600', created_by: 'Regression',
+});
+useHospiStore.getState().testConfigDraft(draft.id);
+assert.equal(useHospiStore.getState().publishConfigDraft(draft.id, 'Regression')?.status, 'published', 'tested configuration can be published');
+assert.equal(useHospiStore.getState().configHistoryEntries[0].after_value, '1600', 'publication writes real configuration history');
 
-function canRootAdminOpenAdminHospi(user, policies) {
-  if (user.role === 'Admin' || user.accessLevel === 'direction') return true;
-  const exact = policies.find(item => item.role === user.role && item.action === 'Admin Hospi');
-  return exact?.mode !== 'deny';
-}
+useHospiStore.getState().setPermissionPolicy('Serveur', 'Remise', 'manager');
+assert.equal(useHospiStore.getState().getPermissionMode('Serveur', 'Remise'), 'manager', 'permission policy persists in the real store');
+const rootAdmin = DEMO_USERS.find(user => user.accessLevel === 'direction');
+assert.equal(canAccessRoute(rootAdmin, '/settings'), true, 'root admin keeps administration access');
 
-function createBusinessPack(label) {
-  const warehouse = { id: `wh-${label}`, name: `Dépôt ${label}`, type: 'bar' };
-  const pos = { id: `pos-${label}`, name: label, type: 'bar', default_warehouse_id: warehouse.id };
-  state.warehouses.push(warehouse);
-  state.posList.push(pos);
-  return { pos, warehouse };
-}
+const pack = useHospiStore.getState().createBusinessPack('bar', 'site-dakar', 'Rooftop Regression');
+assert.ok(pack && pack.pos.default_warehouse_id === pack.warehouse.id, 'business pack creates a linked POS and warehouse');
+const snapshot = useHospiStore.getState().createConfigSnapshot('Regression', 'Regression');
+assert.equal(snapshot.payload.posList.length, useHospiStore.getState().posList.length, 'snapshot captures the real configuration');
 
-function snapshotConfig() {
-  const snapshot = {
-    id: `snapshot-${state.snapshots.length + 1}`,
-    posCount: state.posList.length,
-    warehouseCount: state.warehouses.length,
-  };
-  state.snapshots.unshift(snapshot);
-  return snapshot;
-}
+const approval = useHospiStore.getState().createApprovalRequest({ title: 'Test', detail: 'Validation', module: 'POS', requested_by: 'Regression' });
+assert.equal(useHospiStore.getState().resolveApprovalRequest(approval.id, 'approved', 'Direction')?.status, 'approved', 'approval workflow resolves a real request');
+const badImport = useHospiStore.getState().importAdminCsv('products', 'name;sku\nProduit sans sku;', 'Regression');
+assert.equal(badImport.errors.length, 1, 'real CSV import reports invalid rows');
+const supplierImport = useHospiStore.getState().importAdminCsv('suppliers', 'name;phone;email\nFournisseur Regression;770000000;test@example.com', 'Regression');
+assert.equal(supplierImport.imported, 1, 'supplier CSV import creates a real supplier');
+assert.equal(useHospiStore.getState().suppliers.some(supplier => supplier.name === 'Fournisseur Regression'), true, 'imported supplier is persisted');
+const roomImport = useHospiStore.getState().importAdminCsv('rooms', 'site_id;room_number;room_type;status\nsite-dakar;909;Suite;available', 'Regression');
+assert.equal(roomImport.imported, 1, 'room CSV import creates a real room');
+assert.equal(useHospiStore.getState().rooms.some(room => room.room_number === '909'), true, 'imported room is persisted');
+const customerImport = useHospiStore.getState().importAdminCsv('customers', 'display_name;type;phone;credit_limit;balance\nClient Regression;vip;771111111;100000;25000', 'Regression');
+assert.equal(customerImport.imported, 1, 'customer CSV import creates a real customer account');
+assert.equal(useHospiStore.getState().customerAccounts.some(account => account.display_name === 'Client Regression' && account.balance === 25000), true, 'imported customer account is persisted');
+const stockImport = useHospiStore.getState().importAdminCsv('stock', 'product_id;warehouse_id;quantity;threshold;lot_number;unit_cost\nprod-coca-33;wh-restaurant;88;20;IMPORT-FIFO;390', 'Regression');
+assert.equal(stockImport.imported, 1, 'stock CSV import creates or updates a stock level');
+assert.equal(useHospiStore.getState().getStockLevel('prod-coca-33', 'wh-restaurant')?.quantity, 88, 'imported stock quantity is applied');
+assert.equal(useHospiStore.getState().stockLots.some(lot => lot.lot_number === 'IMPORT-FIFO'), true, 'stock import can create a lot for FIFO');
+const spaAppointment = useBusinessOperationsStore.getState().addSpaAppointment({
+  posId: 'pos-spa-wellness',
+  guestName: 'Regression Spa',
+  serviceName: 'Massage relaxant 60 min',
+  therapist: 'Regression',
+  startsAt: '2026-06-30T16:00:00.000Z',
+  amount: 45000,
+});
+useBusinessOperationsStore.getState().updateSpaAppointmentStatus(spaAppointment.id, 'done');
+assert.equal(useBusinessOperationsStore.getState().spaAppointments.find(item => item.id === spaAppointment.id)?.status, 'done', 'spa workflow persists appointment status');
+const casinoSession = useBusinessOperationsStore.getState().openCasinoSession({
+  posId: 'pos-casino-floor',
+  tableName: 'Regression Blackjack',
+  playerName: 'Regression Player',
+  host: 'Regression',
+  buyIn: 100000,
+});
+useBusinessOperationsStore.getState().closeCasinoSession(casinoSession.id);
+assert.equal(useBusinessOperationsStore.getState().casinoSessions.find(item => item.id === casinoSession.id)?.status, 'closed', 'casino workflow closes real sessions');
+const boutiqueReturn = useBusinessOperationsStore.getState().addBoutiqueReturn({
+  posId: 'pos-boutique-hotel',
+  productName: 'Peignoir hotel',
+  reason: 'Regression exchange',
+  amount: 18000,
+});
+assert.equal(useBusinessOperationsStore.getState().boutiqueReturns[0].id, boutiqueReturn.id, 'boutique workflow records returns');
 
-function resolveApproval(id, status) {
-  const approval = state.approvals.find(item => item.id === id);
-  assert.ok(approval, 'approval exists');
-  approval.status = status;
-}
+const newSite = useHospiStore.getState().addSite({ company_id: 'comp-sartal-demo', name: 'Site Regression', address: 'Test', city: 'Dakar', country: 'Sénégal' });
+assert.equal(useHospiStore.getState().deleteSite('site-dakar'), false, 'linked operational site cannot be deleted');
+assert.equal(useHospiStore.getState().deleteSite(newSite.id), true, 'unused site can be deleted');
 
-function importCsv(kind, csv) {
-  const rows = csv.trim().split(/\r?\n/);
-  const headers = rows[0].split(';');
-  let imported = 0;
-  const errors = [];
-  rows.slice(1).forEach((line, index) => {
-    const values = line.split(';');
-    const row = Object.fromEntries(headers.map((header, i) => [header, values[i] || '']));
-    if (kind === 'products' && (!row.name || !row.sku)) errors.push(`Ligne ${index + 2}: nom ou SKU manquant`);
-    else imported += 1;
-  });
-  return { imported, errors };
-}
-
-function recordSensitiveAudit(managerApprovalRequired) {
-  if (managerApprovalRequired) state.approvals.unshift({ id: `approval-${state.approvals.length + 1}`, status: 'pending' });
-}
-
-function addSite(name) {
-  const site = { id: `site-${state.sites.length + 1}`, name };
-  state.sites.push(site);
-  return site;
-}
-
-function deleteSite(siteId) {
-  const hasLinks = state.posList.some(pos => pos.site_id === siteId) || state.warehouses.some(warehouse => warehouse.site_id === siteId);
-  if (hasLinks) return false;
-  state.sites = state.sites.filter(site => site.id !== siteId);
-  return true;
-}
-
-recordSale('prod-coca-33', 5);
-assert.equal(state.stockLevels.find(item => item.warehouse_id === 'wh-restaurant').quantity, 5, 'POS sale decrements restaurant warehouse');
-assert.equal(state.lots[0].quantity, 0, 'FIFO consumes earliest expiring lot first');
-assert.equal(state.lots[1].quantity, 5, 'FIFO continues on next lot');
-
-chargeOrderToRoom(2500);
-assert.equal(state.folio.total_amount, 2500, 'room charge increases folio total');
-
-const status = receivePartial(3);
-assert.equal(status, 'partially_received', 'partial receipt keeps purchase order partially received');
-assert.equal(state.purchaseLine.quantity_received, 3, 'partial receipt records actual quantity');
-assert.equal(state.stockLevels.find(item => item.warehouse_id === 'wh-restaurant').quantity, 8, 'partial receipt increases stock');
-
-const draft = createDraft('Prix Coca Night Club', '2500 F', '2800 F');
-assert.equal(publishDraft(draft.id), true, 'healthy config draft can publish');
-assert.equal(state.configDrafts[0].status, 'published', 'config draft can be published');
-assert.equal(state.configHistory[0].after_value, '2800 F', 'published draft creates config history');
-
-setPermission('Serveur', 'Remise', 'manager');
-assert.equal(state.permissionPolicies[0].mode, 'manager', 'permission matrix persists manager validation mode');
-assert.equal(state.permissionPolicies.some(item => item.role === 'Serveur' && item.action === 'Remise' && item.mode === 'manager'), true, 'persisted permission can block action behind manager approval');
-setPermission('Admin', 'Admin Hospi', 'deny');
-assert.equal(canRootAdminOpenAdminHospi({ role: 'Admin', accessLevel: 'direction' }, state.permissionPolicies), true, 'root admin bypasses accidental admin hospi deny policy');
-
-state.criticalAlert = true;
-const blockedDraft = createDraft('Pack fiscal', 'ancien', 'nouveau');
-assert.equal(publishDraft(blockedDraft.id), false, 'critical config alert blocks unsafe publication');
-state.criticalAlert = false;
-
-const pack = createBusinessPack('Rooftop');
-assert.equal(pack.pos.default_warehouse_id, pack.warehouse.id, 'business pack creates linked POS and warehouse');
-
-const snapshot = snapshotConfig();
-assert.equal(snapshot.posCount, state.posList.length, 'configuration snapshot captures POS count');
-
-resolveApproval('approval-1', 'approved');
-assert.equal(state.approvals[0].status, 'approved', 'manager approval workflow resolves request');
-
-const badImport = importCsv('products', 'name;sku\nProduit sans sku;');
-assert.equal(badImport.errors.length, 1, 'CSV import reports invalid rows');
-
-recordSensitiveAudit(true);
-assert.equal(state.approvals[0].status, 'pending', 'sensitive audit creates approval request');
-
-const saly = addSite('Site Saly');
-assert.equal(state.sites.some(site => site.id === saly.id), true, 'admin can create a site');
-assert.equal(deleteSite('site-dakar'), false, 'admin cannot delete a site that still has linked operations');
-assert.equal(deleteSite(saly.id), true, 'admin can delete an unused site');
-
-console.log('Regression checks passed: POS stock, FIFO lots, PMS folio, partial supplier receipt, admin config workflows, permissions, imports, publication guard, site admin.');
+console.log('Regression checks passed on production stores: POS transaction, stock, FIFO, folio, purchasing, configuration, permissions, imports and sites.');

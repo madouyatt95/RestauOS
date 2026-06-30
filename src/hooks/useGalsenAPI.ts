@@ -56,12 +56,13 @@ export function useGalsenRegions() {
           setCommunes(comData);
           setLoading(false);
         }
-      } catch (err: any) {
-        console.warn('GalsenAPI indisponible, utilisation des données locales:', err.message);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Erreur réseau inconnue';
+        console.warn('GalsenAPI indisponible, utilisation des données locales:', message);
         if (!cancelled) {
           setRegions(FALLBACK_REGIONS);
           setCommunes([]);
-          setError(err.message);
+          setError(message);
           setLoading(false);
         }
       }

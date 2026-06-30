@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, BedDouble, CreditCard, Package, ReceiptText, Store, Warehouse } from 'lucide-react';
+import { ArrowLeft, BedDouble, CalendarDays, CreditCard, Dice5, Package, ReceiptText, RotateCcw, Store, UserRound, Warehouse } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useHospiStore, type POSProduct } from '../stores/hospiStore';
-import { useOrderStore, type Product } from '../stores/orderStore';
+import { useBusinessOperationsStore } from '../stores/businessOperationsStore';
 import { canAccessPOS } from '../utils/accessControl';
+import { completePOSSale } from '../services/posTransaction';
+import { runtimeDateOffset } from '../utils/runtime';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
@@ -19,16 +21,6 @@ const typeLabels: Record<string, string> = {
   other: 'Point de vente',
 };
 
-const toOrderProduct = (row: POSProduct): Product => ({
-  id: row.product.id,
-  name: row.product.name,
-  price: row.price.sale_price,
-  category: row.product.category_id.includes('boisson') || row.product.category_id.includes('bar') || row.product.category_id.includes('minibar') ? 'boissons' : 'plats',
-  image: row.product.category_id === 'spa' ? 'SPA' : row.product.category_id === 'boutique' ? 'BTQ' : 'POS',
-  stock: row.stock?.quantity || 0,
-  cost: row.product.average_purchase_price || 0,
-});
-
 export default function BusinessPOS() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -37,47 +29,37 @@ export default function BusinessPOS() {
     posList,
     warehouses,
     getProductsForPOS,
-    recordSale,
     getOccupiedRoomsWithOpenFolios,
-    chargeOrderToRoom,
+    adjustInventory,
   } = useHospiStore();
+  const {
+    spaAppointments,
+    casinoSessions,
+    boutiqueReturns,
+    addSpaAppointment,
+    updateSpaAppointmentStatus,
+    openCasinoSession,
+    closeCasinoSession,
+    addBoutiqueReturn,
+  } = useBusinessOperationsStore();
   const [notice, setNotice] = useState('');
 
   const activePOS = posList.find(pos => pos.id === activePOSId);
   const warehouse = warehouses.find(item => item.id === activePOS?.default_warehouse_id);
   const products = useMemo(() => activePOS ? getProductsForPOS(activePOS.id) : [], [activePOS, getProductsForPOS]);
   const rooms = getOccupiedRoomsWithOpenFolios().filter(row => row.room.site_id === activePOS?.site_id);
-
-  const recordOrder = (row: POSProduct, payment: 'carte' | 'especes' | 'wave' | 'room_charge', roomId?: string, roomNumber?: string) => {
-    if (!activePOS) return;
-    const orderId = `metier-${Date.now()}`;
-    const orderProduct = toOrderProduct(row);
-    const order = {
-      id: orderId,
-      items: [{ product: orderProduct, quantity: 1 }],
-      total: row.price.sale_price,
-      type: 'sur_place',
-      payment,
-      date: new Date().toISOString(),
-      status: payment === 'room_charge' ? 'servie' : 'payee',
-      paidAmount: payment === 'room_charge' ? 0 : row.price.sale_price,
-      payments: [{ id: `pay-${orderId}`, amount: row.price.sale_price, method: payment, date: new Date().toISOString() }],
-      itemsReady: {},
-      posId: activePOS.id,
-      roomId,
-      roomNumber,
-      hospiLines: [{ productId: row.product.id, quantity: 1 }],
-      serveurName: user?.name || activePOS.name,
-    };
-
-    useOrderStore.setState(state => ({ orders: [order as any, ...state.orders] }));
-    recordSale(orderId, [{ productId: row.product.id, quantity: 1 }], user?.name || activePOS.name, activePOS.id);
-    return orderId;
-  };
+  const posSpaAppointments = activePOS ? spaAppointments.filter(item => item.posId === activePOS.id) : [];
+  const posCasinoSessions = activePOS ? casinoSessions.filter(item => item.posId === activePOS.id) : [];
+  const posBoutiqueReturns = activePOS ? boutiqueReturns.filter(item => item.posId === activePOS.id) : [];
 
   const sellNow = (row: POSProduct) => {
-    recordOrder(row, 'carte');
-    setNotice(`${row.product.name} vendu sur ${activePOS?.name}. Stock déduit du dépôt ${warehouse?.name || 'lié'}.`);
+    if (!activePOS) return;
+    try {
+      completePOSSale({ posId: activePOS.id, productId: row.product.id, payment: 'carte', actor: user?.name || activePOS.name });
+      setNotice(`${row.product.name} vendu sur ${activePOS.name}. Stock déduit du dépôt ${warehouse?.name || 'lié'}.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'La vente n’a pas pu être enregistrée.');
+    }
   };
 
   const chargeRoom = (row: POSProduct) => {
@@ -86,11 +68,65 @@ export default function BusinessPOS() {
       setNotice('Aucune chambre occupée avec folio ouvert pour imputation.');
       return;
     }
-    const orderId = recordOrder(row, 'room_charge', target.room.id, target.room.room_number);
-    if (orderId) {
-      chargeOrderToRoom(target.room.id, orderId, `${row.product.name} · ${activePOS?.name}`, row.price.sale_price);
+    if (!activePOS) return;
+    try {
+      completePOSSale({ posId: activePOS.id, productId: row.product.id, payment: 'room_charge', actor: user?.name || activePOS.name, roomId: target.room.id });
       setNotice(`${row.product.name} imputé à la chambre ${target.room.room_number}. Stock, POS et folio sont reliés.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'L’imputation chambre a échoué.');
     }
+  };
+
+  const createSpaAppointment = () => {
+    if (!activePOS) return;
+    const service = products.find(row => row.product.category_id === 'spa') || products[0];
+    if (!service) {
+      setNotice('Aucune prestation spa disponible dans ce POS.');
+      return;
+    }
+    const targetRoom = rooms[0];
+    const appointment = addSpaAppointment({
+      posId: activePOS.id,
+      guestName: targetRoom ? `Chambre ${targetRoom.room.room_number}` : 'Client walk-in',
+      roomNumber: targetRoom?.room.room_number,
+      serviceName: service.product.name,
+      therapist: user?.name || 'Spa',
+      startsAt: runtimeDateOffset(0.08),
+      amount: service.price.sale_price,
+    });
+    setNotice(`Rendez-vous spa créé : ${appointment.serviceName} pour ${appointment.guestName}.`);
+  };
+
+  const createCasinoSession = () => {
+    if (!activePOS) return;
+    const session = openCasinoSession({
+      posId: activePOS.id,
+      tableName: `Table VIP ${posCasinoSessions.filter(item => item.status === 'open').length + 1}`,
+      playerName: rooms[0] ? `Chambre ${rooms[0].room.room_number}` : 'Client casino',
+      host: user?.name || 'Casino',
+      buyIn: 100000,
+    });
+    setNotice(`Session casino ouverte : ${session.tableName}, buy-in ${fmt(session.buyIn)} F.`);
+  };
+
+  const recordBoutiqueReturn = () => {
+    if (!activePOS) return;
+    const row = products.find(item => item.product.is_stockable) || products[0];
+    if (!row || !warehouse) {
+      setNotice('Aucun article boutique ou dépôt lié pour enregistrer le retour.');
+      return;
+    }
+    addBoutiqueReturn({
+      posId: activePOS.id,
+      productName: row.product.name,
+      reason: 'Retour client / échange',
+      amount: row.price.sale_price,
+      status: 'received',
+    });
+    if (row.product.is_stockable) {
+      adjustInventory(row.product.id, warehouse.id, (row.stock?.quantity || 0) + 1, 'Retour boutique', user?.name || activePOS.name);
+    }
+    setNotice(`Retour boutique enregistré : ${row.product.name}. Stock du dépôt ${warehouse.name} ajusté.`);
   };
 
   if (!activePOS || !canAccessPOS(user, activePOS)) {
@@ -145,6 +181,94 @@ export default function BusinessPOS() {
         <button onClick={() => setNotice('')} className="w-full rounded-2xl bg-green/10 border border-green/20 text-green text-xs font-bold px-4 py-3 text-left mb-4">
           {notice}
         </button>
+      )}
+
+      {activePOS.type === 'spa' && (
+        <section className="glass-card-lg p-4 mb-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Planning spa</p>
+              <h2 className="text-white font-black text-lg">Rendez-vous du point de vente</h2>
+            </div>
+            <button onClick={createSpaAppointment} className="h-10 px-3 rounded-2xl bg-purple text-white text-xs font-black flex items-center gap-2">
+              <CalendarDays size={15} /> Ajouter
+            </button>
+          </div>
+          <div className="space-y-2">
+            {posSpaAppointments.slice(0, 4).map(appointment => (
+              <div key={appointment.id} className="rounded-2xl bg-white/5 border border-white/10 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-white font-black text-sm">{appointment.serviceName}</p>
+                    <p className="text-text-secondary text-xs mt-1">{appointment.guestName} · {appointment.therapist}</p>
+                  </div>
+                  <span className="text-purple text-[10px] font-black uppercase">{appointment.status}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  <button onClick={() => updateSpaAppointmentStatus(appointment.id, 'in_progress')} className="h-9 rounded-xl bg-white/5 text-white text-[10px] font-black">Démarrer</button>
+                  <button onClick={() => updateSpaAppointmentStatus(appointment.id, 'done')} className="h-9 rounded-xl bg-green/10 text-green text-[10px] font-black">Terminer</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {activePOS.type === 'casino' && (
+        <section className="glass-card-lg p-4 mb-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Casino</p>
+              <h2 className="text-white font-black text-lg">Sessions tables & buy-in</h2>
+            </div>
+            <button onClick={createCasinoSession} className="h-10 px-3 rounded-2xl bg-orange text-white text-xs font-black flex items-center gap-2">
+              <Dice5 size={15} /> Ouvrir
+            </button>
+          </div>
+          <div className="space-y-2">
+            {posCasinoSessions.slice(0, 4).map(session => (
+              <div key={session.id} className="rounded-2xl bg-white/5 border border-white/10 p-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-white font-black text-sm">{session.tableName}</p>
+                  <p className="text-text-secondary text-xs mt-1 truncate">{session.playerName} · {fmt(session.buyIn)} F</p>
+                </div>
+                {session.status === 'open' ? (
+                  <button onClick={() => closeCasinoSession(session.id)} className="h-9 px-3 rounded-xl bg-red/10 text-red text-[10px] font-black">Fermer</button>
+                ) : (
+                  <span className="text-text-tertiary text-[10px] font-black uppercase">Clôturée</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {activePOS.type === 'boutique' && (
+        <section className="glass-card-lg p-4 mb-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Boutique</p>
+              <h2 className="text-white font-black text-lg">Retours, échanges et stock</h2>
+            </div>
+            <button onClick={recordBoutiqueReturn} className="h-10 px-3 rounded-2xl bg-blue text-white text-xs font-black flex items-center gap-2">
+              <RotateCcw size={15} /> Retour
+            </button>
+          </div>
+          <div className="space-y-2">
+            {posBoutiqueReturns.slice(0, 4).map(item => (
+              <div key={item.id} className="rounded-2xl bg-white/5 border border-white/10 p-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-white font-black text-sm">{item.productName}</p>
+                  <p className="text-text-secondary text-xs mt-1 truncate">{item.reason}</p>
+                </div>
+                <div className="text-right">
+                  <UserRound size={15} className="text-blue ml-auto mb-1" />
+                  <p className="text-blue text-[10px] font-black uppercase">{item.status}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       <div className="space-y-3">

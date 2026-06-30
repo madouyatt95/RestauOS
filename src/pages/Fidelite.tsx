@@ -13,7 +13,7 @@ const tierConfig = {
 };
 
 export default function Fidelite() {
-  const { clients, usePoints, addClient } = useClientStore();
+  const { clients, usePoints: spendPoints, addClient } = useClientStore();
   const [selected, setSelected] = useState<Client | null>(null);
   const [showAddClient, setShowAddClient] = useState(false);
   const [newClient, setNewClient] = useState({ name: '', phone: '' });
@@ -40,7 +40,7 @@ export default function Fidelite() {
     if (!selected || otpCode.length < 4) return;
     const pts = Number(pointsToUse);
     
-    usePoints(selected.id, pts, `Réduction ${fmt(pts * 5)} FCFA`);
+    spendPoints(selected.id, pts, `Réduction ${fmt(pts * 5)} FCFA`);
     setSelected({ ...selected, points: selected.points - pts });
     setPointsToUse('');
     setShowOTP(false);

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useReservationStore } from '../stores/reservationStore';
+import { useReservationStore, type Reservation } from '../stores/reservationStore';
 import { useAuthStore } from '../stores/authStore';
-import { Calendar as CalIcon, Clock, Users, MessageSquare, Check, X, Bell, Trash2 } from 'lucide-react';
+import { Calendar as CalIcon, Clock, Users, MessageSquare, Check, X, Bell, Trash2, Plus } from 'lucide-react';
 
 const DATES = [
   { day: 'Auj.', date: new Date().toISOString().split('T')[0] },
@@ -11,6 +11,13 @@ const DATES = [
 ];
 const TIMES = ['12:00', '12:30', '13:00', '13:30', '19:00', '19:30', '20:00', '20:30', '21:00'];
 const OCCASIONS = ['Classique', 'Anniversaire', 'Affaires', 'Romantique', 'Famille'];
+const OCCASION_VALUES: Record<string, Reservation['occasion']> = {
+  Anniversaire: 'anniversaire',
+  Affaires: 'affaires',
+  Romantique: 'romantique',
+  Famille: 'famille',
+  Classique: 'autre',
+};
 
 export default function Reservations() {
   const { user } = useAuthStore();
@@ -32,7 +39,7 @@ export default function Reservations() {
     addReservation({
       clientName: user?.name || 'Client',
       clientPhone: '77 000 00 00',
-      date, time, guests, status, notes, occasion: occasion.toLowerCase() as any
+      date, time, guests, status, notes, occasion: OCCASION_VALUES[occasion] || 'autre'
     });
     setStep(status === 'waitlist' ? 3 : 2);
   };
@@ -201,8 +208,3 @@ export default function Reservations() {
     </div>
   );
 }
-
-// Quick Plus component definition inside this file for compiling reasons
-const Plus = ({ size, className }: any) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-);

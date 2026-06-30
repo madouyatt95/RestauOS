@@ -6,6 +6,7 @@ import { usePlanningStore, type ShiftType } from '../stores/planningStore';
 import { useHospiStore } from '../stores/hospiStore';
 import { getVisiblePOS, getVisibleSites, isDirection } from '../utils/accessControl';
 import { Phone, ChevronLeft, ChevronRight, Plus, X, Sun, Moon, Clock, Users, RefreshCw, Check, AlertCircle, UserPlus, Trash2, QrCode } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 const statusConfig = {
@@ -15,7 +16,7 @@ const statusConfig = {
   repos: { label: 'Repos', color: '#6B7280', bg: 'rgba(107,114,128,0.12)' },
 };
 
-const shiftConfig: Record<ShiftType, { label: string; short: string; color: string; bg: string; icon: any; hours: string }> = {
+const shiftConfig: Record<ShiftType, { label: string; short: string; color: string; bg: string; icon: LucideIcon; hours: string }> = {
   midi: { label: 'Service Midi', short: 'MIDI', color: '#F59E0B', bg: 'rgba(245,158,11,0.15)', icon: Sun, hours: '11:00 - 16:00' },
   soir: { label: 'Service Soir', short: 'SOIR', color: '#3B82F6', bg: 'rgba(59,130,246,0.15)', icon: Moon, hours: '18:00 - 23:00' },
   journee: { label: 'Coupure', short: 'CPR', color: '#8B5CF6', bg: 'rgba(139,92,246,0.15)', icon: Clock, hours: '10:00 - 22:00' },
@@ -23,6 +24,13 @@ const shiftConfig: Record<ShiftType, { label: string; short: string; color: stri
 };
 
 const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+const ROLE_GROUPS: Record<string, string[]> = {
+  Salle: ['Serveur', 'Serveuse', 'Hôtesse', 'Barman'],
+  Cuisine: ['Chef Cuisine', 'Second Cuisine', 'Commis', 'Plongeur', 'Plongeuse', 'Cuisinier'],
+  Livraison: ['Livreur', 'Livreur Indépendant'],
+  Management: ['Caissier', 'Gérant', 'Admin'],
+};
 
 function getWeekDates(weekOffset: number): { label: string; date: string; isToday: boolean }[] {
   const now = new Date();
@@ -61,6 +69,8 @@ export default function Personnel() {
   const [presenceFilter, setPresenceFilter] = useState('Tous');
   const [showQREmp, setShowQREmp] = useState<Employee | null>(null);
   const [personnelNotice, setPersonnelNotice] = useState('');
+  const [shiftToRemove, setShiftToRemove] = useState<{ shiftId: string; employeeName: string; label: string } | null>(null);
+  const [employeeToRemove, setEmployeeToRemove] = useState<Employee | null>(null);
 
   const isManager = ['Admin', 'Gérant'].includes(user?.role || '');
   const visibleSiteIds = getVisibleSites(user, sites).map(site => site.id);
@@ -79,13 +89,6 @@ export default function Personnel() {
   const myShifts = currentEmployee ? shifts.filter(s => s.employeeId === currentEmployee.id) : [];
   const weekDates = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
   const todayStr = new Date().toISOString().split('T')[0];
-
-  const ROLE_GROUPS: Record<string, string[]> = {
-    'Salle': ['Serveur', 'Serveuse', 'Hôtesse', 'Barman'],
-    'Cuisine': ['Chef Cuisine', 'Second Cuisine', 'Commis', 'Plongeur', 'Plongeuse', 'Cuisinier'],
-    'Livraison': ['Livreur', 'Livreur Indépendant'],
-    'Management': ['Caissier', 'Gérant', 'Admin']
-  };
 
   const moduleLabels: Record<string, string> = {
     restaurant: 'Restaurant',
@@ -173,14 +176,14 @@ export default function Personnel() {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6 px-4">
-        {[
+        {([
           { id: 'planning', label: 'Planning', icon: Clock, badge: 0 },
           { id: 'presences', label: 'Présences', icon: Users, badge: 0 },
           { id: 'echanges', label: 'Échanges', icon: RefreshCw, badge: actionableSwaps.length },
-        ].map(tab => (
+        ] as const).map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab(tab.id)}
             className={`flex-1 py-3 rounded-2xl flex items-center justify-center gap-2 transition-all border relative ${activeTab === tab.id ? 'bg-white/10 border-white/20 text-white' : 'bg-transparent border-transparent text-text-tertiary'}`}
           >
             <tab.icon size={16} />
@@ -263,9 +266,7 @@ export default function Personnel() {
                               className="w-full rounded-lg flex items-center justify-center gap-1 py-1.5 active:scale-95 transition-transform"
                               style={{ background: cfg.bg }}
                               onClick={() => {
-                                if (isManager && confirm(`Supprimer le service ${cfg.label} de ${emp.name} ?`)) {
-                                  removeShift(shift.id);
-                                }
+                                if (isManager) setShiftToRemove({ shiftId: shift.id, employeeName: emp.name, label: cfg.label });
                               }}
                             >
                               <cfg.icon size={10} style={{ color: cfg.color }} />
@@ -697,7 +698,7 @@ export default function Personnel() {
                 <p className="text-text-tertiary text-[10px] font-black uppercase tracking-widest">Modifier le statut</p>
                 <div className="grid grid-cols-2 gap-3">
                   {Object.entries(statusConfig).map(([key, cfg]) => (
-                    <button key={key} onClick={() => { updateStatus(selectedEmp.id, key as any); setSelectedEmp({...selectedEmp, status: key as any}); }}
+                    <button key={key} onClick={() => { const status = key as Employee['status']; updateStatus(selectedEmp.id, status); setSelectedEmp({...selectedEmp, status}); }}
                       className={`py-4 rounded-2xl text-[10px] font-black uppercase transition-all ${selectedEmp.status === key ? 'ring-2 ring-white/50' : ''}`}
                       style={{ background: cfg.bg, color: cfg.color }}>
                       {cfg.label}
@@ -708,11 +709,63 @@ export default function Personnel() {
                   <Phone size={18} /> Appeler {selectedEmp.name.split(' ')[0]}
                 </a>
                 {isManager && (
-                  <button onClick={() => { if (confirm(`Retirer ${selectedEmp.name} de l'équipe ?`)) { removeEmployee(selectedEmp.id); setSelectedEmp(null); } }}
+                  <button onClick={() => setEmployeeToRemove(selectedEmp)}
                     className="w-full py-3 rounded-2xl bg-red/5 border border-red/20 text-red font-bold text-xs flex items-center justify-center gap-3">
                     <Trash2 size={16} /> Retirer de l'équipe
                   </button>
                 )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {shiftToRemove && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setShiftToRemove(null)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={event => event.stopPropagation()}>
+              <div className="modal-handle" />
+              <h3 className="text-white font-black text-xl text-center mb-2">Supprimer le service</h3>
+              <p className="text-text-secondary text-sm text-center mb-6">{shiftToRemove.label} - {shiftToRemove.employeeName}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setShiftToRemove(null)} className="py-4 rounded-2xl bg-white/5 text-white font-black text-sm">Annuler</button>
+                <button
+                  onClick={() => {
+                    removeShift(shiftToRemove.shiftId);
+                    setPersonnelNotice(`Service ${shiftToRemove.label} retiré pour ${shiftToRemove.employeeName}.`);
+                    setShiftToRemove(null);
+                  }}
+                  className="py-4 rounded-2xl bg-red text-white font-black text-sm"
+                >
+                  Supprimer
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {employeeToRemove && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setEmployeeToRemove(null)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={event => event.stopPropagation()}>
+              <div className="modal-handle" />
+              <div className="w-14 h-14 rounded-2xl bg-red/10 text-red flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={26} />
+              </div>
+              <h3 className="text-white font-black text-xl text-center mb-2">Retirer {employeeToRemove.name}</h3>
+              <p className="text-text-secondary text-sm text-center mb-6">Le profil disparaît du planning local et des affectations visibles dans cette démo.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setEmployeeToRemove(null)} className="py-4 rounded-2xl bg-white/5 text-white font-black text-sm">Annuler</button>
+                <button
+                  onClick={() => {
+                    removeEmployee(employeeToRemove.id);
+                    if (selectedEmp?.id === employeeToRemove.id) setSelectedEmp(null);
+                    setPersonnelNotice(`${employeeToRemove.name} retiré de l'équipe.`);
+                    setEmployeeToRemove(null);
+                  }}
+                  className="py-4 rounded-2xl bg-red text-white font-black text-sm"
+                >
+                  Retirer
+                </button>
               </div>
             </motion.div>
           </motion.div>

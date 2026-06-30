@@ -11,7 +11,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet default icon paths
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: () => string })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
@@ -363,7 +363,7 @@ export default function Livraisons() {
               className="modal-sheet" onClick={e => e.stopPropagation()}>
               <div className="modal-handle" />
               <h3 className="text-white font-black text-xl mb-2 text-center">Preuve de Livraison</h3>
-              <p className="text-text-secondary text-sm mb-6 text-center">Faites signer le client pour confirmer le paiement de <span className="text-white font-bold">{(selected?.amount! + selected?.deliveryFee!).toLocaleString()} F</span></p>
+              <p className="text-text-secondary text-sm mb-6 text-center">Faites signer le client pour confirmer le paiement de <span className="text-white font-bold">{((selected?.amount || 0) + (selected?.deliveryFee || 0)).toLocaleString()} F</span></p>
               
               <div className="w-full h-48 bg-white/5 border border-white/10 rounded-[2.5rem] mb-8 flex flex-col items-center justify-center relative overflow-hidden">
                 <span className="text-text-tertiary text-[10px] font-black uppercase tracking-widest absolute opacity-20">Zone de signature</span>

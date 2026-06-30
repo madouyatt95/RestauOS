@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNotificationStore, type AppNotification } from '../stores/notificationStore';
@@ -10,22 +10,22 @@ export default function NotificationToaster() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const [toastQueue, setToastQueue] = useState<AppNotification[]>([]);
-  const [lastNotifId, setLastNotifId] = useState<string | null>(null);
+  const lastNotifId = useRef<string | null>(null);
 
   useEffect(() => {
     if (notifications.length === 0 || !user) return;
     
     const latest = notifications[0];
     
-    if (latest.id !== lastNotifId && !latest.read) {
-      setLastNotifId(latest.id);
+    if (latest.id !== lastNotifId.current && !latest.read) {
+      lastNotifId.current = latest.id;
       
       // Target role check
       if (latest.targetRole && latest.targetRole !== user.role && user.role !== 'Gérant') {
         return; 
       }
       
-      setToastQueue(prev => [...prev, latest]);
+      queueMicrotask(() => setToastQueue(prev => [...prev, latest]));
       
       // Native browser notification logic
       if ("Notification" in window && Notification.permission === "granted") {
@@ -39,7 +39,7 @@ export default function NotificationToaster() {
         setToastQueue(prev => prev.filter(n => n.id !== latest.id));
       }, 5000);
     }
-  }, [notifications, lastNotifId, user]);
+  }, [notifications, user]);
 
   const handleClick = (notif: AppNotification) => {
     markRead(notif.id);

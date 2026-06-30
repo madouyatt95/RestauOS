@@ -4,11 +4,12 @@ import { useAuthStore } from '../stores/authStore';
 import { useOrderStore, PRODUCTS, type Order } from '../stores/orderStore';
 import { useDeliveryStore } from '../stores/deliveryStore';
 import { QrCode, ShoppingBag, Plus, Minus, MapPin, Check, Truck, Clock, LogOut, MessageCircle, ClipboardList, Home, ChefHat, CreditCard, X } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const fmt = (n: number) => n.toLocaleString('fr-FR');
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: LucideIcon }> = {
   en_preparation: { label: 'En préparation', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', icon: ChefHat },
   prete: { label: 'Prête', color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)', icon: Check },
   en_livraison: { label: 'En livraison', color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', icon: Truck },
@@ -21,10 +22,11 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 
 export default function ClientHome() {
   const { user } = useAuthStore();
-  const { cart, addToCart, updateQuantity, checkout, orders } = useOrderStore();
-  const { deliveries } = useDeliveryStore();
+  const { cart, addToCart, updateQuantity, checkout, orders, setOrderType } = useOrderStore();
+  const { deliveries, addDelivery } = useDeliveryStore();
   const [showCart, setShowCart] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [fulfillmentMode, setFulfillmentMode] = useState<Order['type']>('livraison');
   const [activeTab, setActiveTab] = useState<'accueil' | 'commandes'>('accueil');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const navigate = useNavigate();
@@ -45,8 +47,25 @@ export default function ClientHome() {
   const getCartQty = (id: string) => cart.find(c => c.product.id === id)?.quantity || 0;
 
   const handleOrder = () => {
-    useOrderStore.setState({ orderType: 'livraison' });
-    checkout('wave', user?.id);
+    setOrderType(fulfillmentMode);
+    const order = checkout('wave', user?.id);
+    if (order && fulfillmentMode === 'livraison') {
+      addDelivery({
+        orderId: order.id,
+        clientName: user?.name || 'Client',
+        clientPhone: '77 000 00 00',
+        address: 'Adresse client à confirmer',
+        amount: order.total,
+        deliveryFee: 1500,
+        paymentMethod: 'wave',
+        paymentStatus: 'paye',
+        driverId: 'e5',
+        driverName: 'Pape Sow',
+        status: 'preparation',
+        estimatedTime: 25,
+        createdAt: order.date,
+      });
+    }
     setShowCart(false);
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 2500);
@@ -77,11 +96,11 @@ export default function ClientHome() {
 
       {/* Tab Switcher */}
       <div className="flex gap-2 mb-6 p-1 bg-white/5 rounded-2xl">
-        {[
+        {([
           { id: 'accueil', label: 'Accueil', icon: Home },
           { id: 'commandes', label: 'Mes Commandes', icon: ClipboardList, badge: activeOrders.length },
-        ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
+        ] as const).map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-2 transition-all text-xs font-black uppercase tracking-wider relative ${
               activeTab === tab.id ? 'bg-white/10 text-white shadow-sm' : 'text-text-tertiary'
             }`}>
@@ -378,8 +397,17 @@ export default function ClientHome() {
                   <div className="flex items-center gap-3"><MapPin className="text-orange" /><p className="text-white font-semibold text-sm">Mode de réception</p></div>
                 </div>
                 <div className="flex gap-2 p-1 bg-white/5 rounded-xl">
-                  {['Livraison', 'Click & Collect'].map(m => (
-                    <button key={m} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${m === 'Livraison' ? 'bg-orange text-white' : 'text-text-tertiary'}`}>{m}</button>
+                  {([
+                    { label: 'Livraison', value: 'livraison' },
+                    { label: 'Click & Collect', value: 'emporter' },
+                  ] as const).map(mode => (
+                    <button
+                      key={mode.value}
+                      onClick={() => setFulfillmentMode(mode.value)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${fulfillmentMode === mode.value ? 'bg-orange text-white' : 'text-text-tertiary'}`}
+                    >
+                      {mode.label}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -396,7 +424,7 @@ export default function ClientHome() {
                 <span className="text-orange font-black text-xl">{fmt(cartTotal)} <span className="text-xs text-text-secondary">FCFA</span></span>
               </div>
               <button onClick={handleOrder} className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange to-amber-600 text-white font-bold text-sm shadow-[0_4px_20px_rgba(255,138,0,0.4)] mb-3">
-                Commander avec Wave
+                {fulfillmentMode === 'livraison' ? 'Commander en livraison avec Wave' : 'Commander à retirer avec Wave'}
               </button>
             </motion.div>
           </div>

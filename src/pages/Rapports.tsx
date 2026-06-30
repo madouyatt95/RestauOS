@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useOrderStore, type Order } from '../stores/orderStore';
 import { useAuthStore } from '../stores/authStore';
@@ -14,6 +14,9 @@ const fmt = (n: number) => n.toLocaleString('fr-FR');
 const DONUT_COLORS = ['#FF8A00', '#8B5CF6', '#3B82F6'];
 const HEAT_COLORS = ['#1a1a2e', '#2d1f4e', '#4c1d95', '#7c3aed', '#a78bfa', '#FF8A00', '#ef4444'];
 const PAID_STATUSES: Order['status'][] = ['payee', 'terminee', 'servie'];
+const HEAT_DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'] as const;
+type HeatDay = typeof HEAT_DAYS[number];
+type HeatRow = { hour: string } & Record<HeatDay, number>;
 
 export default function Rapports() {
   const { orders: allOrders } = useOrderStore();
@@ -69,15 +72,18 @@ export default function Rapports() {
   const avgRating = getAverage();
   const weekWaste = getWeekTotal();
 
-  // Simulated heatmap data (hours x days)
-  const heatmapData = useMemo(() => {
-    const hours = ['11h', '12h', '13h', '14h', '15h', '18h', '19h', '20h', '21h', '22h'];
-    const days = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
-    return hours.map(h => ({
-      hour: h,
-      ...Object.fromEntries(days.map(d => [d, Math.floor(Math.random() * 6) + (h.includes('12') || h.includes('20') ? 4 : 1) + (d === 'Sam' || d === 'Ven' ? 2 : 0)]))
-    }));
-  }, []);
+  const heatmapData: HeatRow[] = (() => {
+    const hours = [11, 12, 13, 14, 15, 18, 19, 20, 21, 22];
+    return hours.map(hour => {
+      const row = Object.fromEntries(HEAT_DAYS.map(day => [day, 0])) as Record<HeatDay, number>;
+      scopedOrders.forEach(order => {
+        const orderDate = new Date(order.date);
+        const dayIndex = (orderDate.getDay() + 6) % 7;
+        if (orderDate.getHours() === hour) row[HEAT_DAYS[dayIndex]] += 1;
+      });
+      return { hour: `${hour}h`, ...row };
+    });
+  })();
 
   // Midi vs Soir
   const midiCA = Math.round(weekCA * 0.42);
@@ -159,14 +165,14 @@ export default function Rapports() {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-5">
-        {[
+        {([
           { id: 'ca', label: 'Chiffres', icon: TrendingUp },
           { id: 'hospi', label: 'Hospi', icon: Building2 },
           { id: 'caisse', label: 'Caisses', icon: ReceiptText },
           { id: 'analytics', label: 'Analytics', icon: Flame },
           { id: 'avis', label: 'Avis', icon: Star },
-        ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
+        ] as const).map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`flex-1 py-3 rounded-2xl flex items-center justify-center gap-2 transition-all border text-[10px] font-black uppercase tracking-wider ${activeTab === tab.id ? 'bg-white/10 border-white/20 text-white' : 'bg-transparent border-transparent text-text-tertiary'}`}>
             <tab.icon size={14} /> {tab.label}
           </button>
@@ -515,7 +521,7 @@ export default function Rapports() {
                 <thead>
                   <tr>
                     <th className="text-[8px] text-text-tertiary font-bold uppercase p-1 text-left w-10"></th>
-                    {['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map(d => (
+                    {HEAT_DAYS.map(d => (
                       <th key={d} className="text-[8px] text-text-tertiary font-bold uppercase p-1 text-center">{d}</th>
                     ))}
                   </tr>
@@ -524,8 +530,8 @@ export default function Rapports() {
                   {heatmapData.map(row => (
                     <tr key={row.hour}>
                       <td className="text-[9px] text-text-tertiary font-bold p-1">{row.hour}</td>
-                      {['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map(d => {
-                        const val = (row as any)[d] as number;
+                      {HEAT_DAYS.map(d => {
+                        const val = row[d];
                         const ci = Math.min(Math.floor(val / 1.5), HEAT_COLORS.length - 1);
                         return (
                           <td key={d} className="p-0.5">

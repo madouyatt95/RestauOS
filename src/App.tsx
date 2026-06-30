@@ -3,42 +3,48 @@ import { AnimatePresence } from 'framer-motion';
 import BottomNav from './components/BottomNav';
 import ProtectedRoute from './components/ProtectedRoute';
 import NotificationToaster from './components/NotificationToaster';
-import Landing from './pages/Landing';
-import Dashboard from './pages/Dashboard';
-import Caisse from './pages/Caisse';
-import Stocks from './pages/Stocks';
-import Personnel from './pages/Personnel';
-import Rapports from './pages/Rapports';
-import Livraisons from './pages/Livraisons';
-import Commandes from './pages/Commandes';
-import Fidelite from './pages/Fidelite';
-import Plus from './pages/Plus';
-import Cuisine from './pages/Cuisine';
-import ClientHome from './pages/ClientHome';
-import Reservations from './pages/Reservations';
-import Wallet from './pages/Wallet';
-import ClientOrder from './pages/ClientOrder';
-import Review from './pages/Review';
-import Onboarding from './pages/Onboarding';
-import MenuBuilder from './pages/MenuBuilder';
-import Factures from './pages/Factures';
-import WhatsAppBot from './pages/WhatsAppBot';
-import HospiSettings from './pages/HospiSettings';
-import PMS from './pages/PMS';
-import BusinessModules from './pages/BusinessModules';
-import BusinessPOS from './pages/BusinessPOS';
-import DemoGuide from './pages/DemoGuide';
+import AppErrorBoundary from './components/AppErrorBoundary';
+import PageLoader from './components/PageLoader';
 import { useThemeStore } from './stores/themeStore';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
+import { installGlobalTelemetry } from './services/telemetry';
 import './index.css';
+
+const Landing = lazy(() => import('./pages/Landing'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Caisse = lazy(() => import('./pages/Caisse'));
+const Stocks = lazy(() => import('./pages/Stocks'));
+const Personnel = lazy(() => import('./pages/Personnel'));
+const Rapports = lazy(() => import('./pages/Rapports'));
+const Livraisons = lazy(() => import('./pages/Livraisons'));
+const Commandes = lazy(() => import('./pages/Commandes'));
+const Fidelite = lazy(() => import('./pages/Fidelite'));
+const Plus = lazy(() => import('./pages/Plus'));
+const Cuisine = lazy(() => import('./pages/Cuisine'));
+const ClientHome = lazy(() => import('./pages/ClientHome'));
+const Reservations = lazy(() => import('./pages/Reservations'));
+const Wallet = lazy(() => import('./pages/Wallet'));
+const ClientOrder = lazy(() => import('./pages/ClientOrder'));
+const Review = lazy(() => import('./pages/Review'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
+const MenuBuilder = lazy(() => import('./pages/MenuBuilder'));
+const Factures = lazy(() => import('./pages/Factures'));
+const WhatsAppBot = lazy(() => import('./pages/WhatsAppBot'));
+const HospiSettings = lazy(() => import('./pages/HospiSettings'));
+const PMS = lazy(() => import('./pages/PMS'));
+const BusinessModules = lazy(() => import('./pages/BusinessModules'));
+const BusinessPOS = lazy(() => import('./pages/BusinessPOS'));
+const DemoGuide = lazy(() => import('./pages/DemoGuide'));
 
 function AppContent() {
   const location = useLocation();
   const isLanding = location.pathname === '/';
   return (
     <>
-      <AnimatePresence mode="wait">
-        <Routes>
+      <AppErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
+          <AnimatePresence mode="wait">
+            <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/dashboard" element={
             <ProtectedRoute allowedRoles={['Admin', 'Gérant']}><Dashboard /></ProtectedRoute>
@@ -107,8 +113,10 @@ function AppContent() {
             <ProtectedRoute allowedRoles={['Admin', 'Gérant']}><HospiSettings /></ProtectedRoute>
           } />
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AnimatePresence>
+            </Routes>
+          </AnimatePresence>
+        </Suspense>
+      </AppErrorBoundary>
       <NotificationToaster />
       {!isLanding && <BottomNav />}
     </>
@@ -122,6 +130,8 @@ export default function App() {
     document.body.className = mode;
     document.documentElement.style.setProperty('--color-orange', accent);
   }, [mode, accent]);
+
+  useEffect(() => installGlobalTelemetry(), []);
 
   return (
     <BrowserRouter>

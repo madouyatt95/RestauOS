@@ -723,9 +723,10 @@ const adminEnvironments: AdminEnvironment[] = [
 const parseSimpleCsv = (csv: string) => {
   const lines = csv.trim().split(/\r?\n/).filter(Boolean);
   if (lines.length < 2) return [];
-  const headers = lines[0].split(';').map(header => header.trim());
+  const delimiter = lines[0].includes(';') ? ';' : ',';
+  const headers = lines[0].split(delimiter).map(header => header.trim());
   return lines.slice(1).map(line => {
-    const values = line.split(';').map(value => value.trim());
+    const values = line.split(delimiter).map(value => value.trim());
     return Object.fromEntries(headers.map((header, index) => [header, values[index] || '']));
   });
 };
@@ -1765,6 +1766,142 @@ export const useHospiStore = create<HospiState>()(
             });
             imported += 1;
           });
+        } else if (kind === 'suppliers') {
+          const nextSuppliers = [...state.suppliers];
+          rows.forEach((row, index) => {
+            if (!row.name) {
+              errors.push(`Ligne ${index + 2}: nom fournisseur manquant`);
+              return;
+            }
+            const supplier: Supplier = {
+              id: row.id || `supplier-import-${Date.now()}-${index}`,
+              company_id: row.company_id || state.companies[0]?.id || 'comp-sartal-demo',
+              name: row.name,
+              phone: row.phone || '',
+              email: row.email || '',
+              address: row.address || '',
+              is_active: row.active !== 'false',
+              created_at: new Date().toISOString(),
+            };
+            const existingIndex = nextSuppliers.findIndex(item => item.id === supplier.id || item.name.toLowerCase() === supplier.name.toLowerCase());
+            if (existingIndex >= 0) nextSuppliers[existingIndex] = { ...nextSuppliers[existingIndex], ...supplier };
+            else nextSuppliers.push(supplier);
+            imported += 1;
+          });
+          set({ suppliers: nextSuppliers });
+        } else if (kind === 'rooms') {
+          const nextRooms = [...state.rooms];
+          rows.forEach((row, index) => {
+            if (!row.room_number) {
+              errors.push(`Ligne ${index + 2}: numéro de chambre manquant`);
+              return;
+            }
+            const siteId = row.site_id || state.sites[0]?.id || 'site-dakar';
+            if (!state.sites.some(site => site.id === siteId)) {
+              errors.push(`Ligne ${index + 2}: site introuvable`);
+              return;
+            }
+            const status = ['available', 'occupied', 'cleaning', 'maintenance'].includes(row.status) ? row.status as RoomStatus : 'available';
+            const room: Room = {
+              id: row.id || `room-import-${siteId}-${row.room_number}`,
+              site_id: siteId,
+              room_number: row.room_number,
+              room_type: row.room_type || 'Standard',
+              status,
+              created_at: new Date().toISOString(),
+            };
+            const existingIndex = nextRooms.findIndex(item => item.id === room.id || (item.site_id === room.site_id && item.room_number === room.room_number));
+            if (existingIndex >= 0) nextRooms[existingIndex] = { ...nextRooms[existingIndex], ...room };
+            else nextRooms.push(room);
+            imported += 1;
+          });
+          set({ rooms: nextRooms });
+        } else if (kind === 'customers') {
+          const nextAccounts = [...state.customerAccounts];
+          rows.forEach((row, index) => {
+            const name = row.display_name || row.name;
+            if (!name) {
+              errors.push(`Ligne ${index + 2}: nom client manquant`);
+              return;
+            }
+            const type = ['guest', 'corporate', 'vip', 'walk_in'].includes(row.type) ? row.type as CustomerAccountType : 'walk_in';
+            const account: CustomerAccount = {
+              id: row.id || `customer-import-${Date.now()}-${index}`,
+              company_id: row.company_id || state.companies[0]?.id || 'comp-sartal-demo',
+              display_name: name,
+              type,
+              phone: row.phone || '',
+              email: row.email || '',
+              credit_limit: Number(row.credit_limit) || 0,
+              balance: Number(row.balance) || 0,
+              is_active: row.active !== 'false',
+              created_at: new Date().toISOString(),
+            };
+            const existingIndex = nextAccounts.findIndex(item => item.id === account.id || item.display_name.toLowerCase() === account.display_name.toLowerCase());
+            if (existingIndex >= 0) nextAccounts[existingIndex] = { ...nextAccounts[existingIndex], ...account };
+            else nextAccounts.push(account);
+            imported += 1;
+          });
+          set({ customerAccounts: nextAccounts });
+        } else if (kind === 'stock') {
+          const nextStockLevels = [...state.stockLevels];
+          const nextLots = [...state.stockLots];
+          const nextMovements = [...state.stockMovements];
+          rows.forEach((row, index) => {
+            if (!row.product_id || !row.warehouse_id || row.quantity === undefined) {
+              errors.push(`Ligne ${index + 2}: product_id, warehouse_id ou quantity manquant`);
+              return;
+            }
+            const product = state.products.find(item => item.id === row.product_id || item.sku === row.product_id);
+            const warehouse = state.warehouses.find(item => item.id === row.warehouse_id);
+            if (!product || !warehouse) {
+              errors.push(`Ligne ${index + 2}: produit ou dépôt introuvable`);
+              return;
+            }
+            const quantity = Number(row.quantity) || 0;
+            const unit = row.unit || product.unit;
+            const existingIndex = nextStockLevels.findIndex(item => item.product_id === product.id && item.warehouse_id === warehouse.id);
+            const updatedAt = new Date().toISOString();
+            const level: StockLevel = {
+              id: existingIndex >= 0 ? nextStockLevels[existingIndex].id : `stock-import-${warehouse.id}-${product.id}`,
+              warehouse_id: warehouse.id,
+              product_id: product.id,
+              quantity,
+              unit,
+              alert_threshold: Number(row.threshold) || (existingIndex >= 0 ? nextStockLevels[existingIndex].alert_threshold : 0),
+              updated_at: updatedAt,
+            };
+            if (existingIndex >= 0) nextStockLevels[existingIndex] = level;
+            else nextStockLevels.push(level);
+            if (row.lot_number) {
+              nextLots.push({
+                id: `lot-import-${Date.now()}-${index}`,
+                warehouse_id: warehouse.id,
+                product_id: product.id,
+                lot_number: row.lot_number,
+                expires_at: row.expires_at || undefined,
+                quantity,
+                unit_cost: Number(row.unit_cost) || product.average_purchase_price || 0,
+                received_at: updatedAt,
+              });
+            }
+            nextMovements.push({
+              id: `move-import-${Date.now()}-${index}`,
+              company_id: state.companies[0]?.id || 'comp-sartal-demo',
+              site_id: warehouse.site_id,
+              warehouse_id: warehouse.id,
+              product_id: product.id,
+              movement_type: 'inventory_adjustment',
+              quantity,
+              reason: 'Import stock initial',
+              reference_type: 'csv_import',
+              reference_id: row.reference_id || 'admin-import',
+              created_by: createdBy,
+              created_at: updatedAt,
+            });
+            imported += 1;
+          });
+          set({ stockLevels: nextStockLevels, stockLots: nextLots, stockMovements: nextMovements });
         } else {
           errors.push('Import non encore automatisé pour ce type.');
         }
