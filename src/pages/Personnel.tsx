@@ -4,7 +4,7 @@ import { useStaffStore, type Employee } from '../stores/staffStore';
 import { useAuthStore } from '../stores/authStore';
 import { usePlanningStore, type ShiftType } from '../stores/planningStore';
 import { useHospiStore } from '../stores/hospiStore';
-import { getVisiblePOS, getVisibleSites, isDirection } from '../utils/accessControl';
+import { getVisiblePOS, getVisibleSites, isDirection, moduleForPOS } from '../utils/accessControl';
 import { Phone, ChevronLeft, ChevronRight, Plus, X, Sun, Moon, Clock, Users, RefreshCw, Check, AlertCircle, UserPlus, Trash2, QrCode } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -28,9 +28,59 @@ const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 const ROLE_GROUPS: Record<string, string[]> = {
   Salle: ['Serveur', 'Serveuse', 'Hôtesse', 'Barman'],
   Cuisine: ['Chef Cuisine', 'Second Cuisine', 'Commis', 'Plongeur', 'Plongeuse', 'Cuisinier'],
+  Hôtel: ['Réceptionniste', 'Gouvernante', 'Maintenance', 'Agent Mini-bar', 'Room Service'],
+  Casino: ['Barman', 'Croupier', 'Hôte Casino', 'Responsable Jeux'],
+  Spa: ['Praticienne Spa', 'Praticien Spa', 'Responsable Spa'],
+  Boutique: ['Vendeuse Boutique', 'Vendeur Boutique', 'Responsable Boutique'],
+  Stock: ['Stockiste', 'Acheteur', 'Réceptionnaire'],
   Livraison: ['Livreur', 'Livreur Indépendant'],
-  Management: ['Caissier', 'Gérant', 'Admin'],
+  Management: ['Caissier', 'Gérant', 'Admin', 'Direction générale', 'Manager Restaurant', 'Manager Hôtel', 'Manager Casino', 'Manager Spa', 'Responsable POS'],
 };
+
+type EmployeeModule = NonNullable<Employee['businessModules']>[number];
+type EmployeeHierarchy = 'direction' | 'site_manager' | 'business_manager' | 'pos_manager' | 'staff';
+
+const MODULE_OPTIONS: Array<{ id: EmployeeModule; label: string }> = [
+  { id: 'restaurant', label: 'Restaurant' },
+  { id: 'hotel', label: 'Hôtel' },
+  { id: 'casino', label: 'Casino' },
+  { id: 'spa', label: 'Spa' },
+  { id: 'boutique', label: 'Boutique' },
+  { id: 'stock', label: 'Stock' },
+  { id: 'delivery', label: 'Livraison' },
+];
+
+const HIERARCHY_OPTIONS: Array<{ id: EmployeeHierarchy; label: string; description: string; accessLevel: NonNullable<Employee['accessLevel']> }> = [
+  { id: 'direction', label: 'Direction', description: 'voit toute l’entreprise', accessLevel: 'direction' },
+  { id: 'site_manager', label: 'Gérant de site', description: 'voit un site complet', accessLevel: 'manager' },
+  { id: 'business_manager', label: 'Manager métier', description: 'voit une activité', accessLevel: 'manager' },
+  { id: 'pos_manager', label: 'Responsable POS', description: 'voit ses points de vente', accessLevel: 'supervisor' },
+  { id: 'staff', label: 'Salarié', description: 'voit son poste du jour', accessLevel: 'staff' },
+];
+
+const STAFF_ROLE_OPTIONS = [
+  'Chef Cuisine',
+  'Second Cuisine',
+  'Commis',
+  'Serveur',
+  'Serveuse',
+  'Réceptionniste',
+  'Gouvernante',
+  'Maintenance',
+  'Agent Mini-bar',
+  'Caissier',
+  'Barman',
+  'Croupier',
+  'Praticienne Spa',
+  'Vendeuse Boutique',
+  'Stockiste',
+  'Acheteur',
+  'Plongeur',
+  'Livreur',
+  'Livreur Indépendant',
+];
+
+const AVATAR_OPTIONS = ['👔', '🧑‍💼', '👨‍🍳', '👩‍🍳', '🧑‍🍳', '👩‍🍽️', '🧑‍🍽️', '💁‍♀️', '🛎️', '🧹', '🔧', '🍸', '🎲', '💆', '🛍️', '📦', '🧾', '🛵'];
 
 function getWeekDates(weekOffset: number): { label: string; date: string; isToday: boolean }[] {
   const now = new Date();
@@ -66,15 +116,23 @@ export default function Personnel() {
   const [newEmpRole, setNewEmpRole] = useState('Serveur');
   const [newEmpPhone, setNewEmpPhone] = useState('');
   const [newEmpAvatar, setNewEmpAvatar] = useState('🧑‍🍽️');
+  const [newEmpHierarchy, setNewEmpHierarchy] = useState<EmployeeHierarchy>('staff');
+  const [newEmpSiteId, setNewEmpSiteId] = useState('');
+  const [newEmpModule, setNewEmpModule] = useState<EmployeeModule>('restaurant');
+  const [newEmpPOSIds, setNewEmpPOSIds] = useState<string[]>([]);
+  const [newEmpShiftType, setNewEmpShiftType] = useState<ShiftType>('journee');
+  const [newEmpCreateShift, setNewEmpCreateShift] = useState(true);
   const [presenceFilter, setPresenceFilter] = useState('Tous');
   const [showQREmp, setShowQREmp] = useState<Employee | null>(null);
   const [personnelNotice, setPersonnelNotice] = useState('');
   const [shiftToRemove, setShiftToRemove] = useState<{ shiftId: string; employeeName: string; label: string } | null>(null);
   const [employeeToRemove, setEmployeeToRemove] = useState<Employee | null>(null);
 
-  const isManager = ['Admin', 'Gérant'].includes(user?.role || '');
-  const visibleSiteIds = getVisibleSites(user, sites).map(site => site.id);
-  const visiblePOSIds = getVisiblePOS(user, posList).map(pos => pos.id);
+  const isManager = isDirection(user) || ['site_manager', 'business_manager', 'pos_manager'].includes(user?.accessLevel || '') || ['Admin', 'Gérant'].includes(user?.role || '');
+  const visibleSites = getVisibleSites(user, sites);
+  const visiblePOS = getVisiblePOS(user, posList);
+  const visibleSiteIds = visibleSites.map(site => site.id);
+  const visiblePOSIds = visiblePOS.map(pos => pos.id);
   const scopedEmployees = employees.filter(emp => {
     if (isDirection(user)) return true;
     const empSites = emp.siteIds || [];
@@ -97,6 +155,7 @@ export default function Personnel() {
     spa: 'Spa',
     boutique: 'Boutique',
     stock: 'Stock',
+    delivery: 'Livraison',
     direction: 'Direction',
   };
 
@@ -119,11 +178,69 @@ export default function Personnel() {
     };
   };
 
-  const availableRoles = ['Tous', 'Salle', 'Cuisine', 'Livraison', 'Management'];
-  const filteredEmployees = useMemo(() => scopedEmployees.filter(e => {
+  const defaultSiteId = visibleSites[0]?.id || sites[0]?.id || '';
+  const defaultModule = (MODULE_OPTIONS.find(option => option.id !== 'direction' && (isDirection(user) || (user?.businessModules || []).includes(option.id)))?.id || 'restaurant') as EmployeeModule;
+  const selectableModules = MODULE_OPTIONS.filter(option => isDirection(user) || (user?.businessModules || []).includes(option.id));
+  const selectedHierarchy = HIERARCHY_OPTIONS.find(option => option.id === newEmpHierarchy) || HIERARCHY_OPTIONS[HIERARCHY_OPTIONS.length - 1];
+  const selectedSiteId = newEmpSiteId || defaultSiteId;
+  const posForNewEmployee = visiblePOS.filter(pos => {
+    const sameSite = !selectedSiteId || pos.site_id === selectedSiteId;
+    const sameModule = moduleForPOS(pos) === newEmpModule;
+    return sameSite && sameModule;
+  });
+  const selectedPOSNames = newEmpPOSIds
+    .map(posId => posList.find(pos => pos.id === posId)?.name)
+    .filter(Boolean);
+
+  const resetNewEmployeeForm = () => {
+    setNewEmpName('');
+    setNewEmpPhone('');
+    setNewEmpRole('Serveur');
+    setNewEmpAvatar('🧑‍🍽️');
+    setNewEmpHierarchy('staff');
+    setNewEmpSiteId(defaultSiteId);
+    setNewEmpModule(defaultModule);
+    setNewEmpPOSIds([]);
+    setNewEmpShiftType('journee');
+    setNewEmpCreateShift(true);
+  };
+
+  const toggleNewEmpPOS = (posId: string) => {
+    setNewEmpPOSIds(current => current.includes(posId) ? current.filter(id => id !== posId) : [...current, posId]);
+  };
+
+  const getRoleFromHierarchy = () => {
+    if (newEmpHierarchy === 'direction') return 'Direction générale';
+    if (newEmpHierarchy === 'site_manager') return 'Gérant';
+    if (newEmpHierarchy === 'business_manager') return `Manager ${moduleLabels[newEmpModule] || 'métier'}`;
+    if (newEmpHierarchy === 'pos_manager') return 'Responsable POS';
+    return newEmpRole;
+  };
+
+  const getModulesFromHierarchy = (): EmployeeModule[] => {
+    if (newEmpHierarchy === 'direction') return ['direction', 'restaurant', 'hotel', 'casino', 'spa', 'boutique', 'stock'];
+    if (newEmpHierarchy === 'site_manager') return selectableModules.map(option => option.id).filter(module => module !== 'delivery');
+    return [newEmpModule];
+  };
+
+  const getSitesFromHierarchy = () => {
+    if (newEmpHierarchy === 'direction') return visibleSiteIds.length > 0 ? visibleSiteIds : sites.map(site => site.id);
+    return selectedSiteId ? [selectedSiteId] : [];
+  };
+
+  const getPOSFromHierarchy = () => {
+    if (newEmpHierarchy === 'pos_manager' || newEmpHierarchy === 'staff') {
+      if (newEmpPOSIds.length > 0) return newEmpPOSIds;
+      return posForNewEmployee[0]?.id ? [posForNewEmployee[0].id] : [];
+    }
+    return [];
+  };
+
+  const availableRoles = ['Tous', ...Object.keys(ROLE_GROUPS)];
+  const filteredEmployees = scopedEmployees.filter(e => {
     if (roleFilter === 'Tous') return true;
     return ROLE_GROUPS[roleFilter]?.includes(e.role);
-  }), [scopedEmployees, roleFilter]);
+  });
 
   const getShifts = (empId: string, date: string) => {
     return shifts.filter(s => s.employeeId === empId && s.date === date);
@@ -162,7 +279,7 @@ export default function Personnel() {
           <p className="text-text-secondary text-xs uppercase tracking-widest font-bold">{scopedEmployees.length} salariés visibles</p>
         </div>
         {isManager && (
-          <button onClick={() => { setShowAddEmployee(true); setNewEmpName(''); setNewEmpPhone(''); setNewEmpRole('Serveur'); setNewEmpAvatar('🧑‍🍽️'); }}
+          <button onClick={() => { resetNewEmployeeForm(); setShowAddEmployee(true); }}
             className="w-10 h-10 rounded-xl bg-orange flex items-center justify-center text-white active:scale-90 transition-transform shadow-lg shadow-orange/20">
             <UserPlus size={18} />
           </button>
@@ -778,14 +895,139 @@ export default function Personnel() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" onClick={() => setShowAddEmployee(false)}>
             <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="modal-sheet" onClick={e => e.stopPropagation()}>
               <div className="modal-handle" />
-              <h3 className="text-white font-black text-xl mb-6 text-center">Nouveau Salarié</h3>
+              <h3 className="text-white font-black text-xl mb-2 text-center">Nouveau salarié</h3>
+              <p className="text-text-tertiary text-xs text-center mb-6">Affectation, droits et premier service</p>
               
               <div className="space-y-5">
-                {/* Avatar picker */}
+                <div>
+                  <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-3 block">Niveau dans la hiérarchie</label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {HIERARCHY_OPTIONS.map(option => (
+                      <button
+                        key={option.id}
+                        onClick={() => {
+                          setNewEmpHierarchy(option.id);
+                          if (option.id === 'direction') setNewEmpPOSIds([]);
+                        }}
+                        className={`p-3 rounded-2xl border text-left transition-all ${newEmpHierarchy === option.id ? 'bg-orange/15 border-orange/60 text-white' : 'bg-white/5 border-white/10 text-text-secondary'}`}
+                      >
+                        <span className="text-xs font-black uppercase block">{option.label}</span>
+                        <span className="text-[10px] font-bold opacity-70">{option.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {newEmpHierarchy !== 'direction' && (
+                  <div>
+                    <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-3 block">Site</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {visibleSites.map(site => (
+                        <button
+                          key={site.id}
+                          onClick={() => { setNewEmpSiteId(site.id); setNewEmpPOSIds([]); }}
+                          className={`p-3 rounded-xl text-left border transition-all ${selectedSiteId === site.id ? 'bg-blue/15 border-blue/60 text-white' : 'bg-white/5 border-white/10 text-text-tertiary'}`}
+                        >
+                          <span className="text-[10px] font-black uppercase block">{site.name}</span>
+                          <span className="text-[9px] font-bold opacity-70">{site.city}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {newEmpHierarchy !== 'direction' && (
+                  <div>
+                    <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-3 block">Métier</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {selectableModules.map(option => (
+                        <button
+                          key={option.id}
+                          onClick={() => { setNewEmpModule(option.id); setNewEmpPOSIds([]); }}
+                          className={`py-3 rounded-xl text-[9px] font-black uppercase transition-all ${newEmpModule === option.id ? 'bg-purple text-white shadow-lg shadow-purple/20' : 'bg-white/5 text-text-tertiary'}`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(newEmpHierarchy === 'pos_manager' || newEmpHierarchy === 'staff') && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest block">Points de vente</label>
+                      {posForNewEmployee.length > 0 && (
+                        <button
+                          onClick={() => setNewEmpPOSIds(posForNewEmployee.map(pos => pos.id))}
+                          className="text-orange text-[9px] font-black uppercase"
+                        >
+                          Tout sélectionner
+                        </button>
+                      )}
+                    </div>
+                    {posForNewEmployee.length > 0 ? (
+                      <div className="grid grid-cols-1 gap-2">
+                        {posForNewEmployee.map(pos => (
+                          <button
+                            key={pos.id}
+                            onClick={() => toggleNewEmpPOS(pos.id)}
+                            className={`p-3 rounded-xl border text-left transition-all ${newEmpPOSIds.includes(pos.id) ? 'bg-green/15 border-green/60 text-white' : 'bg-white/5 border-white/10 text-text-tertiary'}`}
+                          >
+                            <span className="text-xs font-black block">{pos.name}</span>
+                            <span className="text-[9px] font-bold uppercase opacity-70">{moduleLabels[moduleForPOS(pos)] || pos.type}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-text-tertiary text-xs font-bold">
+                        Aucun point de vente trouvé pour ce site et ce métier. Le salarié sera rattaché au site.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                  <p className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-3">Résumé des accès</p>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between gap-3">
+                      <span className="text-text-tertiary">Responsabilité</span>
+                      <span className="text-white font-black text-right">{selectedHierarchy.label}</span>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <span className="text-text-tertiary">Site</span>
+                      <span className="text-white font-black text-right">
+                        {newEmpHierarchy === 'direction' ? 'Tous les sites' : (sites.find(site => site.id === selectedSiteId)?.name || 'À choisir')}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <span className="text-text-tertiary">Métier</span>
+                      <span className="text-white font-black text-right">
+                        {newEmpHierarchy === 'direction' ? 'Tous les métiers' : (moduleLabels[newEmpModule] || newEmpModule)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <span className="text-text-tertiary">POS visibles</span>
+                      <span className="text-white font-black text-right">
+                        {newEmpHierarchy === 'direction' || newEmpHierarchy === 'site_manager' || newEmpHierarchy === 'business_manager'
+                          ? 'Selon le périmètre'
+                          : selectedPOSNames.length > 0 ? selectedPOSNames.join(', ') : (posForNewEmployee[0]?.name || 'Site uniquement')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Nom complet</label>
+                  <input type="text" value={newEmpName} onChange={e => setNewEmpName(e.target.value)}
+                    placeholder="Ex: Ousmane Thiam"
+                    className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-orange/50" />
+                </div>
+
                 <div>
                   <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-3 block">Avatar</label>
                   <div className="flex gap-2 flex-wrap">
-                    {['👨‍🍳', '👩‍🍳', '🧑‍🍳', '👩‍🍽️', '🧑‍🍽️', '🧑‍💼', '💁‍♀️', '🍸', '🛵', '👩', '🧑'].map(av => (
+                    {AVATAR_OPTIONS.map(av => (
                       <button key={av} onClick={() => setNewEmpAvatar(av)}
                         className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition-all ${newEmpAvatar === av ? 'bg-orange shadow-lg shadow-orange/30 scale-110' : 'bg-white/5'}`}>
                         {av}
@@ -794,35 +1036,31 @@ export default function Personnel() {
                   </div>
                 </div>
 
-                    {/* Name */}
-                <div>
-                  <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Nom complet</label>
-                  <input type="text" value={newEmpName} onChange={e => setNewEmpName(e.target.value)}
-                    placeholder="Ex: Ousmane Thiam"
-                    className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-orange/50" />
-                </div>
-
-                {/* Role */}
                 <div>
                   <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Poste</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['Chef Cuisine', 'Second Cuisine', 'Commis', 'Serveur', 'Serveuse', 'Hôtesse', 'Caissier', 'Barman', 'Plongeur', 'Livreur', 'Livreur Indépendant'].map(r => (
-                      <button key={r} onClick={() => setNewEmpRole(r)}
-                        className={`py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${newEmpRole === r ? 'bg-orange text-white' : 'bg-white/5 text-text-tertiary'}`}>
-                        {r}
-                      </button>
-                    ))}
-                  </div>
+                  {newEmpHierarchy === 'staff' ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {STAFF_ROLE_OPTIONS.map(r => (
+                        <button key={r} onClick={() => setNewEmpRole(r)}
+                          className={`py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${newEmpRole === r ? 'bg-orange text-white' : 'bg-white/5 text-text-tertiary'}`}>
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-orange/10 border border-orange/20 text-orange text-xs font-black">
+                      Poste créé automatiquement : {getRoleFromHierarchy()}
+                    </div>
+                  )}
                 </div>
 
-                {newEmpRole === 'Livreur Indépendant' && (
+                {getRoleFromHierarchy() === 'Livreur Indépendant' && (
                   <div className="p-3 bg-blue/10 border border-blue/20 rounded-xl flex gap-3 text-blue text-xs items-start">
                     <AlertCircle size={14} className="shrink-0 mt-0.5" />
                     <p>Un "Lien Magique" (QR) sera généré. Le livreur y verra ses courses et ses frais sans compte complet.</p>
                   </div>
                 )}
 
-                {/* Phone */}
                 <div>
                   <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest mb-2 block">Téléphone</label>
                   <input type="tel" value={newEmpPhone} onChange={e => setNewEmpPhone(e.target.value)}
@@ -830,31 +1068,68 @@ export default function Personnel() {
                     className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-orange/50" />
                 </div>
 
-                {/* Submit */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-text-tertiary text-[9px] font-black uppercase tracking-widest block">Premier service</label>
+                    <button
+                      onClick={() => setNewEmpCreateShift(value => !value)}
+                      className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase ${newEmpCreateShift ? 'bg-green/15 text-green' : 'bg-white/5 text-text-tertiary'}`}
+                    >
+                      {newEmpCreateShift ? 'Planifier' : 'Plus tard'}
+                    </button>
+                  </div>
+                  {newEmpCreateShift && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {Object.entries(shiftConfig).filter(([key]) => key !== 'repos').map(([key, cfg]) => (
+                        <button
+                          key={key}
+                          onClick={() => setNewEmpShiftType(key as ShiftType)}
+                          className={`p-3 rounded-xl border transition-all ${newEmpShiftType === key ? 'border-white/40' : 'border-white/10'}`}
+                          style={{ background: newEmpShiftType === key ? cfg.bg : 'rgba(255,255,255,0.05)' }}
+                        >
+                          <cfg.icon size={16} style={{ color: cfg.color }} className="mx-auto mb-1" />
+                          <span className="text-[9px] font-black uppercase block" style={{ color: cfg.color }}>{cfg.short}</span>
+                          <span className="text-[8px] text-text-tertiary font-bold">{cfg.hours}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <button
                   onClick={() => {
                     if (!newEmpName.trim()) return;
-                    addEmployee({
-                      name: newEmpName.trim(),
-                      role: newEmpRole,
+                    const employeeName = newEmpName.trim();
+                    const employeeRole = getRoleFromHierarchy();
+                    const employee = addEmployee({
+                      name: employeeName,
+                      role: employeeRole,
                       phone: newEmpPhone || '00 000 00 00',
                       avatar: newEmpAvatar,
-                      schedule: 'À planifier',
-                      status: 'repos',
-                      siteIds: user?.siteIds,
-                      posIds: user?.posIds,
-                      businessModules: user?.businessModules as Employee['businessModules'],
-                      accessLevel: 'staff',
+                      schedule: newEmpCreateShift ? shiftConfig[newEmpShiftType].hours : 'À planifier',
+                      status: newEmpCreateShift ? 'present' : 'repos',
+                      siteIds: getSitesFromHierarchy(),
+                      posIds: getPOSFromHierarchy(),
+                      businessModules: getModulesFromHierarchy(),
+                      accessLevel: selectedHierarchy.accessLevel,
                     });
+                    if (newEmpCreateShift) {
+                      addShift({
+                        employeeId: employee.id,
+                        date: todayStr,
+                        type: newEmpShiftType,
+                        hours: shiftConfig[newEmpShiftType].hours,
+                      });
+                    }
                     setShowAddEmployee(false);
-                    setPersonnelNotice(newEmpRole === 'Livreur Indépendant'
-                      ? `Lien magique généré pour ${newEmpName.trim()}.`
-                      : `${newEmpName.trim()} ajouté à l'équipe visible.`
+                    setPersonnelNotice(employeeRole === 'Livreur Indépendant'
+                      ? `Lien magique généré pour ${employeeName}.`
+                      : `${employeeName} ajouté avec son périmètre ${selectedHierarchy.label}.`
                     );
                   }}
                   disabled={!newEmpName.trim()}
                   className="w-full py-4 rounded-2xl bg-orange text-white font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-transform disabled:opacity-30 shadow-lg shadow-orange/20">
-                  <UserPlus size={18} /> {newEmpRole === 'Livreur Indépendant' ? 'Ajouter & Générer Lien' : 'Ajouter à l\'équipe'}
+                  <UserPlus size={18} /> {getRoleFromHierarchy() === 'Livreur Indépendant' ? 'Ajouter & Générer Lien' : 'Ajouter à l\'équipe'}
                 </button>
               </div>
             </motion.div>

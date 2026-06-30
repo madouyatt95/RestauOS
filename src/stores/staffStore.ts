@@ -17,7 +17,7 @@ export interface Employee {
 
 interface StaffState {
   employees: Employee[];
-  addEmployee: (emp: Omit<Employee, 'id'>) => void;
+  addEmployee: (emp: Omit<Employee, 'id'>) => Employee;
   updateStatus: (id: string, status: Employee['status']) => void;
   removeEmployee: (id: string) => void;
 }
@@ -54,9 +54,13 @@ export const useStaffStore = create<StaffState>()(
         { id: 'e14', name: 'Lamine Niang', role: 'Livreur', phone: '76 555 88 99', avatar: '🛵', schedule: '11:00 - 16:00', status: 'present', siteIds: ['site-saly'], posIds: ['pos-saly-bar'], businessModules: ['delivery', 'restaurant'], accessLevel: 'staff' },
       ],
 
-      addEmployee: (emp) => set((s) => ({
-        employees: [...s.employees, { ...emp, id: `e-${Date.now()}` }]
-      })),
+      addEmployee: (emp) => {
+        const employee = { ...emp, id: `e-${Date.now()}` };
+        set((s) => ({
+          employees: [...s.employees, employee]
+        }));
+        return employee;
+      },
 
       updateStatus: (id, status) => set((s) => ({
         employees: s.employees.map(e => e.id === id ? { ...e, status } : e)
